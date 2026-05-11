@@ -1,10 +1,8 @@
 import React, { useState } from 'react';
-import NEXUS_DATA from '../data';
 import Icon from '../icons';
 import { PageHeader, Pill, Tabs } from '../components';
 
-const EquipmentPage = () => {
-  const D = NEXUS_DATA;
+const EquipmentPage = ({ data: D }) => {
   const [tab, setTab] = useState("register");
   const [filter, setFilter] = useState("all");
 

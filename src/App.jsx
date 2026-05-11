@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import NEXUS_DATA from './data';
+import { useNexusData } from './NexusDataContext';
 import { Sidebar, Topbar, Drawer } from './components';
 import { useTweaks, TweaksPanel, TweakSection, TweakRadio } from './tweaks-panel';
 import HomePage from './pages/page-home';
@@ -31,14 +31,14 @@ const App = () => {
 
   const goTo = (r) => { setRoute(r); window.scrollTo({ top: 0 }); };
 
-  const D = NEXUS_DATA;
-  const badges = {
-    tasks: D.tasks.filter(t => t.priority === 'critical').length || null,
-    acc: D.complianceBySection.reduce((s,x) => s + x.nc, 0) || null,
-    studies: D.studies.filter(s => s.status === 'Awaiting sign-off').length || null,
-    equipment: D.equipment.filter(e => e.verifyStatus === 'bad').length || null,
+  const { data, loading, error } = useNexusData();
+  const badges = data ? {
+    tasks: data.tasks.filter(t => t.priority === 'critical').length || null,
+    acc: data.complianceBySection.reduce((s,x) => s + x.nc, 0) || null,
+    studies: data.studies.filter(s => s.status === 'Awaiting sign-off').length || null,
+    equipment: data.equipment.filter(e => e.verifyStatus === 'bad').length || null,
     ncr: 7,
-  };
+  } : {};
 
   const crumbsFor = {
     home: ["Home"],
@@ -56,20 +56,32 @@ const App = () => {
 
   const renderPage = () => {
     switch (route) {
-      case "home": return <HomePage goTo={goTo} openClause={setOpenClauseId} />;
-      case "tasks": return <TasksPage />;
-      case "accreditation": return <AccreditationPage openClause={setOpenClauseId} />;
-      case "indicators": return <IndicatorsPage />;
-      case "studies": return <StudiesPage openStudy={setOpenStudyId} />;
-      case "equipment": return <EquipmentPage />;
+      case "home": return <HomePage data={data} goTo={goTo} openClause={setOpenClauseId} />;
+      case "tasks": return <TasksPage data={data} />;
+      case "accreditation": return <AccreditationPage data={data} openClause={setOpenClauseId} />;
+      case "indicators": return <IndicatorsPage data={data} />;
+      case "studies": return <StudiesPage data={data} openStudy={setOpenStudyId} />;
+      case "equipment": return <EquipmentPage data={data} />;
       case "documents": return <DocumentsPage />;
       case "audits": return <AuditsPage />;
       case "ncr": return <NCRPage />;
       case "staff": return <StaffPage />;
       case "settings": return <SettingsPage />;
-      default: return <HomePage goTo={goTo} openClause={setOpenClauseId} />;
+      default: return <HomePage data={data} goTo={goTo} openClause={setOpenClauseId} />;
     }
   };
+
+  if (loading) return (
+    <div style={{ display: 'grid', placeItems: 'center', height: '100vh', fontSize: 14, color: 'var(--ink-3)' }}>
+      Loading…
+    </div>
+  );
+
+  if (error) return (
+    <div style={{ display: 'grid', placeItems: 'center', height: '100vh', fontSize: 14, color: 'var(--bad)' }}>
+      Could not reach API — is the backend running? ({error})
+    </div>
+  );
 
   return (
     <div className="shell" data-density={tweaks.density}>
@@ -80,11 +92,11 @@ const App = () => {
       </div>
 
       <Drawer open={!!openClauseId} onClose={() => setOpenClauseId(null)}>
-        <ClauseDrawer clauseId={openClauseId} onClose={() => setOpenClauseId(null)} />
+        <ClauseDrawer data={data} clauseId={openClauseId} onClose={() => setOpenClauseId(null)} />
       </Drawer>
 
       <Drawer open={!!openStudyId} onClose={() => setOpenStudyId(null)}>
-        <StudyDrawer studyId={openStudyId} onClose={() => setOpenStudyId(null)} />
+        <StudyDrawer data={data} studyId={openStudyId} onClose={() => setOpenStudyId(null)} />
       </Drawer>
 
       <TweaksPanel title="Tweaks">

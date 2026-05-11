@@ -1,5 +1,4 @@
 import React from 'react';
-import NEXUS_DATA from '../data';
 import Icon from '../icons';
 import { PageHeader, Pill } from '../components';
 
@@ -28,8 +27,7 @@ export const StubPage = ({ title, eyebrow, subtitle, icon, items }) => (
   </div>
 );
 
-export const TasksPage = () => {
-  const D = NEXUS_DATA;
+export const TasksPage = ({ data: D }) => {
   return (
     <div className="page page-wide">
       <PageHeader eyebrow="Workspace" title="My tasks" subtitle="All compliance work assigned to you" />

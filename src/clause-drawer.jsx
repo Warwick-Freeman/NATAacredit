@@ -1,12 +1,10 @@
 import React from 'react';
-import NEXUS_DATA from './data';
 import Icon from './icons';
 import { Avatar, StatusPill } from './components';
 
-const ClauseDrawer = ({ clauseId, onClose }) => {
-  const D = NEXUS_DATA;
-  if (!clauseId) return null;
-  const clause = D.clauses.find(c => c.id === clauseId) || {
+const ClauseDrawer = ({ data, clauseId, onClose }) => {
+  if (!clauseId || !data) return null;
+  const clause = data.clauses.find(c => c.id === clauseId) || {
     id: clauseId, title: "Clause detail", section: clauseId.split(".").slice(0, 2).join("."),
     status: "compliant", evidence: 0, lastReviewed: "—", owner: "—"
   };

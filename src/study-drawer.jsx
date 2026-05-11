@@ -1,12 +1,10 @@
 import React from 'react';
-import NEXUS_DATA from './data';
 import Icon from './icons';
 import { Pill, Avatar } from './components';
 
-const StudyDrawer = ({ studyId, onClose }) => {
-  const D = NEXUS_DATA;
-  if (!studyId) return null;
-  const study = D.studies.find(s => s.id === studyId);
+const StudyDrawer = ({ data, studyId, onClose }) => {
+  if (!studyId || !data) return null;
+  const study = data.studies.find(s => s.id === studyId);
   if (!study) return null;
 
   return (

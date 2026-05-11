@@ -1,10 +1,8 @@
 import React, { useState } from 'react';
-import NEXUS_DATA from '../data';
 import Icon from '../icons';
 import { PageHeader, Donut, Tabs, Pill, StatusPill } from '../components';
 
-const AccreditationPage = ({ openClause }) => {
-  const D = NEXUS_DATA;
+const AccreditationPage = ({ data: D, openClause }) => {
   const [filter, setFilter] = useState("all");
   const [openSection, setOpenSection] = useState("5.3");
   const [tab, setTab] = useState("clauses");

@@ -1,10 +1,8 @@
 import React from 'react';
-import NEXUS_DATA from '../data';
 import Icon from '../icons';
 import { PageHeader, Pill, Avatar, Donut } from '../components';
 
-const HomePage = ({ goTo, openClause }) => {
-  const D = NEXUS_DATA;
+const HomePage = ({ data: D, goTo, openClause }) => {
   const totalClauses = D.complianceBySection.reduce((s, x) => s + x.total, 0);
   const totalCompliant = D.complianceBySection.reduce((s, x) => s + x.compliant, 0);
   const totalPartial = D.complianceBySection.reduce((s, x) => s + x.partial, 0);

@@ -1,10 +1,8 @@
 import React, { useState } from 'react';
-import NEXUS_DATA from '../data';
 import Icon from '../icons';
 import { PageHeader, Pill, Avatar, Tabs } from '../components';
 
-const StudiesPage = ({ openStudy }) => {
-  const D = NEXUS_DATA;
+const StudiesPage = ({ data: D, openStudy }) => {
   const [tab, setTab] = useState("queue");
   const [filter, setFilter] = useState("all");
 

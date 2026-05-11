@@ -1,10 +1,8 @@
 import React, { useState } from 'react';
-import NEXUS_DATA from '../data';
 import Icon from '../icons';
 import { PageHeader, Pill, Avatar, Sparkline } from '../components';
 
-const IndicatorsPage = () => {
-  const D = NEXUS_DATA;
+const IndicatorsPage = ({ data: D }) => {
   const [phase, setPhase] = useState("all");
   const [period, setPeriod] = useState("12m");
 
