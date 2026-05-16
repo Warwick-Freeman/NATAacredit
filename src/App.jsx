@@ -124,7 +124,7 @@ const App = () => {
       case "tasks": return <TasksPage />;
       case "accreditation": return <AccreditationPage data={data} openClause={setOpenClauseId} />;
       case "indicators": return <IndicatorsPage data={data} />;
-      case "patients": return <PatientsPage />;
+      case "patients": return <PatientsPage openStudy={setOpenStudyId} />;
       case "studies": return <StudiesPage data={data} openStudy={setOpenStudyId} />;
       case "equipment": return <EquipmentPage />;
       case "documents": return <DocumentsPage />;

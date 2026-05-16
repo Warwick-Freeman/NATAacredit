@@ -4,29 +4,32 @@ import { PageHeader, Pill, Avatar, Tabs, Drawer } from '../components';
 import { useLocation } from '../LocationContext';
 import { useTaskContext } from '../TaskContext';
 import { useAuth } from '../AuthContext';
+import { useNexusData } from '../NexusDataContext';
 import { DME_PROVIDERS, DX_LIST, initDxFromDiagnoses, generateOrderHtml } from '../dme-order';
 
 // ─── seed data ────────────────────────────────────────────────────────────────
 
 const SEED_PATIENTS = [
+  // Matches study PSG-2026-0441 (Awaiting sign-off, Dr. R. Okafor)
   {
-    id: 'PAT-001', initials: 'JR', name: 'J. Reynolds', dob: '1965-03-15', age: 61, sex: 'M',
+    id: 'PAT-001', initials: 'RK', name: 'R. Kingston', dob: '1974-06-12', age: 51, sex: 'M',
     mrn: 'MRN-4412', site: 'Riverside Main Lab',
     referrer: 'Dr. H. Williams (GP)', physician: 'Dr. R. Okafor',
     diagnoses: ['Severe OSA (AHI 42.3/h)', 'Hypertension', 'Type 2 DM'],
     status: 'active',
     treatment: {
-      type: 'CPAP', provider: 'resmed', device: 'ResMed AirSense 11',
+      type: 'CPAP', provider: 'resmed', device: 'ResMed AirSense 11 AutoSet',
       serial: 'RS-24-7734821', startDate: '2024-09-12',
       prescription: { mode: 'APAP', pMin: 8, pMax: 12, mask: 'ResMed AirFit F20 (Full face)', humidifier: 'Auto' },
     },
     nextReview: '2026-07-20',
-    studies: ['PSG-2024-018', 'HSAT-2024-009'],
+    studies: ['PSG-2024-018', 'PSG-2026-0441'],
     alerts: ['Compliance 61% — below 70% Medicare threshold'],
     compliance: { rate: 61, meanUsage: 4.1, meanAhi: 3.2, p90Pressure: 10.4, meanLeak: 12, lastSync: '2026-05-15' },
   },
+  // Matches study PSG-2026-0440 (Awaiting sign-off, SLA critical, Dr. R. Okafor)
   {
-    id: 'PAT-002', initials: 'AL', name: 'A. Laurent', dob: '1978-11-22', age: 47, sex: 'F',
+    id: 'PAT-002', initials: 'TN', name: 'T. Nguyen', dob: '1989-09-03', age: 36, sex: 'M',
     mrn: 'MRN-4387', site: 'Riverside Main Lab',
     referrer: 'Dr. K. Cheng (Cardiologist)', physician: 'Dr. R. Okafor',
     diagnoses: ['Moderate OSA (AHI 18.7/h)', 'Obesity BMI 33.2'],
@@ -37,12 +40,13 @@ const SEED_PATIENTS = [
       prescription: { mode: 'APAP', pMin: 6, pMax: 10, mask: 'ResMed AirFit N30i (Nasal cradle)', humidifier: 'Auto' },
     },
     nextReview: '2026-08-03',
-    studies: ['PSG-2025-003'],
+    studies: ['PSG-2025-003', 'PSG-2026-0440'],
     alerts: [],
     compliance: { rate: 89, meanUsage: 6.8, meanAhi: 1.4, p90Pressure: 8.8, meanLeak: 6, lastSync: '2026-05-15' },
   },
+  // Matches study PSG-2026-0438 (Preliminary, Split-night PSG/CPAP, Dr. R. Okafor)
   {
-    id: 'PAT-003', initials: 'MK', name: 'M. Kowalski', dob: '1952-07-08', age: 73, sex: 'M',
+    id: 'PAT-003', initials: 'DM', name: 'D. Mitchell', dob: '1955-04-08', age: 71, sex: 'M',
     mrn: 'MRN-4301', site: 'Riverside Main Lab',
     referrer: 'Dr. P. Nguyen (Cardiologist)', physician: 'Dr. R. Okafor',
     diagnoses: ['Severe OSA (AHI 58.1/h)', 'Atrial fibrillation', 'CHF (EF 45%)'],
@@ -53,24 +57,26 @@ const SEED_PATIENTS = [
       prescription: { mode: 'Auto BiPAP', ipap: 14, epap: 8, mask: 'Philips DreamWear Full Face', humidifier: 'Heated tube' },
     },
     nextReview: '2026-06-18',
-    studies: ['PSG-2023-041', 'PSG-2023-055'],
+    studies: ['PSG-2023-041', 'PSG-2023-055', 'PSG-2026-0438'],
     alerts: ['Review date approaching — 33 days'],
     compliance: { rate: 94, meanUsage: 7.2, meanAhi: 2.8, p90Pressure: null, meanLeak: 9, lastSync: '2026-05-14' },
   },
+  // Matches study PSG-2026-0439 (Scoring, Paediatric PSG, Dr. L. Hartono)
   {
-    id: 'PAT-004', initials: 'ST', name: 'S. Tran', dob: '2016-04-21', age: 8, sex: 'F',
+    id: 'PAT-004', initials: 'LW', name: 'L. Walsh', dob: '2012-02-14', age: 14, sex: 'F',
     mrn: 'MRN-4455', site: 'Eastside Paediatric Lab',
     referrer: 'Dr. M. Fisher (Paediatric ENT)', physician: 'Dr. L. Hartono',
     diagnoses: ['Paediatric OSA — post-adenotonsillectomy monitoring'],
     status: 'monitoring',
     treatment: null,
     nextReview: '2026-09-10',
-    studies: ['PSG-2026-011'],
+    studies: ['PSG-2026-0439'],
     alerts: [],
     compliance: null,
   },
+  // Matches study MSLT-2026-0031 (Awaiting sign-off, MSLT, Dr. R. Okafor)
   {
-    id: 'PAT-005', initials: 'DC', name: 'D. Campbell', dob: '1991-08-14', age: 34, sex: 'M',
+    id: 'PAT-005', initials: 'SC', name: 'S. Carter', dob: '1998-07-17', age: 27, sex: 'F',
     mrn: 'MRN-4398', site: 'Riverside Main Lab',
     referrer: 'Dr. J. Park (Neurologist)', physician: 'Dr. R. Okafor',
     diagnoses: ['Narcolepsy Type 1 (CSF hypocretin <110 pg/mL)', 'Cataplexy confirmed'],
@@ -80,52 +86,51 @@ const SEED_PATIENTS = [
       prescription: { mode: 'Modafinil 200mg mane + Sodium oxybate 4.5g nocte', mask: null },
     },
     nextReview: '2026-07-01',
-    studies: ['MSLT-2025-002', 'PSG-2025-008'],
+    studies: ['PSG-2025-008', 'MSLT-2026-0031'],
     alerts: [],
     compliance: null,
   },
+  // Matches study HSAT-2026-0218 (Scoring, Type 3 HSAT, Dr. F. Liu, Home Service)
   {
-    id: 'PAT-006', initials: 'RM', name: 'R. Morrison', dob: '1958-12-03', age: 67, sex: 'F',
-    mrn: 'MRN-4471', site: 'Riverside Main Lab',
-    referrer: 'Dr. S. Adams (GP)', physician: 'Dr. R. Okafor',
-    diagnoses: ['Severe OSA (AHI 37.4/h)', 'Hypothyroidism'],
-    status: 'active',
-    treatment: {
-      type: 'CPAP', provider: 'fp', device: 'Fisher & Paykel SleepStyle 650',
-      serial: 'FP-26-3301122', startDate: '2026-03-10',
-      prescription: { mode: 'APAP', pMin: 7, pMax: 14, mask: 'F&P Evora Full Face', humidifier: 'Integrated' },
-    },
-    nextReview: '2026-09-10',
-    studies: ['PSG-2026-004'],
-    alerts: [],
-    compliance: { rate: 72, meanUsage: 5.1, meanAhi: 4.8, p90Pressure: 11.2, meanLeak: 18, lastSync: '2026-05-13' },
-  },
-  {
-    id: 'PAT-007', initials: 'AB', name: 'A. Bergström', dob: '1969-05-30', age: 56, sex: 'M',
-    mrn: 'MRN-4329', site: 'Riverside Main Lab',
-    referrer: 'Dr. K. Cheng (Cardiologist)', physician: 'Dr. R. Okafor',
-    diagnoses: ['Central Sleep Apnea (complex)', 'HFrEF (EF 38%)', 'Cheyne-Stokes respiration'],
-    status: 'active',
-    treatment: {
-      type: 'ASV', provider: 'resmed', device: 'ResMed AirCurve 10 CS Pacewave',
-      serial: 'RS-23-6612441', startDate: '2023-11-14',
-      prescription: { mode: 'ASV Auto', ipapMax: 25, epap: 5, mask: 'ResMed AirFit F20', humidifier: 'Auto' },
-    },
-    nextReview: '2026-08-14',
-    studies: ['PSG-2023-089', 'PSG-2024-031'],
-    alerts: [],
-    compliance: { rate: 88, meanUsage: 7.0, meanAhi: 1.9, p90Pressure: null, meanLeak: 8, lastSync: '2026-05-15' },
-  },
-  {
-    id: 'PAT-008', initials: 'HW', name: 'H. Walsh', dob: '1980-02-18', age: 46, sex: 'F',
-    mrn: 'MRN-4489', site: 'Home Service – North',
-    referrer: 'Dr. T. Brown (GP)', physician: 'Dr. L. Hartono',
-    diagnoses: ['Suspected OSA — pending study', 'Epworth Sleepiness Scale 17/24'],
+    id: 'PAT-006', initials: 'PB', name: 'P. Brown', dob: '1968-11-22', age: 57, sex: 'F',
+    mrn: 'MRN-4471', site: 'Home Service – North',
+    referrer: 'Dr. S. Adams (GP)', physician: 'Dr. F. Liu',
+    diagnoses: ['Suspected OSA (Epworth 16/24)', 'Hypothyroidism', 'Obesity BMI 31.4'],
     status: 'awaiting-study',
     treatment: null,
     nextReview: null,
-    studies: [],
-    alerts: ['In-home study scheduled 2026-05-28'],
+    studies: ['HSAT-2026-0218'],
+    alerts: ['HSAT-2026-0218 in scoring — report pending'],
+    compliance: null,
+  },
+  // Matches study PSG-2026-0437 (Final, signed Dr. F. Liu, 7 days)
+  {
+    id: 'PAT-007', initials: 'AP', name: 'A. Park', dob: '1971-01-29', age: 55, sex: 'M',
+    mrn: 'MRN-4329', site: 'Eastside Paediatric Lab',
+    referrer: 'Dr. K. Cheng (Cardiologist)', physician: 'Dr. F. Liu',
+    diagnoses: ['Severe OSA (AHI 37.8/h)', 'Hypertension', 'Obesity BMI 34.1'],
+    status: 'active',
+    treatment: {
+      type: 'CPAP', provider: 'fp', device: 'Fisher & Paykel SleepStyle 650',
+      serial: 'FP-26-3301122', startDate: '2026-04-28',
+      prescription: { mode: 'APAP', pMin: 7, pMax: 14, mask: 'F&P Evora Full Face', humidifier: 'Integrated' },
+    },
+    nextReview: '2026-10-28',
+    studies: ['PSG-2026-0437'],
+    alerts: [],
+    compliance: { rate: 72, meanUsage: 5.1, meanAhi: 4.8, p90Pressure: 11.2, meanLeak: 18, lastSync: '2026-05-13' },
+  },
+  // Matches study HSAT-2026-0217 (Final, Type 2 HSAT, signed Dr. F. Liu, Home Service)
+  {
+    id: 'PAT-008', initials: 'MT', name: 'M. Torres', dob: '1983-05-15', age: 42, sex: 'F',
+    mrn: 'MRN-4489', site: 'Home Service – North',
+    referrer: 'Dr. T. Brown (GP)', physician: 'Dr. F. Liu',
+    diagnoses: ['Moderate OSA (AHI 22.4/h) — confirmed HSAT-2026-0217', 'Excessive daytime sleepiness (ESS 14/24)'],
+    status: 'active',
+    treatment: null,
+    nextReview: '2026-08-20',
+    studies: ['HSAT-2026-0217'],
+    alerts: ['CPAP prescription pending — report signed 09 May 2026'],
     compliance: null,
   },
 ];
@@ -696,7 +701,7 @@ function CompliancePill({ rate }) {
 
 // ─── patient detail drawer ─────────────────────────────────────────────────────
 
-function PatientDrawer({ patient, onClose, onCreateTask, onOrderDme }) {
+function PatientDrawer({ patient, onClose, onCreateTask, onOrderDme, studies = [], openStudy }) {
   const [dtab, setDtab] = useState('overview');
   const data = patient.compliance ? makeDailyData(patient.id, patient.compliance.rate, patient.compliance.meanUsage) : [];
   const provider = patient.treatment?.provider ? CPAP_PROVIDERS[patient.treatment.provider] : null;
@@ -841,18 +846,32 @@ function PatientDrawer({ patient, onClose, onCreateTask, onOrderDme }) {
           <div>
             {patient.studies.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--ink-3)', fontSize: 13 }}>No studies on file.</div>
-            ) : patient.studies.map((s, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
-                <div style={{ width: 32, height: 32, borderRadius: 7, background: 'var(--accent-soft)', color: 'var(--accent-ink)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-                  <Icon name="paper" size={14} />
+            ) : patient.studies.map((sid, i) => {
+              const study = studies.find(x => x.id === sid);
+              const statusKind = study?.status === 'Final' ? 'good'
+                : study?.status === 'Awaiting sign-off' ? 'warn'
+                : study?.status === 'Preliminary' ? 'info'
+                : study?.status === 'Scoring' ? 'outline'
+                : 'outline';
+              const isClickable = !!study && !!openStudy;
+              return (
+                <div key={i}
+                  onClick={isClickable ? () => openStudy(sid) : undefined}
+                  style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--border)', cursor: isClickable ? 'pointer' : 'default' }}>
+                  <div style={{ width: 32, height: 32, borderRadius: 7, background: 'var(--accent-soft)', color: 'var(--accent-ink)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                    <Icon name="paper" size={14} />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 500 }}>{sid}</div>
+                    <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{study ? study.type : 'Sleep study'} · {patient.site}</div>
+                  </div>
+                  {study
+                    ? <><Pill kind={statusKind}>{study.status}</Pill>{isClickable && <Icon name="chev_right" size={14} />}</>
+                    : <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>Historical</span>
+                  }
                 </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 500 }}>{s}</div>
-                  <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>Sleep study · {patient.site}</div>
-                </div>
-                <Pill kind="good">Final</Pill>
-              </div>
-            ))}
+              );
+            })}
             <div style={{ paddingTop: 12 }}>
               <button className="btn" style={{ width: '100%', justifyContent: 'center' }}>
                 <Icon name="plus" size={13} />Request new study
@@ -911,11 +930,12 @@ function PatientDrawer({ patient, onClose, onCreateTask, onOrderDme }) {
 
 // ─── main component ────────────────────────────────────────────────────────────
 
-const PatientsPage = () => {
+const PatientsPage = ({ openStudy }) => {
   const [tab, setTab] = useState('patients');
   const { site } = useLocation();
   const { openCreateTask } = useTaskContext();
   const { user } = useAuth();
+  const { data } = useNexusData();
 
   const [patients] = useState(SEED_PATIENTS);
   const [selectedId, setSelectedId] = useState(null);
@@ -1239,6 +1259,8 @@ const PatientsPage = () => {
             onClose={() => setSelectedId(null)}
             onCreateTask={openCreateTask}
             onOrderDme={() => { setDmePatient(selectedPatient); setSelectedId(null); }}
+            studies={data?.studies ?? []}
+            openStudy={(sid) => { setSelectedId(null); openStudy?.(sid); }}
           />
         )}
       </Drawer>
