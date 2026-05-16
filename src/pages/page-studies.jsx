@@ -6,7 +6,11 @@ const StudiesPage = ({ data: D, openStudy }) => {
   const [tab, setTab] = useState("queue");
   const [filter, setFilter] = useState("all");
 
-  const filtered = D.studies.filter(s => {
+  const baseStudies = tab === 'queue'
+    ? D.studies.filter(s => s.status !== 'Final')
+    : D.studies;
+
+  const filtered = baseStudies.filter(s => {
     if (filter === 'all') return true;
     if (filter === 'awaiting') return s.status === 'Awaiting sign-off';
     if (filter === 'scoring') return s.status === 'Scoring';
@@ -53,7 +57,7 @@ const StudiesPage = ({ data: D, openStudy }) => {
         </div>
       </div>
 
-      <Tabs value={tab} onChange={setTab} tabs={[
+      <Tabs value={tab} onChange={t => { setTab(t); setFilter('all'); }} tabs={[
         { id: "queue", label: "Active queue", count: D.studies.filter(s => s.status !== 'Final').length },
         { id: "all", label: "All studies", count: D.studies.length },
         { id: "concord", label: "Concordance" },
@@ -67,7 +71,7 @@ const StudiesPage = ({ data: D, openStudy }) => {
             <button className={`chip-btn ${filter === 'scoring' ? 'active' : ''}`} onClick={() => setFilter('scoring')}>Scoring</button>
             <button className={`chip-btn ${filter === 'prelim' ? 'active' : ''}`} onClick={() => setFilter('prelim')}>Preliminary</button>
             <button className={`chip-btn ${filter === 'awaiting' ? 'active' : ''}`} onClick={() => setFilter('awaiting')}>Awaiting sign-off</button>
-            <button className={`chip-btn ${filter === 'final' ? 'active' : ''}`} onClick={() => setFilter('final')}>Final</button>
+            {tab === 'all' && <button className={`chip-btn ${filter === 'final' ? 'active' : ''}`} onClick={() => setFilter('final')}>Final</button>}
             <div style={{ flex: 1 }} />
             <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>{filtered.length} studies</span>
           </div>
