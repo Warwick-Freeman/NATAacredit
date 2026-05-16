@@ -64,6 +64,16 @@ app.MapGet("/api/studies/{id}", async (string id, NexusDbContext db) =>
     await db.Studies.FirstOrDefaultAsync(s => s.StudyId == id)
         is { } study ? Results.Ok(study) : Results.NotFound());
 
+app.MapPatch("/api/studies/{id}/status", async (string id, StudyStatusDto dto, NexusDbContext db) =>
+{
+    var study = await db.Studies.FirstOrDefaultAsync(s => s.StudyId == id);
+    if (study == null) return Results.NotFound();
+    study.Status = dto.Status;
+    if (dto.SignedDays.HasValue) study.SignedDays = dto.SignedDays;
+    await db.SaveChangesAsync();
+    return Results.Ok(study);
+});
+
 app.MapGet("/api/equipment", async (NexusDbContext db) =>
     await db.Equipment.ToListAsync());
 
@@ -196,6 +206,8 @@ app.MapGet("/api/documents/{id}/file", async (string id, NexusDbContext db) =>
 });
 
 app.Run();
+
+record StudyStatusDto(string Status, int? SignedDays);
 
 record DocumentDto(
     string DocId, string Title, string Version, string Status, string Folder,

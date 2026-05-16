@@ -107,6 +107,16 @@ function normaliseActivity(a) {
   };
 }
 
+export async function patchStudyStatus(id, status, signedDays) {
+  const res = await fetch(`${BASE}/api/studies/${id}/status`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status, signedDays: signedDays ?? null }),
+  });
+  if (!res.ok) throw new Error(`API error ${res.status}`);
+  return res.json();
+}
+
 export async function fetchAll() {
   const [studies, equipment, indicators, clauses, compliance, tasks, activity] =
     await Promise.all([

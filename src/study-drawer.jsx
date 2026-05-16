@@ -4,6 +4,7 @@ import { Pill, Avatar } from './components';
 import { useLocation } from './LocationContext';
 import { useAuth } from './AuthContext';
 import { DME_PROVIDERS, DX_LIST, generateOrderHtml } from './dme-order';
+import { patchStudyStatus } from './api';
 
 // ─── prescription defaults by study type ────────────────────────────────────────
 
@@ -60,7 +61,7 @@ function openDmeHtml(html, mrn) {
 
 // ─── study drawer ───────────────────────────────────────────────────────────────
 
-const StudyDrawer = ({ data, studyId, onClose }) => {
+const StudyDrawer = ({ data, studyId, onClose, onStudyUpdated }) => {
   const { site } = useLocation();
   const { user } = useAuth();
 
@@ -107,9 +108,14 @@ const StudyDrawer = ({ data, studyId, onClose }) => {
     setDmeNote('DME order opened — print or save as PDF from your browser.');
   };
 
-  const signFinal = (withDme = false) => {
+  const signFinal = async (withDme = false) => {
     if (withDme && rx) generateDmeOrder();
+    const signedDays = study.due != null ? Math.max(0, 10 - study.due) : undefined;
+    try {
+      await patchStudyStatus(study.id, 'Final', signedDays);
+    } catch (_) {}
     setSigned(true);
+    onStudyUpdated?.();
   };
 
   // shared styles

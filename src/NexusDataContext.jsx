@@ -42,6 +42,10 @@ export function NexusDataProvider({ children }) {
       .finally(() => setLoading(false));
   }, []);
 
+  const refreshData = () => {
+    fetchAll().then(setData).catch(() => {});
+  };
+
   const patchedData = data ? {
     ...data,
     service: {
@@ -52,7 +56,7 @@ export function NexusDataProvider({ children }) {
   } : null;
 
   return (
-    <NexusDataContext.Provider value={{ data: patchedData, loading, error, assessmentDate, setAssessmentDate }}>
+    <NexusDataContext.Provider value={{ data: patchedData, loading, error, assessmentDate, setAssessmentDate, refreshData }}>
       {children}
     </NexusDataContext.Provider>
   );

@@ -51,7 +51,7 @@ const App = () => {
 
   if (!user) return <LoginPage />;
 
-  const { data, loading, error } = useNexusData();
+  const { data, loading, error, refreshData } = useNexusData();
 
   const criticalTaskCount = tasks.filter(t => t.status !== 'done' && t.priority === 'critical').length;
 
@@ -163,7 +163,7 @@ const App = () => {
         </Drawer>
 
         <Drawer open={!!openStudyId} onClose={() => setOpenStudyId(null)}>
-          <StudyDrawer data={data} studyId={openStudyId} onClose={() => setOpenStudyId(null)} />
+          <StudyDrawer data={data} studyId={openStudyId} onClose={() => setOpenStudyId(null)} onStudyUpdated={refreshData} />
         </Drawer>
 
         <TweaksPanel title="Tweaks">
