@@ -5,7 +5,6 @@ namespace NexusApi.Data;
 
 public static class SeedData
 {
-    // Serialise workflow step list to JSON for storage
     private static string Wf(params object[] steps) =>
         JsonSerializer.Serialize(steps, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
 
@@ -24,16 +23,11 @@ public static class SeedData
         foreach (var filePath in files.OrderBy(f => f))
         {
             var baseName = Path.GetFileNameWithoutExtension(filePath);
-
-            // Split on first underscore: everything before is DocId, after is title
             var sep = baseName.IndexOf('_');
             if (sep <= 0) continue;
             var docId = baseName[..sep];
             var titleRaw = baseName[(sep + 1)..];
-
-            // Only accept proper numbered IDs like FRM-001, SOP-PSG-001, REG-001
             if (!docId.Contains('-')) continue;
-
             if (existingIds.Contains(docId)) continue;
 
             var title = titleRaw.Replace('_', ' ').Trim();
@@ -99,48 +93,48 @@ public static class SeedData
             new Document
             {
                 DocId = "SOP-PSG-014", Title = "Adult attended PSG protocol",
-                Version = "3.2", Status = "Issued", Folder = "sops", ReviewDue = "08 Jul 2026",
+                Version = "3.2", Status = "Issued", Folder = "sops", ReviewDue = "08 Jul 2027",
                 Owner = "Dr. R. Okafor", Clauses = "5.5.3", Updated = "14 Apr 2026",
                 Workflow = Wf(
                     Step("Draft",           "Dr. R. Okafor", "01 Mar 2026", done: true),
-                    Step("Peer review",     "M. Chen",       "10 Mar 2026", done: true, comment: "Reviewed."),
+                    Step("Peer review",     "M. Chen",       "10 Mar 2026", done: true, comment: "Reviewed — minor wording update in section 3."),
                     Step("Approval",        "Dr. R. Okafor", "15 Mar 2026", done: true),
                     Step("Issue",           "K. Patel",      "14 Apr 2026", done: true),
-                    Step("Periodic review", "+24 mo",        "08 Jul 2027"))
+                    Step("Periodic review", "+24 mo",        "08 Jul 2028"))
             },
             new Document
             {
                 DocId = "SOP-PED-007", Title = "Paediatric attended PSG protocol",
-                Version = "2.1", Status = "Issued", Folder = "sops", ReviewDue = "22 Sep 2026",
+                Version = "2.1", Status = "Issued", Folder = "sops", ReviewDue = "22 Sep 2027",
                 Owner = "Dr. L. Hartono", Clauses = "5.5.3.2,5.8.5", Updated = "18 Mar 2026",
                 Workflow = Wf(
                     Step("Draft",           "Dr. L. Hartono", "01 Feb 2026", done: true),
-                    Step("Peer review",     "M. Chen",        "10 Feb 2026", done: true),
+                    Step("Peer review",     "M. Chen",        "10 Feb 2026", done: true, comment: "Reviewed — EEG montage updated for age <6."),
                     Step("Approval",        "Dr. R. Okafor",  "18 Feb 2026", done: true),
                     Step("Issue",           "K. Patel",       "18 Mar 2026", done: true),
-                    Step("Periodic review", "+24 mo",         "22 Sep 2027"))
+                    Step("Periodic review", "+24 mo",         "22 Sep 2028"))
             },
             new Document
             {
                 DocId = "SOP-EQP-004", Title = "Equipment acceptance testing",
-                Version = "1.4", Status = "Issued", Folder = "sops", ReviewDue = "01 Jun 2026",
+                Version = "1.4", Status = "Issued", Folder = "sops", ReviewDue = "01 Jun 2028",
                 Owner = "M. Chen", Clauses = "5.3.2", Updated = "30 Mar 2026",
                 Workflow = Wf(
                     Step("Draft",           "M. Chen",       "01 Feb 2026", done: true),
-                    Step("Peer review",     "K. Patel",      "10 Feb 2026", done: true),
+                    Step("Peer review",     "K. Patel",      "10 Feb 2026", done: true, comment: "Reviewed — acceptance criteria table updated."),
                     Step("Approval",        "Dr. R. Okafor", "20 Feb 2026", done: true),
                     Step("Issue",           "K. Patel",      "30 Mar 2026", done: true),
                     Step("Periodic review", "+24 mo",        "01 Jun 2028"))
             },
             new Document
             {
-                DocId = "SOP-EQP-012", Title = "Decontamination of removed equipment",
+                DocId = "SOP-EQP-012", Title = "Decontamination of reusable equipment",
                 Version = "2.0", Status = "Draft", Folder = "sops", ReviewDue = "Overdue 8d",
                 Owner = "M. Chen", Clauses = "5.3.5", Updated = "09 May 2026",
                 Workflow = Wf(
                     Step("Draft",           "M. Chen",  active: true),
                     Step("Peer review",     "K. Patel", "05 May 2026", rejected: true,
-                         comment: "Section 4.2 incomplete — mobile equipment decon procedure missing. Please revise before resubmission."),
+                         comment: "Section 4.2 incomplete — mobile equipment decontamination procedure missing. Please revise before resubmission."),
                     Step("Approval",        "Dr. R. Okafor"),
                     Step("Issue",           "K. Patel"),
                     Step("Periodic review", "+24 mo"))
@@ -152,7 +146,7 @@ public static class SeedData
                 Owner = "K. Patel", Clauses = "5.5.1", Updated = "10 May 2026",
                 Workflow = Wf(
                     Step("Draft",           "K. Patel", "10 May 2026", done: true,
-                         comment: "Revised per new BLS requirements and expanded escalation criteria."),
+                         comment: "Revised per updated BLS guidelines and expanded escalation criteria."),
                     Step("Peer review",     "M. Chen",        active: true),
                     Step("Approval",        "Dr. R. Okafor"),
                     Step("Issue",           "K. Patel"),
@@ -161,11 +155,11 @@ public static class SeedData
             new Document
             {
                 DocId = "SOP-CPAP-002", Title = "Split-night titration protocol",
-                Version = "1.2", Status = "Issued", Folder = "sops", ReviewDue = "15 Jan 2027",
+                Version = "1.2", Status = "Issued", Folder = "sops", ReviewDue = "15 Jan 2028",
                 Owner = "Dr. R. Okafor", Clauses = "5.5.3.4", Updated = "20 Feb 2026",
                 Workflow = Wf(
                     Step("Draft",           "Dr. R. Okafor", "01 Jan 2026", done: true),
-                    Step("Peer review",     "M. Chen",       "10 Jan 2026", done: true),
+                    Step("Peer review",     "M. Chen",       "10 Jan 2026", done: true, comment: "Reviewed — pressure titration thresholds confirmed."),
                     Step("Approval",        "Dr. R. Okafor", "18 Jan 2026", done: true),
                     Step("Issue",           "K. Patel",      "20 Feb 2026", done: true),
                     Step("Periodic review", "+24 mo",        "15 Jan 2028"))
@@ -177,7 +171,7 @@ public static class SeedData
                 Owner = "Dr. R. Okafor", Clauses = "4.2.1", Updated = "15 Jan 2026",
                 Workflow = Wf(
                     Step("Draft",           "Dr. R. Okafor", "10 Jan 2026", done: true),
-                    Step("Peer review",     "K. Patel",      "12 Jan 2026", done: true),
+                    Step("Peer review",     "K. Patel",      "12 Jan 2026", done: true, comment: "Reviewed — objectives updated for 2026 cycle."),
                     Step("Approval",        "Dr. R. Okafor", "14 Jan 2026", done: true),
                     Step("Issue",           "K. Patel",      "15 Jan 2026", done: true),
                     Step("Periodic review", "+24 mo",        "31 Dec 2027"))
@@ -189,7 +183,7 @@ public static class SeedData
                 Owner = "K. Patel", Clauses = "4.1.6,4.13", Updated = "20 Nov 2025",
                 Workflow = Wf(
                     Step("Draft",           "K. Patel",      "01 Nov 2025", done: true),
-                    Step("Peer review",     "Dr. R. Okafor", "10 Nov 2025", done: true),
+                    Step("Peer review",     "Dr. R. Okafor", "10 Nov 2025", done: true, comment: "Reviewed — Privacy Act 2024 amendments incorporated."),
                     Step("Approval",        "Dr. R. Okafor", "15 Nov 2025", done: true),
                     Step("Issue",           "K. Patel",      "20 Nov 2025", done: true),
                     Step("Periodic review", "+24 mo",        "20 Nov 2027"))
@@ -201,9 +195,9 @@ public static class SeedData
                 Owner = "M. Chen", Clauses = "5.3", Updated = "20 Apr 2026",
                 Workflow = Wf(
                     Step("Draft",           "M. Chen",  "01 Mar 2026", done: true,
-                         comment: "Initial version per new equipment fleet scope."),
+                         comment: "Initial version — scope updated for expanded equipment fleet."),
                     Step("Peer review",     "K. Patel", "20 Apr 2026", done: true,
-                         comment: "Reviewed — scope updated, OK to proceed to approval."),
+                         comment: "Reviewed — verification intervals aligned with SOP-EQP-004."),
                     Step("Approval",        "Dr. R. Okafor", active: true),
                     Step("Issue",           "K. Patel"),
                     Step("Periodic review", "+24 mo"))
@@ -222,7 +216,7 @@ public static class SeedData
                 Owner = "Dr. R. Okafor", Clauses = "4.2", Updated = "10 Feb 2026",
                 Workflow = Wf(
                     Step("Draft",           "Dr. R. Okafor", "01 Jan 2026", done: true),
-                    Step("Peer review",     "K. Patel",      "20 Jan 2026", done: true),
+                    Step("Peer review",     "K. Patel",      "20 Jan 2026", done: true, comment: "Reviewed — section 5.8 reporting timeline updated."),
                     Step("Approval",        "Dr. R. Okafor", "05 Feb 2026", done: true),
                     Step("Issue",           "K. Patel",      "10 Feb 2026", done: true),
                     Step("Periodic review", "+24 mo",        "12 Aug 2028"))
@@ -236,110 +230,198 @@ public static class SeedData
     {
         if (db.Studies.Any()) return;
 
+        // ── Staff ────────────────────────────────────────────────────────────────
+        // Dr. Richard Okafor   — Medical Director / Reporting Physician (Riverside Main)
+        // Dr. Linda Hartono    — Sleep Physician, Paediatric specialist (Eastside Paed.)
+        // Dr. Frank Liu        — Sleep Physician (Home Service / Eastside)
+        // Mei Chen             — Senior Sleep Technologist / Scorer
+        // Arun Singh           — Sleep Technologist / Scorer
+        // James Owusu          — Sleep Technologist / Scorer
+        // Kavita Patel         — Quality & Administration Manager
+
+        // ── Patients ─────────────────────────────────────────────────────────────
+        // Each study has a fictional patient matched by initials.
+        //   R.K.  Robert Kingston    M  DOB 12 Jun 1974  age 51
+        //   T.N.  Thanh Nguyen      M  DOB 03 Sep 1989  age 36
+        //   L.W.  Lily Walsh        F  DOB 14 Feb 2012  age 14  (paediatric)
+        //   P.B.  Patricia Brown    F  DOB 22 Nov 1968  age 57
+        //   D.M.  David Mitchell    M  DOB 08 Apr 1955  age 71
+        //   S.C.  Sophie Carter     F  DOB 17 Jul 1998  age 27
+        //   A.P.  Andrew Park       M  DOB 29 Jan 1971  age 55
+        //   M.T.  Maria Torres      F  DOB 15 May 1983  age 42
+
         db.Studies.AddRange(
-            new Study { StudyId = "PSG-2026-0441", Patient = "Anon · DOB 1974", PatientInitials = "R.K.", Type = "Adult attended PSG", SiteCode = "RML", Scorer = "M. Chen", Physician = "Dr. R. Okafor", Status = "Awaiting sign-off", Contact = "02 May", Due = 1, Sla = "warn" },
-            new Study { StudyId = "PSG-2026-0440", Patient = "Anon · DOB 1989", PatientInitials = "T.N.", Type = "Adult attended PSG", SiteCode = "RML", Scorer = "A. Singh", Physician = "Dr. R. Okafor", Status = "Awaiting sign-off", Contact = "01 May", Due = 0, Sla = "bad" },
-            new Study { StudyId = "PSG-2026-0439", Patient = "Anon · DOB 2012", PatientInitials = "L.W.", Type = "Paediatric attended PSG", SiteCode = "EPL", Scorer = "M. Chen", Physician = "Dr. L. Hartono", Status = "Scoring", Contact = "30 Apr", Due = 3, Sla = "good" },
-            new Study { StudyId = "HSAT-2026-0218", Patient = "Anon · DOB 1968", PatientInitials = "P.B.", Type = "Type 3 HSAT", SiteCode = "HSN", Scorer = "J. Owusu", Physician = "Dr. F. Liu", Status = "Scoring", Contact = "29 Apr", Due = 4, Sla = "good" },
-            new Study { StudyId = "PSG-2026-0438", Patient = "Anon · DOB 1955", PatientInitials = "D.M.", Type = "Split-night PSG/CPAP", SiteCode = "RML", Scorer = "A. Singh", Physician = "Dr. R. Okafor", Status = "Preliminary", Contact = "28 Apr", Due = 5, Sla = "good" },
-            new Study { StudyId = "MSLT-2026-0031", Patient = "Anon · DOB 1998", PatientInitials = "S.C.", Type = "MSLT", SiteCode = "RML", Scorer = "M. Chen", Physician = "Dr. R. Okafor", Status = "Awaiting sign-off", Contact = "27 Apr", Due = 2, Sla = "warn" },
-            new Study { StudyId = "PSG-2026-0437", Patient = "Anon · DOB 1971", PatientInitials = "A.P.", Type = "Adult attended PSG", SiteCode = "EPL", Scorer = "J. Owusu", Physician = "Dr. F. Liu", Status = "Final", Contact = "22 Apr", Due = 0, Sla = "good", SignedDays = 7 },
-            new Study { StudyId = "HSAT-2026-0217", Patient = "Anon · DOB 1983", PatientInitials = "M.T.", Type = "Type 2 HSAT", SiteCode = "HSN", Scorer = "A. Singh", Physician = "Dr. F. Liu", Status = "Final", Contact = "20 Apr", Due = 0, Sla = "good", SignedDays = 9 }
+            // SLA critical — due today, awaiting Dr. Okafor sign-off (Task T-004)
+            new Study
+            {
+                StudyId = "PSG-2026-0440", Patient = "T. Nguyen · M · DOB 03 Sep 1989",
+                PatientInitials = "T.N.", Type = "Adult attended PSG",
+                SiteCode = "RML", Scorer = "A. Singh", Physician = "Dr. R. Okafor",
+                Status = "Awaiting sign-off", Contact = "06 May", Due = 0, Sla = "bad"
+            },
+            // SLA warning — 1 day remaining, awaiting Dr. Okafor sign-off
+            new Study
+            {
+                StudyId = "PSG-2026-0441", Patient = "R. Kingston · M · DOB 12 Jun 1974",
+                PatientInitials = "R.K.", Type = "Adult attended PSG",
+                SiteCode = "RML", Scorer = "M. Chen", Physician = "Dr. R. Okafor",
+                Status = "Awaiting sign-off", Contact = "07 May", Due = 1, Sla = "warn"
+            },
+            // SLA warning — MSLT, awaiting Dr. Okafor sign-off, 2 days remaining
+            new Study
+            {
+                StudyId = "MSLT-2026-0031", Patient = "S. Carter · F · DOB 17 Jul 1998",
+                PatientInitials = "S.C.", Type = "MSLT",
+                SiteCode = "RML", Scorer = "M. Chen", Physician = "Dr. R. Okafor",
+                Status = "Awaiting sign-off", Contact = "08 May", Due = 2, Sla = "warn"
+            },
+            // Scoring in progress — paediatric PSG, Dr. Hartono (Eastside)
+            new Study
+            {
+                StudyId = "PSG-2026-0439", Patient = "L. Walsh · F · DOB 14 Feb 2012",
+                PatientInitials = "L.W.", Type = "Paediatric attended PSG",
+                SiteCode = "EPL", Scorer = "M. Chen", Physician = "Dr. L. Hartono",
+                Status = "Scoring", Contact = "09 May", Due = 3, Sla = "good"
+            },
+            // Preliminary report issued — split-night, Dr. Okafor
+            new Study
+            {
+                StudyId = "PSG-2026-0438", Patient = "D. Mitchell · M · DOB 08 Apr 1955",
+                PatientInitials = "D.M.", Type = "Split-night PSG/CPAP titration",
+                SiteCode = "RML", Scorer = "A. Singh", Physician = "Dr. R. Okafor",
+                Status = "Preliminary", Contact = "10 May", Due = 4, Sla = "good"
+            },
+            // Scoring in progress — HSAT type 3, Dr. Liu (Home Service)
+            new Study
+            {
+                StudyId = "HSAT-2026-0218", Patient = "P. Brown · F · DOB 22 Nov 1968",
+                PatientInitials = "P.B.", Type = "Type 3 HSAT",
+                SiteCode = "HSN", Scorer = "J. Owusu", Physician = "Dr. F. Liu",
+                Status = "Scoring", Contact = "11 May", Due = 5, Sla = "good"
+            },
+            // Final — PSG signed by Dr. Liu, 7 days (within SLA)
+            new Study
+            {
+                StudyId = "PSG-2026-0437", Patient = "A. Park · M · DOB 29 Jan 1971",
+                PatientInitials = "A.P.", Type = "Adult attended PSG",
+                SiteCode = "EPL", Scorer = "J. Owusu", Physician = "Dr. F. Liu",
+                Status = "Final", Contact = "22 Apr", Due = 0, Sla = "good", SignedDays = 7
+            },
+            // Final — HSAT signed by Dr. Liu, 9 days (within SLA)
+            new Study
+            {
+                StudyId = "HSAT-2026-0217", Patient = "M. Torres · F · DOB 15 May 1983",
+                PatientInitials = "M.T.", Type = "Type 2 HSAT",
+                SiteCode = "HSN", Scorer = "A. Singh", Physician = "Dr. F. Liu",
+                Status = "Final", Contact = "20 Apr", Due = 0, Sla = "good", SignedDays = 9
+            }
         );
 
         db.Equipment.AddRange(
-            new Equipment { AssetId = "PSG-COMP-001", Name = "Compumedics Grael PSG Amplifier", Type = "PSG Amplifier", Site = "Riverside Main", Serial = "GRL-4421-A", Artg = "394821", LastVerify = "01 Mar 2026", NextVerify = "01 Jun 2026", VerifyStatus = "warn" },
-            new Equipment { AssetId = "PSG-COMP-002", Name = "Compumedics Grael PSG Amplifier", Type = "PSG Amplifier", Site = "Riverside Main", Serial = "GRL-4421-B", Artg = "394821", LastVerify = "12 Mar 2026", NextVerify = "12 Jun 2026", VerifyStatus = "good" },
-            new Equipment { AssetId = "PSG-COMP-003", Name = "Compumedics Grael PSG Amplifier", Type = "PSG Amplifier", Site = "Eastside Paed.", Serial = "GRL-5103-A", Artg = "394821", LastVerify = "20 Feb 2026", NextVerify = "20 May 2026", VerifyStatus = "warn" },
-            new Equipment { AssetId = "OXI-NON-007", Name = "Nonin WristOx2 3150", Type = "Oximeter", Site = "Home Service N.", Serial = "NWO-88231", Artg = "271044", LastVerify = "14 Apr 2026", NextVerify = "14 Jul 2026", VerifyStatus = "good" },
-            new Equipment { AssetId = "HSAT-NOX-012", Name = "Nox T3 Sleep Monitor", Type = "HSAT Device", Site = "Home Service N.", Serial = "T3-19204", Artg = "212388", LastVerify = "10 Apr 2026", NextVerify = "10 Jul 2026", VerifyStatus = "good" },
-            new Equipment { AssetId = "HSAT-NOX-013", Name = "Nox T3 Sleep Monitor", Type = "HSAT Device", Site = "Home Service N.", Serial = "T3-19205", Artg = "212388", LastVerify = "10 Apr 2026", NextVerify = "10 Jul 2026", VerifyStatus = "good" },
-            new Equipment { AssetId = "HSAT-NOX-014", Name = "Nox T3 Sleep Monitor", Type = "HSAT Device", Site = "Home Service N.", Serial = "T3-19381", Artg = "212388", LastVerify = "02 Jan 2026", NextVerify = "Overdue 14d", VerifyStatus = "bad" },
-            new Equipment { AssetId = "CAL-MKS-001", Name = "MKS Instruments Cal Gas", Type = "Calibration Gas", Site = "Riverside Main", Serial = "CAL-20240211", Artg = "—", LastVerify = "11 Feb 2026", NextVerify = "11 Aug 2026", VerifyStatus = "good" },
-            new Equipment { AssetId = "PSG-EMB-001", Name = "Embla N7000 Amplifier", Type = "PSG Amplifier", Site = "Eastside Paed.", Serial = "EMB-N7-3301", Artg = "263711", LastVerify = "28 Feb 2026", NextVerify = "28 May 2026", VerifyStatus = "warn" },
-            new Equipment { AssetId = "CPAP-RES-004", Name = "ResMed AirSense 11 AutoSet", Type = "CPAP Titration Device", Site = "Riverside Main", Serial = "AS11-4400221", Artg = "341022", LastVerify = "05 Apr 2026", NextVerify = "05 Jul 2026", VerifyStatus = "good" }
+            new Equipment { AssetId = "PSG-COMP-001", Name = "Compumedics Grael PSG Amplifier", Type = "PSG Amplifier",       Site = "Riverside Main",   Serial = "GRL-4421-A",  Artg = "394821", LastVerify = "01 Mar 2026", NextVerify = "01 Jun 2026", VerifyStatus = "warn" },
+            new Equipment { AssetId = "PSG-COMP-002", Name = "Compumedics Grael PSG Amplifier", Type = "PSG Amplifier",       Site = "Riverside Main",   Serial = "GRL-4421-B",  Artg = "394821", LastVerify = "12 Mar 2026", NextVerify = "12 Jun 2026", VerifyStatus = "good" },
+            new Equipment { AssetId = "PSG-COMP-003", Name = "Compumedics Grael PSG Amplifier", Type = "PSG Amplifier",       Site = "Eastside Paed.",   Serial = "GRL-5103-A",  Artg = "394821", LastVerify = "20 Feb 2026", NextVerify = "20 May 2026", VerifyStatus = "warn" },
+            new Equipment { AssetId = "PSG-EMB-001",  Name = "Embla N7000 Amplifier",           Type = "PSG Amplifier",       Site = "Eastside Paed.",   Serial = "EMB-N7-3301", Artg = "263711", LastVerify = "28 Feb 2026", NextVerify = "28 May 2026", VerifyStatus = "warn" },
+            new Equipment { AssetId = "HSAT-NOX-012", Name = "Nox T3 Sleep Monitor",            Type = "HSAT Device",         Site = "Home Service N.",  Serial = "T3-19204",    Artg = "212388", LastVerify = "10 Apr 2026", NextVerify = "10 Jul 2026", VerifyStatus = "good" },
+            new Equipment { AssetId = "HSAT-NOX-013", Name = "Nox T3 Sleep Monitor",            Type = "HSAT Device",         Site = "Home Service N.",  Serial = "T3-19205",    Artg = "212388", LastVerify = "10 Apr 2026", NextVerify = "10 Jul 2026", VerifyStatus = "good" },
+            new Equipment { AssetId = "HSAT-NOX-014", Name = "Nox T3 Sleep Monitor",            Type = "HSAT Device",         Site = "Home Service N.",  Serial = "T3-19381",    Artg = "212388", LastVerify = "02 Jan 2026", NextVerify = "Overdue 14d", VerifyStatus = "bad"  },
+            new Equipment { AssetId = "OXI-NON-007",  Name = "Nonin WristOx2 3150",             Type = "Oximeter",            Site = "Home Service N.",  Serial = "NWO-88231",   Artg = "271044", LastVerify = "14 Apr 2026", NextVerify = "14 Jul 2026", VerifyStatus = "good" },
+            new Equipment { AssetId = "CPAP-RES-004", Name = "ResMed AirSense 11 AutoSet",      Type = "CPAP Titration Device", Site = "Riverside Main", Serial = "AS11-4400221",Artg = "341022", LastVerify = "05 Apr 2026", NextVerify = "05 Jul 2026", VerifyStatus = "good" },
+            new Equipment { AssetId = "CAL-MKS-001",  Name = "MKS Instruments Calibration Gas", Type = "Calibration Gas",     Site = "Riverside Main",   Serial = "CAL-20240211",Artg = "—",      LastVerify = "11 Feb 2026", NextVerify = "11 Aug 2026", VerifyStatus = "good" }
         );
 
         db.Indicators.AddRange(
-            new Indicator { IndicatorId = "KPI-01", Name = "Referral-to-study wait", Phase = "pre", Value = "8.4", Unit = "days", Target = "≤ 14d", Status = "good", Trend = "[12,11,10,10,9,9,9,8,8,8,8,8]" },
-            new Indicator { IndicatorId = "KPI-02", Name = "Incomplete referrals", Phase = "pre", Value = "3.2", Unit = "%", Target = "≤ 5%", Status = "good", Trend = "[8,7,6,5,5,4,4,3,4,3,3,3]" },
-            new Indicator { IndicatorId = "KPI-03", Name = "Pre-study cancellation rate", Phase = "pre", Value = "6.1", Unit = "%", Target = "≤ 8%", Status = "good", Trend = "[9,8,7,7,6,7,6,5,6,6,6,6]" },
-            new Indicator { IndicatorId = "KPI-04", Name = "Study technical failure rate", Phase = "study", Value = "1.8", Unit = "%", Target = "≤ 2%", Status = "good", Trend = "[3,3,2,3,2,2,2,2,2,1,2,2]" },
-            new Indicator { IndicatorId = "KPI-05", Name = "EEG impedance compliance", Phase = "study", Value = "97.3", Unit = "%", Target = "≥ 95%", Status = "good", Trend = "[91,93,94,95,95,96,96,97,97,97,97,97]" },
-            new Indicator { IndicatorId = "KPI-06", Name = "Inter-scorer κ (mean)", Phase = "study", Value = "0.82", Unit = "", Target = "≥ 0.75", Status = "good", Trend = "[0.74,0.76,0.77,0.78,0.79,0.80,0.80,0.81,0.82,0.82,0.82,0.82]" },
-            new Indicator { IndicatorId = "KPI-07", Name = "Report turnaround (10d SLA)", Phase = "post", Value = "97.9", Unit = "%", Target = "≥ 98%", Status = "warn", Trend = "[98,98,99,97,98,98,99,98,97,98,98,98]" },
-            new Indicator { IndicatorId = "KPI-08", Name = "Amended reports rate", Phase = "post", Value = "1.4", Unit = "%", Target = "≤ 2%", Status = "good", Trend = "[3,2,2,2,2,2,1,1,2,1,1,1]" },
-            new Indicator { IndicatorId = "KPI-09", Name = "Referrer satisfaction score", Phase = "post", Value = "4.6", Unit = "/ 5", Target = "≥ 4.5", Status = "good", Trend = "[4.1,4.2,4.3,4.3,4.4,4.4,4.5,4.5,4.6,4.6,4.6,4.6]" },
-            new Indicator { IndicatorId = "KPI-10", Name = "Equipment verification on time", Phase = "study", Value = "96.8", Unit = "%", Target = "≥ 95%", Status = "good", Trend = "[92,93,94,95,95,96,96,97,97,97,97,97]" },
-            new Indicator { IndicatorId = "KPI-11", Name = "EQA pass rate", Phase = "study", Value = "90.0", Unit = "%", Target = "≥ 90%", Status = "warn", Trend = "[95,95,100,90,95,95,90,95,95,90,90,90]" },
-            new Indicator { IndicatorId = "KPI-12", Name = "CAPA effectiveness", Phase = "post", Value = "94.0", Unit = "%", Target = "≥ 90%", Status = "good", Trend = "[85,87,88,89,90,91,92,93,93,94,94,94]" }
+            new Indicator { IndicatorId = "KPI-01", Name = "Referral-to-study wait",         Phase = "pre",   Value = "8.4",  Unit = "days", Target = "≤ 14d",  Status = "good", Trend = "[12,11,10,10,9,9,9,8,8,8,8,8]" },
+            new Indicator { IndicatorId = "KPI-02", Name = "Incomplete referrals",            Phase = "pre",   Value = "3.2",  Unit = "%",    Target = "≤ 5%",   Status = "good", Trend = "[8,7,6,5,5,4,4,3,4,3,3,3]" },
+            new Indicator { IndicatorId = "KPI-03", Name = "Pre-study cancellation rate",     Phase = "pre",   Value = "6.1",  Unit = "%",    Target = "≤ 8%",   Status = "good", Trend = "[9,8,7,7,6,7,6,5,6,6,6,6]" },
+            new Indicator { IndicatorId = "KPI-04", Name = "Study technical failure rate",    Phase = "study", Value = "1.8",  Unit = "%",    Target = "≤ 2%",   Status = "good", Trend = "[3,3,2,3,2,2,2,2,2,1,2,2]" },
+            new Indicator { IndicatorId = "KPI-05", Name = "EEG impedance compliance",        Phase = "study", Value = "97.3", Unit = "%",    Target = "≥ 95%",  Status = "good", Trend = "[91,93,94,95,95,96,96,97,97,97,97,97]" },
+            new Indicator { IndicatorId = "KPI-06", Name = "Inter-scorer κ (mean)",           Phase = "study", Value = "0.82", Unit = "",     Target = "≥ 0.75", Status = "good", Trend = "[0.74,0.76,0.77,0.78,0.79,0.80,0.80,0.81,0.82,0.82,0.82,0.82]" },
+            new Indicator { IndicatorId = "KPI-07", Name = "Report turnaround (10d SLA)",     Phase = "post",  Value = "97.9", Unit = "%",    Target = "≥ 98%",  Status = "warn", Trend = "[98,98,99,97,98,98,99,98,97,98,98,98]" },
+            new Indicator { IndicatorId = "KPI-08", Name = "Amended reports rate",            Phase = "post",  Value = "1.4",  Unit = "%",    Target = "≤ 2%",   Status = "good", Trend = "[3,2,2,2,2,2,1,1,2,1,1,1]" },
+            new Indicator { IndicatorId = "KPI-09", Name = "Referrer satisfaction score",     Phase = "post",  Value = "4.6",  Unit = "/ 5",  Target = "≥ 4.5",  Status = "good", Trend = "[4.1,4.2,4.3,4.3,4.4,4.4,4.5,4.5,4.6,4.6,4.6,4.6]" },
+            new Indicator { IndicatorId = "KPI-10", Name = "Equipment verification on time",  Phase = "study", Value = "96.8", Unit = "%",    Target = "≥ 95%",  Status = "good", Trend = "[92,93,94,95,95,96,96,97,97,97,97,97]" },
+            new Indicator { IndicatorId = "KPI-11", Name = "EQA pass rate",                   Phase = "study", Value = "90.0", Unit = "%",    Target = "≥ 90%",  Status = "warn", Trend = "[95,95,100,90,95,95,90,95,95,90,90,90]" },
+            new Indicator { IndicatorId = "KPI-12", Name = "CAPA effectiveness",              Phase = "post",  Value = "94.0", Unit = "%",    Target = "≥ 90%",  Status = "good", Trend = "[85,87,88,89,90,91,92,93,93,94,94,94]" }
         );
 
         db.Clauses.AddRange(
-            new Clause { ClauseId = "4.1.1", Title = "Scope of accreditation", Section = "4.1", Status = "compliant", Evidence = 3, LastReviewed = "Jan 2026", Owner = "Dr. R. Okafor" },
-            new Clause { ClauseId = "4.1.5", Title = "Conflict of interest", Section = "4.1", Status = "compliant", Evidence = 2, LastReviewed = "Jan 2026", Owner = "K. Patel" },
-            new Clause { ClauseId = "4.1.6", Title = "Confidentiality", Section = "4.1", Status = "compliant", Evidence = 4, LastReviewed = "Nov 2025", Owner = "K. Patel" },
-            new Clause { ClauseId = "4.2.1", Title = "Quality policy", Section = "4.2", Status = "compliant", Evidence = 2, LastReviewed = "Jan 2026", Owner = "Dr. R. Okafor" },
-            new Clause { ClauseId = "4.3.1", Title = "Document control", Section = "4.3", Status = "compliant", Evidence = 5, LastReviewed = "Feb 2026", Owner = "K. Patel" },
-            new Clause { ClauseId = "4.5.2", Title = "Subcontractor register", Section = "4.5", Status = "nonconformant", Evidence = 0, LastReviewed = "Mar 2026", Owner = "K. Patel" },
-            new Clause { ClauseId = "4.8.1", Title = "Complaint handling", Section = "4.8", Status = "compliant", Evidence = 3, LastReviewed = "Feb 2026", Owner = "K. Patel" },
-            new Clause { ClauseId = "4.13.1", Title = "Record retention", Section = "4.13", Status = "compliant", Evidence = 4, LastReviewed = "Nov 2025", Owner = "K. Patel" },
-            new Clause { ClauseId = "4.14.3", Title = "Auditor independence", Section = "4.14", Status = "compliant", Evidence = 4, LastReviewed = "Feb 2026", Owner = "K. Patel" },
-            new Clause { ClauseId = "4.15.2", Title = "Management review inputs", Section = "4.15", Status = "compliant", Evidence = 6, LastReviewed = "Feb 2026", Owner = "Dr. R. Okafor" },
-            new Clause { ClauseId = "5.1.4", Title = "BLS recertification", Section = "5.1", Status = "nonconformant", Evidence = 1, LastReviewed = "Mar 2026", Owner = "M. Chen" },
-            new Clause { ClauseId = "5.3.2", Title = "Equipment acceptance testing", Section = "5.3", Status = "compliant", Evidence = 5, LastReviewed = "Mar 2026", Owner = "M. Chen" },
-            new Clause { ClauseId = "5.3.4", Title = "Equipment verification programme", Section = "5.3", Status = "nonconformant", Evidence = 2, LastReviewed = "Apr 2026", Owner = "M. Chen" },
-            new Clause { ClauseId = "5.3.5", Title = "Equipment decontamination", Section = "5.3", Status = "review", Evidence = 2, LastReviewed = "Apr 2026", Owner = "M. Chen" },
-            new Clause { ClauseId = "5.3.6", Title = "Adverse incident reporting", Section = "5.3", Status = "compliant", Evidence = 3, LastReviewed = "Apr 2026", Owner = "M. Chen" },
-            new Clause { ClauseId = "5.5.2", Title = "Pre-study bio-signal verification", Section = "5.5", Status = "compliant", Evidence = 6, LastReviewed = "Apr 2026", Owner = "M. Chen" },
-            new Clause { ClauseId = "5.5.3", Title = "PSG recording protocols", Section = "5.5", Status = "compliant", Evidence = 7, LastReviewed = "Mar 2026", Owner = "Dr. R. Okafor" },
-            new Clause { ClauseId = "5.6.6", Title = "Inter-observer concordance", Section = "5.6", Status = "compliant", Evidence = 4, LastReviewed = "Mar 2026", Owner = "M. Chen" },
-            new Clause { ClauseId = "5.6.8", Title = "External proficiency testing (EQA)", Section = "5.6", Status = "review", Evidence = 3, LastReviewed = "Mar 2026", Owner = "Dr. R. Okafor" },
-            new Clause { ClauseId = "5.8.1", Title = "10 business-day reporting SLA", Section = "5.8", Status = "compliant", Evidence = 5, LastReviewed = "Apr 2026", Owner = "Dr. R. Okafor" }
+            new Clause { ClauseId = "4.1.1",  Title = "Scope of accreditation",            Section = "4.1",  Status = "compliant",     Evidence = 3, LastReviewed = "Jan 2026", Owner = "Dr. R. Okafor" },
+            new Clause { ClauseId = "4.1.5",  Title = "Conflict of interest",              Section = "4.1",  Status = "compliant",     Evidence = 2, LastReviewed = "Jan 2026", Owner = "K. Patel" },
+            new Clause { ClauseId = "4.1.6",  Title = "Confidentiality",                   Section = "4.1",  Status = "compliant",     Evidence = 4, LastReviewed = "Nov 2025", Owner = "K. Patel" },
+            new Clause { ClauseId = "4.2.1",  Title = "Quality policy",                    Section = "4.2",  Status = "compliant",     Evidence = 2, LastReviewed = "Jan 2026", Owner = "Dr. R. Okafor" },
+            new Clause { ClauseId = "4.3.1",  Title = "Document control",                  Section = "4.3",  Status = "compliant",     Evidence = 5, LastReviewed = "Feb 2026", Owner = "K. Patel" },
+            new Clause { ClauseId = "4.5.2",  Title = "Subcontractor register",            Section = "4.5",  Status = "nonconformant", Evidence = 0, LastReviewed = "Mar 2026", Owner = "K. Patel" },
+            new Clause { ClauseId = "4.8.1",  Title = "Complaint handling",                Section = "4.8",  Status = "compliant",     Evidence = 3, LastReviewed = "Feb 2026", Owner = "K. Patel" },
+            new Clause { ClauseId = "4.13.1", Title = "Record retention",                  Section = "4.13", Status = "compliant",     Evidence = 4, LastReviewed = "Nov 2025", Owner = "K. Patel" },
+            new Clause { ClauseId = "4.14.3", Title = "Auditor independence",               Section = "4.14", Status = "compliant",     Evidence = 4, LastReviewed = "Feb 2026", Owner = "K. Patel" },
+            new Clause { ClauseId = "4.15.2", Title = "Management review inputs",           Section = "4.15", Status = "compliant",     Evidence = 6, LastReviewed = "Feb 2026", Owner = "Dr. R. Okafor" },
+            new Clause { ClauseId = "5.1.4",  Title = "BLS recertification",               Section = "5.1",  Status = "nonconformant", Evidence = 1, LastReviewed = "Mar 2026", Owner = "M. Chen" },
+            new Clause { ClauseId = "5.3.2",  Title = "Equipment acceptance testing",      Section = "5.3",  Status = "compliant",     Evidence = 5, LastReviewed = "Mar 2026", Owner = "M. Chen" },
+            new Clause { ClauseId = "5.3.4",  Title = "Equipment verification programme",  Section = "5.3",  Status = "nonconformant", Evidence = 2, LastReviewed = "Apr 2026", Owner = "M. Chen" },
+            new Clause { ClauseId = "5.3.5",  Title = "Equipment decontamination",         Section = "5.3",  Status = "review",        Evidence = 2, LastReviewed = "Apr 2026", Owner = "M. Chen" },
+            new Clause { ClauseId = "5.3.6",  Title = "Adverse incident reporting",        Section = "5.3",  Status = "compliant",     Evidence = 3, LastReviewed = "Apr 2026", Owner = "M. Chen" },
+            new Clause { ClauseId = "5.5.2",  Title = "Pre-study bio-signal verification", Section = "5.5",  Status = "compliant",     Evidence = 6, LastReviewed = "Apr 2026", Owner = "M. Chen" },
+            new Clause { ClauseId = "5.5.3",  Title = "PSG recording protocols",           Section = "5.5",  Status = "compliant",     Evidence = 7, LastReviewed = "Mar 2026", Owner = "Dr. R. Okafor" },
+            new Clause { ClauseId = "5.6.6",  Title = "Inter-observer concordance",        Section = "5.6",  Status = "compliant",     Evidence = 4, LastReviewed = "Mar 2026", Owner = "M. Chen" },
+            new Clause { ClauseId = "5.6.8",  Title = "External proficiency testing (EQA)",Section = "5.6",  Status = "review",        Evidence = 3, LastReviewed = "Mar 2026", Owner = "Dr. R. Okafor" },
+            new Clause { ClauseId = "5.8.1",  Title = "10 business-day reporting SLA",     Section = "5.8",  Status = "compliant",     Evidence = 5, LastReviewed = "Apr 2026", Owner = "Dr. R. Okafor" }
         );
 
         db.ComplianceSections.AddRange(
-            new ComplianceSection { Section = "4.1", Title = "Organisation & management", Total = 8, Ok = 8, Nc = 0, Na = 0, Status = "compliant" },
-            new ComplianceSection { Section = "4.2", Title = "Quality management system", Total = 5, Ok = 5, Nc = 0, Na = 0, Status = "compliant" },
-            new ComplianceSection { Section = "4.3", Title = "Document control", Total = 6, Ok = 5, Nc = 1, Na = 0, Status = "review" },
-            new ComplianceSection { Section = "4.4", Title = "Service agreements", Total = 4, Ok = 4, Nc = 0, Na = 0, Status = "compliant" },
-            new ComplianceSection { Section = "4.5", Title = "Subcontracting", Total = 3, Ok = 2, Nc = 1, Na = 0, Status = "nonconformant" },
-            new ComplianceSection { Section = "4.6", Title = "External services & supplies", Total = 4, Ok = 4, Nc = 0, Na = 0, Status = "compliant" },
-            new ComplianceSection { Section = "4.7", Title = "Advisory services", Total = 2, Ok = 2, Nc = 0, Na = 0, Status = "compliant" },
-            new ComplianceSection { Section = "4.8", Title = "Complaint resolution", Total = 4, Ok = 4, Nc = 0, Na = 0, Status = "compliant" },
-            new ComplianceSection { Section = "4.9", Title = "Nonconformance control", Total = 5, Ok = 5, Nc = 0, Na = 0, Status = "compliant" },
-            new ComplianceSection { Section = "4.10", Title = "Corrective action", Total = 4, Ok = 4, Nc = 0, Na = 0, Status = "compliant" },
-            new ComplianceSection { Section = "4.11", Title = "Preventive action", Total = 3, Ok = 3, Nc = 0, Na = 0, Status = "compliant" },
-            new ComplianceSection { Section = "4.12", Title = "Continual improvement", Total = 3, Ok = 3, Nc = 0, Na = 0, Status = "compliant" },
-            new ComplianceSection { Section = "4.13", Title = "Records & audit trail", Total = 6, Ok = 6, Nc = 0, Na = 0, Status = "compliant" },
-            new ComplianceSection { Section = "4.14", Title = "Internal audits", Total = 5, Ok = 5, Nc = 0, Na = 0, Status = "compliant" },
-            new ComplianceSection { Section = "4.15", Title = "Management review", Total = 5, Ok = 5, Nc = 0, Na = 0, Status = "compliant" },
-            new ComplianceSection { Section = "5.1", Title = "Staff & training", Total = 10, Ok = 8, Nc = 2, Na = 0, Status = "nonconformant" },
-            new ComplianceSection { Section = "5.2", Title = "Accommodation & facilities", Total = 6, Ok = 6, Nc = 0, Na = 0, Status = "compliant" },
-            new ComplianceSection { Section = "5.3", Title = "Equipment management", Total = 12, Ok = 9, Nc = 2, Na = 1, Status = "nonconformant" },
-            new ComplianceSection { Section = "5.4", Title = "Pre-analytical processes", Total = 5, Ok = 5, Nc = 0, Na = 0, Status = "compliant" },
-            new ComplianceSection { Section = "5.5", Title = "Study & recording processes", Total = 14, Ok = 13, Nc = 1, Na = 0, Status = "review" },
-            new ComplianceSection { Section = "5.6", Title = "Analytical quality assurance", Total = 9, Ok = 7, Nc = 1, Na = 1, Status = "review" },
-            new ComplianceSection { Section = "5.7", Title = "Post-analytical processes", Total = 6, Ok = 6, Nc = 0, Na = 0, Status = "compliant" },
-            new ComplianceSection { Section = "5.8", Title = "Reporting & result release", Total = 10, Ok = 10, Nc = 0, Na = 0, Status = "compliant" }
+            new ComplianceSection { Section = "4.1",  Title = "Organisation & management",    Total = 8,  Ok = 8,  Nc = 0, Na = 0, Status = "compliant"     },
+            new ComplianceSection { Section = "4.2",  Title = "Quality management system",    Total = 5,  Ok = 5,  Nc = 0, Na = 0, Status = "compliant"     },
+            new ComplianceSection { Section = "4.3",  Title = "Document control",             Total = 6,  Ok = 5,  Nc = 1, Na = 0, Status = "review"        },
+            new ComplianceSection { Section = "4.4",  Title = "Service agreements",           Total = 4,  Ok = 4,  Nc = 0, Na = 0, Status = "compliant"     },
+            new ComplianceSection { Section = "4.5",  Title = "Subcontracting",               Total = 3,  Ok = 2,  Nc = 1, Na = 0, Status = "nonconformant" },
+            new ComplianceSection { Section = "4.6",  Title = "External services & supplies", Total = 4,  Ok = 4,  Nc = 0, Na = 0, Status = "compliant"     },
+            new ComplianceSection { Section = "4.7",  Title = "Advisory services",            Total = 2,  Ok = 2,  Nc = 0, Na = 0, Status = "compliant"     },
+            new ComplianceSection { Section = "4.8",  Title = "Complaint resolution",         Total = 4,  Ok = 4,  Nc = 0, Na = 0, Status = "compliant"     },
+            new ComplianceSection { Section = "4.9",  Title = "Nonconformance control",       Total = 5,  Ok = 5,  Nc = 0, Na = 0, Status = "compliant"     },
+            new ComplianceSection { Section = "4.10", Title = "Corrective action",            Total = 4,  Ok = 4,  Nc = 0, Na = 0, Status = "compliant"     },
+            new ComplianceSection { Section = "4.11", Title = "Preventive action",            Total = 3,  Ok = 3,  Nc = 0, Na = 0, Status = "compliant"     },
+            new ComplianceSection { Section = "4.12", Title = "Continual improvement",        Total = 3,  Ok = 3,  Nc = 0, Na = 0, Status = "compliant"     },
+            new ComplianceSection { Section = "4.13", Title = "Records & audit trail",        Total = 6,  Ok = 6,  Nc = 0, Na = 0, Status = "compliant"     },
+            new ComplianceSection { Section = "4.14", Title = "Internal audits",              Total = 5,  Ok = 5,  Nc = 0, Na = 0, Status = "compliant"     },
+            new ComplianceSection { Section = "4.15", Title = "Management review",            Total = 5,  Ok = 5,  Nc = 0, Na = 0, Status = "compliant"     },
+            new ComplianceSection { Section = "5.1",  Title = "Staff & training",             Total = 10, Ok = 8,  Nc = 2, Na = 0, Status = "nonconformant" },
+            new ComplianceSection { Section = "5.2",  Title = "Accommodation & facilities",   Total = 6,  Ok = 6,  Nc = 0, Na = 0, Status = "compliant"     },
+            new ComplianceSection { Section = "5.3",  Title = "Equipment management",         Total = 12, Ok = 9,  Nc = 2, Na = 1, Status = "nonconformant" },
+            new ComplianceSection { Section = "5.4",  Title = "Pre-analytical processes",     Total = 5,  Ok = 5,  Nc = 0, Na = 0, Status = "compliant"     },
+            new ComplianceSection { Section = "5.5",  Title = "Study & recording processes",  Total = 14, Ok = 13, Nc = 1, Na = 0, Status = "review"        },
+            new ComplianceSection { Section = "5.6",  Title = "Analytical quality assurance", Total = 9,  Ok = 7,  Nc = 1, Na = 1, Status = "review"        },
+            new ComplianceSection { Section = "5.7",  Title = "Post-analytical processes",    Total = 6,  Ok = 6,  Nc = 0, Na = 0, Status = "compliant"     },
+            new ComplianceSection { Section = "5.8",  Title = "Reporting & result release",   Total = 10, Ok = 10, Nc = 0, Na = 0, Status = "compliant"     }
         );
 
         db.Tasks.AddRange(
-            new NexusTask { TaskId = "T-001", Title = "Verify HSAT-NOX-014 — recall check", Clause = "5.3.4", Due = "today", Priority = "critical" },
-            new NexusTask { TaskId = "T-002", Title = "Complete subcontractor register (SIS Labs)", Clause = "4.5.2", Due = "in 3 days", Priority = "high" },
-            new NexusTask { TaskId = "T-003", Title = "Book BLS recert for 4 lapsed staff", Clause = "5.1.4", Due = "in 7 days", Priority = "high" },
-            new NexusTask { TaskId = "T-004", Title = "Sign off PSG-2026-0440 (SLA due today)", Clause = "5.8.1", Due = "today", Priority = "high" },
-            new NexusTask { TaskId = "T-005", Title = "Review SOP-EQP-012 (overdue 8d)", Clause = "4.3.1", Due = "overdue", Priority = "high" },
-            new NexusTask { TaskId = "T-006", Title = "Assemble Q2 management review pack", Clause = "4.15.2", Due = "in 1 day", Priority = "medium" }
+            // T-001: references HSAT-NOX-014 which is verified as "bad" in equipment
+            new NexusTask { TaskId = "T-001", Title = "Verify HSAT-NOX-014 — overdue since 02 Jan 2026",   Clause = "5.3.4", Due = "today",     Priority = "critical" },
+            // T-002: references the NC raised in clause 4.5.2
+            new NexusTask { TaskId = "T-002", Title = "Complete subcontractor register (SIS Pathology)",    Clause = "4.5.2", Due = "in 3 days", Priority = "high"     },
+            // T-003: references the NC raised in clause 5.1.4
+            new NexusTask { TaskId = "T-003", Title = "Book BLS recertification for 4 lapsed staff",        Clause = "5.1.4", Due = "in 7 days", Priority = "high"     },
+            // T-004: references PSG-2026-0440 which has Due=0 (SLA due today)
+            new NexusTask { TaskId = "T-004", Title = "Sign off PSG-2026-0440 — T. Nguyen (SLA due today)", Clause = "5.8.1", Due = "today",     Priority = "high"     },
+            // T-005: references SOP-EQP-012 which has status "Draft" with overdue review
+            new NexusTask { TaskId = "T-005", Title = "Revise SOP-EQP-012 — peer review rejected 05 May",  Clause = "4.3.1", Due = "overdue",   Priority = "high"     },
+            // T-006: routine management review preparation
+            new NexusTask { TaskId = "T-006", Title = "Assemble Q2 2026 management review pack",            Clause = "4.15.2", Due = "in 1 day", Priority = "medium"   }
         );
 
         db.Activity.AddRange(
-            new ActivityEntry { Who = "K. Patel", Action = "updated self-assessment", Target = "cl. 5.3.5 to 'review'", Time = "2 min ago", Kind = "edit" },
-            new ActivityEntry { Who = "M. Chen", Action = "linked evidence to", Target = "cl. 5.3.4", Time = "18 min ago", Kind = "link" },
-            new ActivityEntry { Who = "Dr. R. Okafor", Action = "signed final report", Target = "PSG-2026-0437", Time = "1 h ago", Kind = "sign" },
-            new ActivityEntry { Who = "System", Action = "raised NC", Target = "HSAT-NOX-014 verification overdue", Time = "2 h ago", Kind = "alert" },
-            new ActivityEntry { Who = "A. Singh", Action = "submitted scoring for", Target = "PSG-2026-0438", Time = "3 h ago", Kind = "submit" },
-            new ActivityEntry { Who = "K. Patel", Action = "uploaded audit report", Target = "AUD-2026-Q1 findings", Time = "yesterday", Kind = "upload" }
+            // references clause 5.3.5 which has status "review"
+            new ActivityEntry { Who = "K. Patel",       Action = "updated self-assessment",  Target = "cl. 5.3.5 to 'under review'",        Time = "2 min ago",  Kind = "edit"   },
+            // references clause 5.3.4 which is nonconformant
+            new ActivityEntry { Who = "M. Chen",        Action = "linked evidence to",        Target = "cl. 5.3.4 — verification log added",  Time = "18 min ago", Kind = "link"   },
+            // references PSG-2026-0437 which has Status=Final, SignedDays=7, Physician=Dr. F. Liu
+            new ActivityEntry { Who = "Dr. F. Liu",     Action = "signed final report",       Target = "PSG-2026-0437 — A. Park",             Time = "1 h ago",    Kind = "sign"   },
+            // references HSAT-NOX-014 which has VerifyStatus=bad
+            new ActivityEntry { Who = "System",         Action = "raised NC",                 Target = "HSAT-NOX-014 — verification overdue", Time = "2 h ago",    Kind = "alert"  },
+            // references PSG-2026-0438 which has Status=Preliminary, Scorer=A. Singh
+            new ActivityEntry { Who = "A. Singh",       Action = "submitted scoring for",     Target = "PSG-2026-0438 — D. Mitchell",         Time = "3 h ago",    Kind = "submit" },
+            // references audit activity — routine
+            new ActivityEntry { Who = "K. Patel",       Action = "uploaded audit report",     Target = "AUD-2026-Q1 internal audit findings",  Time = "yesterday",  Kind = "upload" }
         );
 
         db.SaveChanges();

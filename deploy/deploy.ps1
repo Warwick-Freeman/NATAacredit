@@ -1,5 +1,8 @@
-# Usage: .\deploy\deploy.ps1
+# Usage: .\deploy\deploy.ps1 [-Reseed]
 # Run from the repo root.
+# -Reseed: delete the database on the server so it reseeds on next startup
+
+param([switch]$Reseed)
 
 $ErrorActionPreference = 'Stop'
 $KeyPath = "C:\Users\wef.CMPHQ\NATAacredit\Hosting\N360Accredit.pem"
@@ -34,6 +37,12 @@ scp -i $KeyPath deploy/nexus-api.service "${server}:/tmp/nexus-api.service"
 ssh -i $KeyPath $server "sudo mv /tmp/nexus-api.service /etc/systemd/system/nexus-api.service"
 ssh -i $KeyPath $server "sudo systemctl daemon-reload"
 ssh -i $KeyPath $server "sudo systemctl enable nexus-api"
+
+if ($Reseed) {
+    Write-Host "==> Clearing database (reseed on next startup)..."
+    ssh -i $KeyPath $server "sudo rm -f /opt/nexus-api/nexus.db /opt/nexus-api/data/*"
+}
+
 ssh -i $KeyPath $server "sudo systemctl restart nexus-api"
 
 Write-Host "==> Installing nginx config..."
