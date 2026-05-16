@@ -9,23 +9,24 @@ Write-Host "==> Building frontend..."
 npm run build
 
 Write-Host "==> Publishing .NET API..."
+if (Test-Path api\publish) { Remove-Item -Recurse -Force api\publish }
 Push-Location api
 dotnet publish -c Release -o ./publish
 Pop-Location
 
 Write-Host "==> Uploading frontend..."
-ssh -i $KeyPath $server "sudo mkdir -p /var/www/nexus && sudo chown ubuntu:ubuntu /var/www/nexus"
-Compress-Archive -Path dist\* -DestinationPath dist.zip -Force
-scp -i $KeyPath dist.zip "${server}:/tmp/nexus-dist.zip"
-Remove-Item dist.zip
-ssh -i $KeyPath $server "unzip -o /tmp/nexus-dist.zip -d /var/www/nexus && rm /tmp/nexus-dist.zip"
+ssh -i $KeyPath $server "sudo mkdir -p /var/www/nexus && sudo chown -R ubuntu:ubuntu /var/www/nexus"
+tar -czf dist.tar.gz -C dist .
+scp -i $KeyPath dist.tar.gz "${server}:/tmp/nexus-dist.tar.gz"
+Remove-Item dist.tar.gz
+ssh -i $KeyPath $server "tar -xzf /tmp/nexus-dist.tar.gz -C /var/www/nexus && rm /tmp/nexus-dist.tar.gz"
 
 Write-Host "==> Uploading API..."
-ssh -i $KeyPath $server "sudo mkdir -p /opt/nexus-api && sudo chown ubuntu:ubuntu /opt/nexus-api"
-Compress-Archive -Path api\publish\* -DestinationPath api-publish.zip -Force
-scp -i $KeyPath api-publish.zip "${server}:/tmp/nexus-api.zip"
-Remove-Item api-publish.zip
-ssh -i $KeyPath $server "unzip -o /tmp/nexus-api.zip -d /opt/nexus-api && rm /tmp/nexus-api.zip"
+ssh -i $KeyPath $server "sudo systemctl stop nexus-api; sudo mkdir -p /opt/nexus-api && sudo chown -R ubuntu:ubuntu /opt/nexus-api"
+tar -czf api-publish.tar.gz -C api/publish .
+scp -i $KeyPath api-publish.tar.gz "${server}:/tmp/nexus-api.tar.gz"
+Remove-Item api-publish.tar.gz
+ssh -i $KeyPath $server "tar -xzf /tmp/nexus-api.tar.gz -C /opt/nexus-api && rm /tmp/nexus-api.tar.gz"
 ssh -i $KeyPath $server "sudo chown -R www-data:www-data /opt/nexus-api"
 
 Write-Host "==> Installing systemd service..."
