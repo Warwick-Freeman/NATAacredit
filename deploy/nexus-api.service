@@ -4,11 +4,14 @@ After=network.target
 
 [Service]
 WorkingDirectory=/opt/nexus-api
-ExecStart=/usr/bin/dotnet /opt/nexus-api/api.dll
+ExecStart=/usr/bin/dotnet /opt/nexus-api/NexusApi.dll
 Restart=always
 RestartSec=5
 Environment=ASPNETCORE_URLS=http://127.0.0.1:5000
 Environment=ASPNETCORE_ENVIRONMENT=Production
+Environment=DOTNET_CLI_HOME=/opt/nexus-api
+Environment=DOTNET_NOLOGO=1
+Environment=DOTNET_CLI_TELEMETRY_OPTOUT=1
 User=www-data
 Group=www-data
 
