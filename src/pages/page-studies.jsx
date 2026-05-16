@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import Icon from '../icons';
 import { PageHeader, Pill, Avatar, Tabs } from '../components';
+import { studyStatusKind } from './page-patients';
 
 const StudiesPage = ({ data: D, openStudy }) => {
   const [tab, setTab] = useState("queue");
@@ -102,12 +103,7 @@ const StudiesPage = ({ data: D, openStudy }) => {
                     <td><div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Avatar name={s.scorer} size={20} idx={s.scorer.charCodeAt(0) % 9} />{s.scorer}</div></td>
                     <td>{s.physician}</td>
                     <td>
-                      <Pill kind={
-                        s.status === 'Final' ? 'good'
-                          : s.status === 'Awaiting sign-off' ? 'warn'
-                          : s.status === 'Preliminary' ? 'info'
-                          : 'outline'
-                      }>{s.status}</Pill>
+                      <Pill kind={studyStatusKind(s.status)}>{s.status}</Pill>
                     </td>
                     <td>
                       <div className="sla">

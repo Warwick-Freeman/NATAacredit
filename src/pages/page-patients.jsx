@@ -7,12 +7,28 @@ import { useAuth } from '../AuthContext';
 import { useNexusData } from '../NexusDataContext';
 import { DME_PROVIDERS, DX_LIST, initDxFromDiagnoses, generateOrderHtml } from '../dme-order';
 
+// ─── helpers ──────────────────────────────────────────────────────────────────
+
+const ageFromDob = (dob) => {
+  const today = new Date();
+  const b = new Date(dob);
+  let age = today.getFullYear() - b.getFullYear();
+  if (today < new Date(today.getFullYear(), b.getMonth(), b.getDate())) age--;
+  return age;
+};
+
+export const studyStatusKind = (status) =>
+  status === 'Final' ? 'good'
+  : status === 'Awaiting sign-off' ? 'warn'
+  : status === 'Preliminary' ? 'info'
+  : 'outline';
+
 // ─── seed data ────────────────────────────────────────────────────────────────
 
 const SEED_PATIENTS = [
   // Matches study PSG-2026-0441 (Awaiting sign-off, Dr. R. Okafor)
   {
-    id: 'PAT-001', initials: 'RK', name: 'R. Kingston', dob: '1974-06-12', age: 51, sex: 'M',
+    id: 'PAT-001', initials: 'RK', name: 'R. Kingston', dob: '1974-06-12', age: ageFromDob('1974-06-12'), sex: 'M',
     mrn: 'MRN-4412', site: 'Riverside Main Lab',
     referrer: 'Dr. H. Williams (GP)', physician: 'Dr. R. Okafor',
     diagnoses: ['Severe OSA (AHI 42.3/h)', 'Hypertension', 'Type 2 DM'],
@@ -29,7 +45,7 @@ const SEED_PATIENTS = [
   },
   // Matches study PSG-2026-0440 (Awaiting sign-off, SLA critical, Dr. R. Okafor)
   {
-    id: 'PAT-002', initials: 'TN', name: 'T. Nguyen', dob: '1989-09-03', age: 36, sex: 'M',
+    id: 'PAT-002', initials: 'TN', name: 'T. Nguyen', dob: '1989-09-03', age: ageFromDob('1989-09-03'), sex: 'M',
     mrn: 'MRN-4387', site: 'Riverside Main Lab',
     referrer: 'Dr. K. Cheng (Cardiologist)', physician: 'Dr. R. Okafor',
     diagnoses: ['Moderate OSA (AHI 18.7/h)', 'Obesity BMI 33.2'],
@@ -46,7 +62,7 @@ const SEED_PATIENTS = [
   },
   // Matches study PSG-2026-0438 (Preliminary, Split-night PSG/CPAP, Dr. R. Okafor)
   {
-    id: 'PAT-003', initials: 'DM', name: 'D. Mitchell', dob: '1955-04-08', age: 71, sex: 'M',
+    id: 'PAT-003', initials: 'DM', name: 'D. Mitchell', dob: '1955-04-08', age: ageFromDob('1955-04-08'), sex: 'M',
     mrn: 'MRN-4301', site: 'Riverside Main Lab',
     referrer: 'Dr. P. Nguyen (Cardiologist)', physician: 'Dr. R. Okafor',
     diagnoses: ['Severe OSA (AHI 58.1/h)', 'Atrial fibrillation', 'CHF (EF 45%)'],
@@ -63,7 +79,7 @@ const SEED_PATIENTS = [
   },
   // Matches study PSG-2026-0439 (Scoring, Paediatric PSG, Dr. L. Hartono)
   {
-    id: 'PAT-004', initials: 'LW', name: 'L. Walsh', dob: '2012-02-14', age: 14, sex: 'F',
+    id: 'PAT-004', initials: 'LW', name: 'L. Walsh', dob: '2012-02-14', age: ageFromDob('2012-02-14'), sex: 'F',
     mrn: 'MRN-4455', site: 'Eastside Paediatric Lab',
     referrer: 'Dr. M. Fisher (Paediatric ENT)', physician: 'Dr. L. Hartono',
     diagnoses: ['Paediatric OSA — post-adenotonsillectomy monitoring'],
@@ -76,7 +92,7 @@ const SEED_PATIENTS = [
   },
   // Matches study MSLT-2026-0031 (Awaiting sign-off, MSLT, Dr. R. Okafor)
   {
-    id: 'PAT-005', initials: 'SC', name: 'S. Carter', dob: '1998-07-17', age: 27, sex: 'F',
+    id: 'PAT-005', initials: 'SC', name: 'S. Carter', dob: '1998-07-17', age: ageFromDob('1998-07-17'), sex: 'F',
     mrn: 'MRN-4398', site: 'Riverside Main Lab',
     referrer: 'Dr. J. Park (Neurologist)', physician: 'Dr. R. Okafor',
     diagnoses: ['Narcolepsy Type 1 (CSF hypocretin <110 pg/mL)', 'Cataplexy confirmed'],
@@ -92,7 +108,7 @@ const SEED_PATIENTS = [
   },
   // Matches study HSAT-2026-0218 (Scoring, Type 3 HSAT, Dr. F. Liu, Home Service)
   {
-    id: 'PAT-006', initials: 'PB', name: 'P. Brown', dob: '1968-11-22', age: 57, sex: 'F',
+    id: 'PAT-006', initials: 'PB', name: 'P. Brown', dob: '1968-11-22', age: ageFromDob('1968-11-22'), sex: 'F',
     mrn: 'MRN-4471', site: 'Home Service – North',
     referrer: 'Dr. S. Adams (GP)', physician: 'Dr. F. Liu',
     diagnoses: ['Suspected OSA (Epworth 16/24)', 'Hypothyroidism', 'Obesity BMI 31.4'],
@@ -105,7 +121,7 @@ const SEED_PATIENTS = [
   },
   // Matches study PSG-2026-0437 (Final, signed Dr. F. Liu, 7 days)
   {
-    id: 'PAT-007', initials: 'AP', name: 'A. Park', dob: '1971-01-29', age: 55, sex: 'M',
+    id: 'PAT-007', initials: 'AP', name: 'A. Park', dob: '1971-01-29', age: ageFromDob('1971-01-29'), sex: 'M',
     mrn: 'MRN-4329', site: 'Eastside Paediatric Lab',
     referrer: 'Dr. K. Cheng (Cardiologist)', physician: 'Dr. F. Liu',
     diagnoses: ['Severe OSA (AHI 37.8/h)', 'Hypertension', 'Obesity BMI 34.1'],
@@ -122,7 +138,7 @@ const SEED_PATIENTS = [
   },
   // Matches study HSAT-2026-0217 (Final, Type 2 HSAT, signed Dr. F. Liu, Home Service)
   {
-    id: 'PAT-008', initials: 'MT', name: 'M. Torres', dob: '1983-05-15', age: 42, sex: 'F',
+    id: 'PAT-008', initials: 'MT', name: 'M. Torres', dob: '1983-05-15', age: ageFromDob('1983-05-15'), sex: 'F',
     mrn: 'MRN-4489', site: 'Home Service – North',
     referrer: 'Dr. T. Brown (GP)', physician: 'Dr. F. Liu',
     diagnoses: ['Moderate OSA (AHI 22.4/h) — confirmed HSAT-2026-0217', 'Excessive daytime sleepiness (ESS 14/24)'],
@@ -703,7 +719,7 @@ function CompliancePill({ rate }) {
 
 function PatientDrawer({ patient, onClose, onCreateTask, onOrderDme, studies = [], openStudy }) {
   const [dtab, setDtab] = useState('overview');
-  const data = patient.compliance ? makeDailyData(patient.id, patient.compliance.rate, patient.compliance.meanUsage) : [];
+  const complianceDays = patient.compliance ? makeDailyData(patient.id, patient.compliance.rate, patient.compliance.meanUsage) : [];
   const provider = patient.treatment?.provider ? CPAP_PROVIDERS[patient.treatment.provider] : null;
 
   return (
@@ -808,7 +824,7 @@ function PatientDrawer({ patient, onClose, onCreateTask, onOrderDme, studies = [
               <div style={{ background: 'var(--surface-2)', borderRadius: 8, padding: '12px 14px' }}>
                 <ComplianceBar patientId={patient.id} rate={patient.compliance.rate} meanUsage={patient.compliance.meanUsage} />
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4, fontSize: 10, color: 'var(--ink-4)' }}>
-                  <span>{data[0]?.date}</span><span>today</span>
+                  <span>{complianceDays[0]?.date}</span><span>today</span>
                 </div>
               </div>
             </div>
@@ -846,16 +862,11 @@ function PatientDrawer({ patient, onClose, onCreateTask, onOrderDme, studies = [
           <div>
             {patient.studies.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--ink-3)', fontSize: 13 }}>No studies on file.</div>
-            ) : patient.studies.map((sid, i) => {
+            ) : patient.studies.map((sid) => {
               const study = studies.find(x => x.id === sid);
-              const statusKind = study?.status === 'Final' ? 'good'
-                : study?.status === 'Awaiting sign-off' ? 'warn'
-                : study?.status === 'Preliminary' ? 'info'
-                : study?.status === 'Scoring' ? 'outline'
-                : 'outline';
               const isClickable = !!study && !!openStudy;
               return (
-                <div key={i}
+                <div key={sid}
                   onClick={isClickable ? () => openStudy(sid) : undefined}
                   style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--border)', cursor: isClickable ? 'pointer' : 'default' }}>
                   <div style={{ width: 32, height: 32, borderRadius: 7, background: 'var(--accent-soft)', color: 'var(--accent-ink)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
@@ -866,7 +877,7 @@ function PatientDrawer({ patient, onClose, onCreateTask, onOrderDme, studies = [
                     <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{study ? study.type : 'Sleep study'} · {patient.site}</div>
                   </div>
                   {study
-                    ? <><Pill kind={statusKind}>{study.status}</Pill>{isClickable && <Icon name="chev_right" size={14} />}</>
+                    ? <><Pill kind={studyStatusKind(study.status)}>{study.status}</Pill>{isClickable && <Icon name="chev_right" size={14} />}</>
                     : <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>Historical</span>
                   }
                 </div>
