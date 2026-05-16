@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node /c/Users/wef.CMPHQ/NATAacredit/update_docs.cjs)"
+    ]
+  }
+}

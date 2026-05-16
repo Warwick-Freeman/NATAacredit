@@ -1,4 +1,4 @@
-const BASE = 'http://localhost:5000';
+const BASE = import.meta.env.VITE_API_URL ?? '';
 
 async function get(path) {
   const res = await fetch(`${BASE}${path}`);
@@ -53,24 +53,32 @@ function normaliseIndicator(k) {
   };
 }
 
+const CLAUSE_STATUS_MAP = { nonconformant: 'nc', review: 'partial' };
+
 function normaliseClause(c) {
   return {
     id: c.clauseId,
     title: c.title,
     section: c.section,
-    status: c.status,
+    status: CLAUSE_STATUS_MAP[c.status] || c.status,
     evidence: c.evidence,
     lastReviewed: c.lastReviewed,
     owner: c.owner,
+    notes: '',
   };
 }
 
 function normaliseSection(s) {
+  const partial = Math.max(0, s.total - s.ok - s.nc - (s.na || 0));
   return {
+    id: s.section,
+    name: s.title,
     section: s.section,
     title: s.title,
     total: s.total,
+    compliant: s.ok,
     ok: s.ok,
+    partial,
     nc: s.nc,
     na: s.na,
     status: s.status,
@@ -90,10 +98,12 @@ function normaliseTask(t) {
 function normaliseActivity(a) {
   return {
     who: a.who,
+    what: a.action,
+    when: a.time,
+    kind: a.kind,
     action: a.action,
     target: a.target,
     time: a.time,
-    kind: a.kind,
   };
 }
 
@@ -110,6 +120,14 @@ export async function fetchAll() {
     ]);
 
   return {
+    service: {
+      name: "Riverside Sleep & Respiratory Centre",
+      abn: "67 412 998 003",
+      sites: ["Riverside Main Lab", "Eastside Paediatric Lab", "Home Service – North"],
+      nextAssessment: "12 Aug 2026",
+      daysToAssessment: 92,
+      accreditation: { status: "Accredited", since: "Mar 2022", certNo: "NATA-15847" },
+    },
     studies: studies.map(normaliseStudy),
     equipment: equipment.map(normaliseEquipment),
     indicators: indicators.map(normaliseIndicator),

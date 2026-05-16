@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNexusData } from './NexusDataContext';
+import { useAuth } from './AuthContext';
+import { useTaskContext } from './TaskContext';
 import { Sidebar, Topbar, Drawer } from './components';
+import LoginPage from './pages/page-login';
 import { useTweaks, TweaksPanel, TweakSection, TweakRadio } from './tweaks-panel';
 import HomePage from './pages/page-home';
 import AccreditationPage from './pages/page-accreditation';
@@ -12,14 +15,21 @@ import AuditsPage from './pages/page-audits';
 import NCRPage from './pages/page-ncr';
 import StaffPage from './pages/page-staff';
 import SettingsPage from './pages/page-settings';
-import { TasksPage } from './pages/page-stubs';
+import AuditTrailPage from './pages/page-audit-trail';
+import TasksPage from './pages/page-tasks';
+import PatientsPage from './pages/page-patients';
+import TaskFormDrawer from './task-form-drawer';
 import ClauseDrawer from './clause-drawer';
 import StudyDrawer from './study-drawer';
+import GlobalSearch from './global-search';
 
 const App = () => {
+  const { user, signOut } = useAuth();
+  const { tasks, modalOpen, modalPrefill, closeTaskModal, addTask } = useTaskContext();
   const [route, setRoute] = useState("home");
   const [openClauseId, setOpenClauseId] = useState(null);
   const [openStudyId, setOpenStudyId] = useState(null);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [tweaks, setTweak] = useTweaks({
     "palette": "default",
     "density": "comfortable"
@@ -29,16 +39,68 @@ const App = () => {
     document.documentElement.dataset.palette = tweaks.palette === 'default' ? '' : tweaks.palette;
   }, [tweaks.palette]);
 
+  useEffect(() => {
+    const handler = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); setSearchOpen(true); }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, []);
+
   const goTo = (r) => { setRoute(r); window.scrollTo({ top: 0 }); };
 
+  if (!user) return <LoginPage />;
+
   const { data, loading, error } = useNexusData();
+
+  const criticalTaskCount = tasks.filter(t => t.status !== 'done' && t.priority === 'critical').length;
+
+  const notifications = (() => {
+    const items = [];
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+
+    const critTasks = tasks.filter(t => t.priority === 'critical' && t.status !== 'done');
+    if (critTasks.length > 0)
+      items.push({ kind: 'bad', icon: 'alert', title: `${critTasks.length} critical task${critTasks.length > 1 ? 's' : ''} open`, sub: critTasks.slice(0, 2).map(t => t.title).join(' · '), page: 'tasks' });
+
+    const overdue = tasks.filter(t => t.status !== 'done' && t.dueDate && new Date(t.dueDate) < today);
+    if (overdue.length > 0)
+      items.push({ kind: 'bad', icon: 'clock', title: `${overdue.length} overdue task${overdue.length > 1 ? 's' : ''}`, sub: overdue.slice(0, 2).map(t => t.title).join(' · '), page: 'tasks' });
+
+    if (data) {
+      const badStudies = data.studies.filter(s => s.sla === 'bad' && s.status !== 'Final');
+      if (badStudies.length > 0)
+        items.push({ kind: 'bad', icon: 'paper', title: `${badStudies.length} stud${badStudies.length > 1 ? 'ies' : 'y'} past 10-day SLA`, sub: badStudies.map(s => s.id).join(', '), page: 'studies' });
+
+      const awaitingStudies = data.studies.filter(s => s.status === 'Awaiting sign-off');
+      if (awaitingStudies.length > 0)
+        items.push({ kind: 'warn', icon: 'paper', title: `${awaitingStudies.length} stud${awaitingStudies.length > 1 ? 'ies' : 'y'} awaiting sign-off`, sub: awaitingStudies.map(s => s.id).join(', '), page: 'studies' });
+
+      const badEquip = data.equipment.filter(e => e.verifyStatus === 'bad');
+      if (badEquip.length > 0)
+        items.push({ kind: 'bad', icon: 'cube', title: `${badEquip.length} equipment item${badEquip.length > 1 ? 's' : ''} verification overdue`, sub: badEquip.slice(0, 2).map(e => e.id).join(', '), page: 'equipment' });
+
+      const ncSections = data.complianceBySection.filter(s => s.nc > 0);
+      if (ncSections.length > 0) {
+        const totalNc = ncSections.reduce((s, x) => s + x.nc, 0);
+        items.push({ kind: 'warn', icon: 'shield', title: `${totalNc} non-conformant clause${totalNc > 1 ? 's' : ''}`, sub: ncSections.map(s => `§${s.id}`).join('  ·  '), page: 'accreditation' });
+      }
+
+      const days = data.service?.daysToAssessment;
+      if (days != null && days >= 0 && days < 90)
+        items.push({ kind: days < 30 ? 'bad' : 'warn', icon: 'shield', title: `NATA assessment in ${days} day${days !== 1 ? 's' : ''}`, sub: `Scheduled: ${data.service.nextAssessment}`, page: 'accreditation' });
+    }
+
+    return items;
+  })();
+
   const badges = data ? {
-    tasks: data.tasks.filter(t => t.priority === 'critical').length || null,
+    tasks: criticalTaskCount || null,
     acc: data.complianceBySection.reduce((s,x) => s + x.nc, 0) || null,
     studies: data.studies.filter(s => s.status === 'Awaiting sign-off').length || null,
     equipment: data.equipment.filter(e => e.verifyStatus === 'bad').length || null,
     ncr: 7,
-  } : {};
+  } : { tasks: criticalTaskCount || null };
 
   const crumbsFor = {
     home: ["Home"],
@@ -47,26 +109,30 @@ const App = () => {
     documents: ["Compliance", "Documents & SOPs"],
     audits: ["Compliance", "Audits & reviews"],
     ncr: ["Compliance", "NC & CAPA"],
+    patients: ["Operations", "Patients"],
     studies: ["Operations", "Studies & reports"],
     indicators: ["Operations", "Quality indicators"],
     equipment: ["Operations", "Equipment register"],
     staff: ["Operations", "Staff & training"],
     settings: ["Admin", "Settings"],
+    trail: ["Admin", "Audit trail"],
   };
 
   const renderPage = () => {
     switch (route) {
       case "home": return <HomePage data={data} goTo={goTo} openClause={setOpenClauseId} />;
-      case "tasks": return <TasksPage data={data} />;
+      case "tasks": return <TasksPage />;
       case "accreditation": return <AccreditationPage data={data} openClause={setOpenClauseId} />;
       case "indicators": return <IndicatorsPage data={data} />;
+      case "patients": return <PatientsPage />;
       case "studies": return <StudiesPage data={data} openStudy={setOpenStudyId} />;
-      case "equipment": return <EquipmentPage data={data} />;
+      case "equipment": return <EquipmentPage />;
       case "documents": return <DocumentsPage />;
       case "audits": return <AuditsPage />;
       case "ncr": return <NCRPage />;
       case "staff": return <StaffPage />;
       case "settings": return <SettingsPage />;
+      case "trail": return <AuditTrailPage />;
       default: return <HomePage data={data} goTo={goTo} openClause={setOpenClauseId} />;
     }
   };
@@ -84,32 +150,53 @@ const App = () => {
   );
 
   return (
-    <div className="shell" data-density={tweaks.density}>
-      <Sidebar current={route} setCurrent={goTo} badges={badges} />
-      <div className="main">
-        <Topbar crumbs={crumbsFor[route] || ["Home"]} />
-        {renderPage()}
+    <>
+      <div className="shell" data-density={tweaks.density}>
+        <Sidebar current={route} setCurrent={goTo} badges={badges} user={user} onSignOut={signOut} />
+        <div className="main">
+          <Topbar crumbs={crumbsFor[route] || ["Home"]} onSearch={() => setSearchOpen(true)} notifications={notifications} goTo={goTo} />
+          {renderPage()}
+        </div>
+
+        <Drawer open={!!openClauseId} onClose={() => setOpenClauseId(null)}>
+          <ClauseDrawer data={data} clauseId={openClauseId} onClose={() => setOpenClauseId(null)} />
+        </Drawer>
+
+        <Drawer open={!!openStudyId} onClose={() => setOpenStudyId(null)}>
+          <StudyDrawer data={data} studyId={openStudyId} onClose={() => setOpenStudyId(null)} />
+        </Drawer>
+
+        <TweaksPanel title="Tweaks">
+          <TweakSection title="Palette" subtitle="Color treatments for the same product">
+            <TweakRadio
+              label="Color system"
+              value={tweaks.palette}
+              options={['default', 'navy', 'neutral', 'teal']}
+              onChange={(v) => setTweak('palette', v)}
+            />
+          </TweakSection>
+        </TweaksPanel>
       </div>
 
-      <Drawer open={!!openClauseId} onClose={() => setOpenClauseId(null)}>
-        <ClauseDrawer data={data} clauseId={openClauseId} onClose={() => setOpenClauseId(null)} />
-      </Drawer>
+      {searchOpen && data && (
+        <GlobalSearch data={data} goTo={(r) => { goTo(r); setSearchOpen(false); }} onClose={() => setSearchOpen(false)} />
+      )}
 
-      <Drawer open={!!openStudyId} onClose={() => setOpenStudyId(null)}>
-        <StudyDrawer data={data} studyId={openStudyId} onClose={() => setOpenStudyId(null)} />
-      </Drawer>
-
-      <TweaksPanel title="Tweaks">
-        <TweakSection title="Palette" subtitle="Color treatments for the same product">
-          <TweakRadio
-            label="Color system"
-            value={tweaks.palette}
-            options={['default', 'navy', 'neutral', 'teal']}
-            onChange={(v) => setTweak('palette', v)}
-          />
-        </TweakSection>
-      </TweaksPanel>
-    </div>
+      {/* Global task creation modal — z-index 60, above drawers */}
+      {modalOpen && (
+        <div className="task-modal-overlay" onClick={closeTaskModal}>
+          <div className="task-modal" onClick={e => e.stopPropagation()}>
+            <TaskFormDrawer
+              key={JSON.stringify(modalPrefill)}
+              prefill={modalPrefill}
+              isEdit={false}
+              onSave={(task) => { addTask(task); closeTaskModal(); }}
+              onClose={closeTaskModal}
+            />
+          </div>
+        </div>
+      )}
+    </>
   );
 };
 

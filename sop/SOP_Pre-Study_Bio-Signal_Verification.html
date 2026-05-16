@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SOP - Pre-Study Bio-Signal Verification</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm 22mm 16mm; }
+  body {
+    font-family: "Segoe UI", Arial, sans-serif;
+    font-size: 11pt;
+    color: #1f2933;
+    line-height: 1.45;
+    margin: 0;
+    padding: 24px;
+    background: #f5f7fa;
+  }
+  .page {
+    max-width: 920px;
+    margin: 0 auto;
+    background: #ffffff;
+    padding: 32px 40px;
+    border: 1px solid #d6dde6;
+    border-radius: 6px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+  }
+  .doc-header {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 18px;
+    border-bottom: 3px solid #14406b;
+    padding-bottom: 10px;
+    margin-bottom: 18px;
+  }
+  .doc-header .title {
+    grid-column: 1 / span 2;
+    font-size: 18pt;
+    font-weight: 700;
+    color: #14406b;
+    margin: 0 0 4px 0;
+  }
+  .doc-header .subtitle {
+    grid-column: 1 / span 2;
+    font-size: 10.5pt;
+    color: #506478;
+    margin-bottom: 6px;
+  }
+  .doc-header .field {
+    font-size: 9.5pt;
+    color: #1f2933;
+    border-bottom: 1px dotted #ccd4dc;
+    padding-bottom: 3px;
+  }
+  .doc-header .field strong {
+    display: inline-block;
+    width: 130px;
+    color: #506478;
+    font-weight: 600;
+  }
+  h2 {
+    font-size: 12.5pt;
+    color: #14406b;
+    margin-top: 22px;
+    margin-bottom: 8px;
+    border-left: 4px solid #14406b;
+    padding: 2px 0 2px 8px;
+    background: #eef3f9;
+  }
+  h3 {
+    font-size: 11pt;
+    color: #1f2933;
+    margin-top: 16px;
+    margin-bottom: 4px;
+  }
+  p, li { font-size: 10.5pt; }
+  ul, ol { margin: 4px 0 8px 22px; padding: 0; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 8px 0 12px 0;
+    font-size: 10pt;
+  }
+  th, td {
+    border: 1px solid #c5cfdb;
+    padding: 6px 8px;
+    text-align: left;
+    vertical-align: top;
+  }
+  th {
+    background: #eef3f9;
+    color: #14406b;
+    font-weight: 600;
+  }
+  .step-num {
+    background: #14406b;
+    color: #ffffff;
+    border-radius: 50%;
+    width: 22px;
+    height: 22px;
+    display: inline-block;
+    text-align: center;
+    line-height: 22px;
+    font-weight: 700;
+    font-size: 10pt;
+    margin-right: 6px;
+  }
+  .badge {
+    display: inline-block;
+    padding: 1px 8px;
+    border-radius: 10px;
+    font-size: 9pt;
+    font-weight: 600;
+    margin-left: 4px;
+  }
+  .badge.req { background: #fcd9d3; color: #8b1f0e; }
+  .badge.opt { background: #d8e8d2; color: #2c5d18; }
+  .callout {
+    background: #fff7e0;
+    border: 1px solid #f0d27e;
+    border-left: 4px solid #d49b1c;
+    padding: 8px 12px;
+    margin: 10px 0;
+    font-size: 10pt;
+  }
+  .callout.warn {
+    background: #fdecea;
+    border-color: #f0a99e;
+    border-left-color: #c0392b;
+  }
+  .signoff {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+    margin-top: 14px;
+  }
+  .sign-cell {
+    border: 1px solid #c5cfdb;
+    padding: 8px;
+    min-height: 60px;
+    font-size: 9.5pt;
+    color: #506478;
+  }
+  .sign-cell strong { color: #1f2933; }
+  .footer {
+    border-top: 1px solid #c5cfdb;
+    margin-top: 24px;
+    padding-top: 8px;
+    font-size: 9pt;
+    color: #506478;
+    text-align: center;
+  }
+  .clause-tag {
+    display: inline-block;
+    background: #14406b;
+    color: #fff;
+    font-size: 8.5pt;
+    padding: 1px 6px;
+    border-radius: 3px;
+    margin-left: 4px;
+    vertical-align: middle;
+  }
+  @media print {
+    body { background: #ffffff; padding: 0; }
+    .page { box-shadow: none; border: none; padding: 0; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="doc-header">
+    <div class="title">Standard Operating Procedure</div>
+    <div class="subtitle">Pre-Study Bio-Signal (Biocalibration) Verification - Adult and Paediatric Polysomnography</div>
+    <div class="field"><strong>Document ID:</strong> SOP-PSG-005</div>
+    <div class="field"><strong>Revision:</strong> 1.0</div>
+    <div class="field"><strong>Effective date:</strong> _____ / _____ / _______</div>
+    <div class="field"><strong>Review date:</strong> _____ / _____ / _______</div>
+    <div class="field"><strong>Authorised by:</strong> Medical Director / Tech Lead</div>
+    <div class="field"><strong>Page:</strong> 1 of 1</div>
+  </header>
+
+  <h2>1. Purpose <span class="clause-tag">ASA 5.3.4.2 / 5.5.5.3(a)</span></h2>
+  <p>To verify, prior to each in-lab or ambulatory sleep study, that the polysomnographic recording system, sensors and associated channels are correctly applied and producing physiologically valid signals in accordance with the AASM Manual for the Scoring of Sleep and Associated Events (v2.5+) and the ASA Guidelines for Sleep Studies in Adults / ASTA-ASA Paediatric Addendum. The biocalibration ("biocal") is the patient-performed component of the equipment verification programme (ASA cl. 5.3.4).</p>
+
+  <h2>2. Scope</h2>
+  <p>Applies to all attended Type 1 polysomnography (PSG), CPAP/PAP titration, MSLT/MWT, and unattended Type 2 home studies performed by the service in adult and paediatric patients. Where a patient is unable to cooperate (eg infant, severe cognitive impairment), the alternative qualitative verification described in Section 7 applies.</p>
+
+  <h2>3. Responsibilities</h2>
+  <table>
+    <thead><tr><th>Role</th><th>Responsibility</th></tr></thead>
+    <tbody>
+      <tr><td>Recording Technologist</td><td>Performs biocal, annotates record, judges acceptability, performs corrective re-application.</td></tr>
+      <tr><td>Senior Scientist / Technologist</td><td>Reviews biocal records for trends, signs off out-of-spec exceptions, authorises study commencement when criteria not met.</td></tr>
+      <tr><td>Reporting Physician</td><td>Reviews biocal as part of raw-data review (ASA 5.8.2) and reports any signal quality limitations.</td></tr>
+      <tr><td>Quality Manager</td><td>Audits biocal completion rate as a quality indicator (ASA 5.6.3).</td></tr>
+    </tbody>
+  </table>
+
+  <h2>4. Definitions</h2>
+  <ul>
+    <li><strong>Biocalibration (biocal):</strong> a sequence of patient-performed physiological manoeuvres used to confirm signal polarity, amplitude, and channel labelling.</li>
+    <li><strong>Impedance check:</strong> objective electrical measurement of electrode-to-skin contact resistance.</li>
+    <li><strong>AASM Manual:</strong> Berry RB et al, <em>The AASM Manual for the Scoring of Sleep and Associated Events</em>, current version.</li>
+  </ul>
+
+  <h2>5. Equipment & Materials</h2>
+  <ul>
+    <li>PSG acquisition system (ARTG-listed, current verification certificate within calibration interval - ASA 5.3).</li>
+    <li>Electrodes / sensors per montage: EEG (F3-M2, F4-M1, C3-M2, C4-M1, O1-M2, O2-M1), EOG (E1-M2, E2-M2), chin EMG (3 electrodes), ECG, right & left anterior tibialis EMG, oronasal thermal sensor, nasal pressure transducer, RIP thoracic and abdominal belts, SpO<sub>2</sub> probe with pulse waveform, snore sensor, body-position sensor, optional CO<sub>2</sub> sensor, optional PAP-flow channel.</li>
+    <li>Time-synchronised infrared video (mandatory paediatric, recommended adult).</li>
+    <li>Skin-prep abrasive, conductive paste, tape, measuring tape.</li>
+    <li>Recording sheet / electronic biocal worksheet.</li>
+  </ul>
+
+  <h2>6. Pre-Biocalibration Checks</h2>
+  <ol>
+    <li>Confirm patient identity using three identifiers (ASA 5.4.4).</li>
+    <li>Confirm referral, study type and any special instructions (eg split-night, paediatric NIV).</li>
+    <li>Apply electrodes per the International 10-20 system and ASA/AASM montage; head measurement, skin preparation, and impedance verified at &lt;5 k&Omega; for EEG/EOG/EMG (target &lt;10 k&Omega; for limb EMG).</li>
+    <li>Verify channel labelling and display sensitivity defaults per AASM technical specifications (EEG 7 &micro;V/mm, EOG 7 &micro;V/mm, chin EMG 7 &micro;V/mm, ECG 1 mV calibration, respiratory channels per manufacturer).</li>
+    <li>Confirm low/high-frequency filters per AASM defaults (EEG/EOG 0.3-35 Hz; chin & leg EMG 10-100 Hz; ECG 0.3-70 Hz; airflow 0.1-15 Hz).</li>
+    <li>Run system impedance/calibration self-test; record result in the patient file.</li>
+  </ol>
+
+  <h2>7. Biocalibration Procedure <span class="clause-tag">AASM Manual / ASA 5.3.4.2</span></h2>
+  <p>Perform every step in the order shown. For each step, instruct the patient clearly, annotate the start of the manoeuvre on the recording, observe at least the channels listed under <em>Channels to verify</em>, and judge against the acceptance criteria. Each manoeuvre should be held / repeated for the duration shown.</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width:32px;">#</th>
+        <th>Instruction to patient</th>
+        <th>Duration</th>
+        <th>Channels to verify</th>
+        <th>Expected signal</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="step-num">1</span></td>
+        <td>"Lie still, keep eyes open and look straight ahead at a fixed point."</td>
+        <td>30 s</td>
+        <td>EEG, EOG, chin EMG</td>
+        <td>Low-amplitude mixed-frequency EEG; suppressed alpha; flat EOG.</td>
+      </tr>
+      <tr>
+        <td><span class="step-num">2</span></td>
+        <td>"Close your eyes and stay still."</td>
+        <td>30 s</td>
+        <td>EEG (O1, O2), EOG</td>
+        <td>Posterior alpha rhythm (8-13 Hz) clearly present over occipital derivations.</td>
+      </tr>
+      <tr>
+        <td><span class="step-num">3</span></td>
+        <td>"Eyes closed - look up and down, up and down." Repeat 5 times.</td>
+        <td>~10 s</td>
+        <td>EOG (E1, E2)</td>
+        <td>In-phase vertical deflections in both EOG channels (eyes positive going up).</td>
+      </tr>
+      <tr>
+        <td><span class="step-num">4</span></td>
+        <td>"Eyes closed - look left and right, left and right." Repeat 5 times.</td>
+        <td>~10 s</td>
+        <td>EOG (E1, E2)</td>
+        <td>Out-of-phase deflections - E1 and E2 mirror each other, confirming polarity and that left/right channels are not swapped.</td>
+      </tr>
+      <tr>
+        <td><span class="step-num">5</span></td>
+        <td>"Blink five times slowly."</td>
+        <td>~10 s</td>
+        <td>EOG, frontal EEG</td>
+        <td>Five sharp, symmetric, in-phase blink artefacts in both EOG channels.</td>
+      </tr>
+      <tr>
+        <td><span class="step-num">6</span></td>
+        <td>"Grit your teeth (clench your jaw) for 5 seconds, then relax."</td>
+        <td>5 s + relax</td>
+        <td>Chin EMG</td>
+        <td>Marked sustained increase in chin EMG amplitude; returns to baseline on relaxation.</td>
+      </tr>
+      <tr>
+        <td><span class="step-num">7</span></td>
+        <td>"Hum or make a snoring sound."</td>
+        <td>~5 s</td>
+        <td>Snore sensor, microphone, airflow</td>
+        <td>Clear oscillation on snore channel and microphone trace.</td>
+      </tr>
+      <tr>
+        <td><span class="step-num">8</span></td>
+        <td>"Take a deep breath in through your nose, then out through your nose." Repeat twice.</td>
+        <td>~15 s</td>
+        <td>Nasal pressure, oronasal thermal, thorax/abdomen RIP</td>
+        <td>Strong inspiratory deflection on nasal pressure and thermal; in-phase chest and abdominal excursion.</td>
+      </tr>
+      <tr>
+        <td><span class="step-num">9</span></td>
+        <td>"Close your mouth - breathe only through your mouth (pinch nose). Then breathe only through your nose."</td>
+        <td>~15 s</td>
+        <td>Nasal pressure, oronasal thermal</td>
+        <td>Nasal pressure flattens during mouth breathing; thermal signal persists - confirms each pathway independently.</td>
+      </tr>
+      <tr>
+        <td><span class="step-num">10</span></td>
+        <td>"Take a deep breath in and hold it for 10 seconds. Then breathe out."</td>
+        <td>10 s</td>
+        <td>RIP belts, airflow, SpO<sub>2</sub></td>
+        <td>Flat airflow with stable chest/abdominal position during hold; SpO<sub>2</sub> waveform remains; transient O<sub>2</sub> change after release.</td>
+      </tr>
+      <tr>
+        <td><span class="step-num">11</span></td>
+        <td>"Simulate snoring or paradoxical breathing (chest in, abdomen out)." <em>Optional - omit for paediatric.</em></td>
+        <td>~10 s</td>
+        <td>Thorax / abdomen RIP</td>
+        <td>Visible paradox - thoracic and abdominal traces move out of phase.</td>
+      </tr>
+      <tr>
+        <td><span class="step-num">12</span></td>
+        <td>"Flex your right foot up towards your head - hold 2 seconds - relax." Repeat 3 times.</td>
+        <td>~10 s</td>
+        <td>Right anterior tibialis EMG</td>
+        <td>Clear EMG burst on right channel only.</td>
+      </tr>
+      <tr>
+        <td><span class="step-num">13</span></td>
+        <td>"Now flex your left foot - hold - relax." Repeat 3 times.</td>
+        <td>~10 s</td>
+        <td>Left anterior tibialis EMG</td>
+        <td>Clear EMG burst on left channel only - confirms no left/right swap.</td>
+      </tr>
+      <tr>
+        <td><span class="step-num">14</span></td>
+        <td>"Roll onto your right side - back to centre - onto your left side - back to centre."</td>
+        <td>~30 s</td>
+        <td>Body position sensor, RIP belts, ECG</td>
+        <td>Position channel updates to each posture; respiratory and ECG remain interpretable.</td>
+      </tr>
+      <tr>
+        <td><span class="step-num">15</span></td>
+        <td><em>PAP titration studies only:</em> Fit interface, deliver 4 cmH<sub>2</sub>O, ask patient to breathe normally for 30 s.</td>
+        <td>30 s</td>
+        <td>PAP flow, mask pressure, leak</td>
+        <td>PAP pressure channel reads ~4 cmH<sub>2</sub>O, mask leak within manufacturer threshold.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout">
+    <strong>Paediatric adaptation (ASA 5.3.4.3):</strong> for infants and children unable to follow commands, perform a qualitative verification at the bedside: confirm all channels display physiological signals during quiet wakefulness, observe spontaneous eye movements, gentle limb movement on stimulation, and clear respiratory waveforms. Document the limitation and the alternative steps performed in the patient file.
+  </div>
+
+  <h2>8. Acceptance Criteria</h2>
+  <table>
+    <thead><tr><th>Signal</th><th>Acceptance threshold</th></tr></thead>
+    <tbody>
+      <tr><td>EEG / EOG / chin EMG impedance</td><td>&lt; 5 k&Omega; (re-prep if &gt; 5 k&Omega;)</td></tr>
+      <tr><td>Inter-electrode impedance match</td><td>Within 25% across derivations</td></tr>
+      <tr><td>EOG polarity</td><td>Step 4 out-of-phase deflections clearly visible</td></tr>
+      <tr><td>Chin EMG</td><td>&gt;= 3x baseline amplitude on jaw clench</td></tr>
+      <tr><td>Leg EMG</td><td>Clear lateralised burst &gt; baseline x 4</td></tr>
+      <tr><td>Airflow channels</td><td>Visible flow during nasal-only and mouth-only breathing, flat during breath-hold</td></tr>
+      <tr><td>RIP belts</td><td>Symmetrical, in-phase deflection during quiet breathing</td></tr>
+      <tr><td>SpO<sub>2</sub></td><td>Stable plethysmograph, signal-quality index acceptable per device manual</td></tr>
+      <tr><td>ECG</td><td>Clear QRS, no 50 Hz mains contamination</td></tr>
+      <tr><td>Body position</td><td>All four positions register correctly</td></tr>
+    </tbody>
+  </table>
+
+  <h2>9. Troubleshooting</h2>
+  <table>
+    <thead><tr><th>Observation</th><th>Likely cause</th><th>Corrective action</th></tr></thead>
+    <tbody>
+      <tr><td>High impedance / drift</td><td>Poor skin prep, dried paste, loose electrode</td><td>Re-prep skin, re-apply paste, re-tape; repeat biocal.</td></tr>
+      <tr><td>EOG in-phase when out-of-phase expected</td><td>E1/E2 swap or reference error</td><td>Verify cable, re-label channel, repeat step 4.</td></tr>
+      <tr><td>Absent EMG burst on jaw clench</td><td>Loose chin electrode or reversed pair</td><td>Re-apply chin electrodes; repeat step 6.</td></tr>
+      <tr><td>Flat nasal pressure with intact thermal</td><td>Blocked nasal cannula or disconnect</td><td>Inspect cannula, clear / replace; re-verify step 8.</td></tr>
+      <tr><td>Paradoxical RIP signal during quiet breathing</td><td>Belts swapped or upside-down</td><td>Re-fit belts; confirm step 8.</td></tr>
+      <tr><td>50 Hz interference</td><td>Mains coupling, faulty earth, mobile device nearby</td><td>Check ground, remove device, re-route cables.</td></tr>
+      <tr><td>SpO<sub>2</sub> drop-out</td><td>Probe placement, cold extremity</td><td>Reposition probe, warm extremity.</td></tr>
+      <tr><td>Persistent failure</td><td>Suspected equipment fault</td><td>Withdraw equipment from use (ASA 5.3.5(c)), log adverse equipment event, switch to verified spare.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>10. Quality Assurance <span class="clause-tag">ASA 5.5.5.3(f), 5.6.3</span></h2>
+  <ul>
+    <li>Biocal completion is mandatory and forms a quality indicator (target 100%, threshold &gt;= 98%/month).</li>
+    <li>Biocal failures that delay or abort a study are recorded as nonconformances (ASA 4.9) and trended quarterly.</li>
+    <li>Senior Scientist/Technologist reviews 10% of biocals each month for completeness and signal quality.</li>
+    <li>Trends suggesting equipment drift trigger an out-of-cycle verification per the Equipment Verification SOP.</li>
+  </ul>
+
+  <h2>11. Records <span class="clause-tag">ASA 4.13, 5.3.4.2</span></h2>
+  <ul>
+    <li>Biocal worksheet (paper or electronic) attached to the patient study file, including: study ID, three patient identifiers, date, time, technologist ID, impedance values, step-by-step pass/fail or signal-quality grading, deviations, corrective actions.</li>
+    <li>Retention: with the polysomnography record per the service Records Retention Policy.</li>
+    <li>Corrections per ASA 4.13.2.7 (cross-out, initial, date - no destructive edits).</li>
+  </ul>
+
+  <h2>12. References</h2>
+  <ul>
+    <li>Berry RB et al. <em>The AASM Manual for the Scoring of Sleep and Associated Events: Rules, Terminology and Technical Specifications.</em> Current version.</li>
+    <li>Australasian Sleep Association. <em>Guidelines for Sleep Studies in Adults.</em> Sleep Medicine 2017; 36: S2-S22.</li>
+    <li>Australasian Sleep Association. <em>Clinical Practice Guidelines for Performing Sleep Studies in Children.</em> Sleep Medicine 2017; 36: S23-S42.</li>
+    <li>ASA/ASTA Addendum to AASM Guidelines for recording and scoring of paediatric sleep, 2011.</li>
+    <li>ASA Standard for Sleep Disorders Services, March 2019 (cl. 4.13, 5.3.4, 5.4.4, 5.5).</li>
+    <li>SOP-PSG-002 Electrode Application and Skin Preparation.</li>
+    <li>SOP-PSG-007 Equipment Verification and Calibration.</li>
+    <li>SOP-QMS-009 Nonconformance Management.</li>
+  </ul>
+
+  <h2>13. Document Control & Approval <span class="clause-tag">ASA 4.3</span></h2>
+  <div class="signoff">
+    <div class="sign-cell">
+      <strong>Prepared by</strong><br>Name:<br>Role:<br>Signature / Date:
+    </div>
+    <div class="sign-cell">
+      <strong>Reviewed by (Tech Lead)</strong><br>Name:<br>Role:<br>Signature / Date:
+    </div>
+    <div class="sign-cell">
+      <strong>Authorised by (Medical Director)</strong><br>Name:<br>Role:<br>Signature / Date:
+    </div>
+  </div>
+
+  <div class="footer">
+    Controlled document - uncontrolled when printed. SOP-PSG-005 Rev 1.0 - Page 1 of 1.
+  </div>
+
+</div>
+</body>
+</html>

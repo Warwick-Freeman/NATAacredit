@@ -12,4 +12,5 @@ public class NexusDbContext(DbContextOptions<NexusDbContext> options) : DbContex
     public DbSet<ComplianceSection> ComplianceSections => Set<ComplianceSection>();
     public DbSet<NexusTask> Tasks => Set<NexusTask>();
     public DbSet<ActivityEntry> Activity => Set<ActivityEntry>();
+    public DbSet<Document> Documents => Set<Document>();
 }

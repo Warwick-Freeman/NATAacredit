@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SOP-PSG-001 - Referral Handling & Prioritisation</title>
+<style>
+@page { size: A4; margin: 18mm 16mm 22mm 16mm; }
+body { font-family: "Segoe UI", Arial, sans-serif; font-size: 11pt; color: #1f2933; line-height: 1.45; margin: 0; padding: 24px; background: #f5f7fa; }
+.page { max-width: 920px; margin: 0 auto; background: #ffffff; padding: 32px 40px; border: 1px solid #d6dde6; border-radius: 6px; box-shadow: 0 2px 6px rgba(0,0,0,0.04); }
+.doc-header { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 18px; border-bottom: 3px solid #14406b; padding-bottom: 10px; margin-bottom: 18px; }
+.doc-header .kind { grid-column: 1 / span 2; font-size: 9.5pt; color: #506478; text-transform: uppercase; letter-spacing: 1.5px; }
+.doc-header .title { grid-column: 1 / span 2; font-size: 18pt; font-weight: 700; color: #14406b; margin: 0 0 4px 0; }
+.doc-header .subtitle { grid-column: 1 / span 2; font-size: 10.5pt; color: #506478; margin-bottom: 6px; }
+.doc-header .field { font-size: 9.5pt; color: #1f2933; border-bottom: 1px dotted #ccd4dc; padding-bottom: 3px; }
+.doc-header .field strong { display: inline-block; width: 130px; color: #506478; font-weight: 600; }
+h2 { font-size: 12.5pt; color: #14406b; margin-top: 22px; margin-bottom: 8px; border-left: 4px solid #14406b; padding: 2px 0 2px 8px; background: #eef3f9; }
+h3 { font-size: 11pt; color: #1f2933; margin-top: 16px; margin-bottom: 4px; }
+p, li { font-size: 10.5pt; }
+ul, ol { margin: 4px 0 8px 22px; padding: 0; }
+table { width: 100%; border-collapse: collapse; margin: 8px 0 12px 0; font-size: 10pt; }
+th, td { border: 1px solid #c5cfdb; padding: 6px 8px; text-align: left; vertical-align: top; }
+th { background: #eef3f9; color: #14406b; font-weight: 600; }
+.callout { background: #fff7e0; border: 1px solid #f0d27e; border-left: 4px solid #d49b1c; padding: 8px 12px; margin: 10px 0; font-size: 10pt; }
+.callout.warn { background: #fdecea; border-color: #f0a99e; border-left-color: #c0392b; }
+.callout.nexus { background: #eef6ff; border: 1px solid #93c5fd; border-left: 4px solid #2563eb; padding: 8px 12px; margin: 10px 0; font-size: 10pt; }
+.callout.nexus strong { color: #1d4ed8; }
+.signoff { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 14px; }
+.sign-cell { border: 1px solid #c5cfdb; padding: 8px; min-height: 60px; font-size: 9.5pt; color: #506478; }
+.sign-cell strong { color: #1f2933; }
+.footer { border-top: 1px solid #c5cfdb; margin-top: 24px; padding-top: 8px; font-size: 9pt; color: #506478; text-align: center; }
+.clause-tag { display: inline-block; background: #14406b; color: #fff; font-size: 8.5pt; padding: 1px 6px; border-radius: 3px; margin-left: 4px; vertical-align: middle; }
+.fill { display: inline-block; min-width: 180px; border-bottom: 1px solid #1f2933; height: 14px; }
+.fill.lg { min-width: 360px; }
+.fill.sm { min-width: 80px; }
+.box { border: 1px solid #1f2933; display: inline-block; width: 12px; height: 12px; vertical-align: middle; margin-right: 4px; }
+.section-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 18px; margin: 8px 0; }
+.section-grid .cell { font-size: 10pt; border-bottom: 1px dotted #ccd4dc; padding-bottom: 4px; }
+.section-grid .cell strong { color: #506478; font-weight: 600; display: block; font-size: 9pt; }
+@media print { body { background: #ffffff; padding: 0; } .page { box-shadow: none; border: none; padding: 0; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="doc-header">
+    <div class="kind">Standard Operating Procedure</div>
+    <div class="title">Referral Handling & Prioritisation</div>
+    <div class="subtitle">Receipt, review, triage and scheduling of referrals</div>
+    <div class="field"><strong>Document ID:</strong> SOP-PSG-001</div>
+    <div class="field"><strong>Revision:</strong> 1.1</div>
+    <div class="field"><strong>Effective date:</strong> _____ / _____ / _______</div>
+    <div class="field"><strong>Review date:</strong> _____ / _____ / _______</div>
+    <div class="field"><strong>Authorised by:</strong> Medical Director</div>
+    <div class="field"><strong>Page:</strong> 1 of 1</div>
+  </header>
+
+  <h2>1. Purpose <span class="clause-tag">ASA 4.4, 5.4</span></h2>
+  <p>To ensure referrals are appropriate, triaged for urgency, and scheduled in line with capacity and clinical need.</p>
+
+  
+
+  <div class="callout nexus"><strong>&#x2139;&#xFE0F; Nexus 360 Integration:</strong> Steps in this procedure that are performed or supported by the Nexus 360 quality management system are identified with [Nexus 360] throughout this document. Staff must access Nexus 360 at <code>http://localhost:5173</code> to complete these steps. The system audit trail satisfies record-keeping requirements for all digitally recorded activities.</div>
+
+
+  <h2>2. Procedure</h2>
+  <ol>
+  <li>Referral received via fax, secure email, EMR or web; logged on FRM-001 within 1 working day; study register tracked in Nexus 360 Studies &amp; Reports module <span style="background:#dbeafe;color:#1d4ed8;font-size:8.5pt;padding:1px 5px;border-radius:3px;margin-left:4px;font-weight:600;">[Nexus 360]</span>.</li>
+  <li>Administrative completeness check: 3 patient identifiers, clinical details, study type, referrer details, Medicare/insurance details.</li>
+  <li>Sleep physician triages clinically; confirms appropriateness of the requested test; documents any deviation.</li>
+  <li>Paediatric referrals routed to paediatric sleep physician.</li>
+  <li>Urgency category applied:
+    <ul>
+      <li><strong>Category 1 (Urgent):</strong> safety-critical occupations with suspected significant OSA, or significant comorbidities (unstable IHD, heart failure, hypercapnic respiratory failure, pulmonary hypertension, neuromuscular disease with suspected hypoventilation) - schedule within 4 weeks.</li>
+      <li><strong>Category 2 (Routine):</strong> next available within service target.</li>
+      <li><strong>Category 3 (Deferred):</strong> patient preparation required before booking.</li>
+    </ul>
+  </li>
+  <li>Booking confirmed with patient; pre-study information pack issued.</li>
+  </ol>
+
+  <h2>3. Demand Management</h2>
+  <p>Where demand exceeds capacity, Tech Lead and Medical Director apply escalation protocol: extended hours, weekend lists, subcontracting per SOP-QMS-011.</p>
+
+  <h2>4. Records</h2>
+  <p>Referrals and study register tracked in Nexus 360 Studies &amp; Reports module <span style="background:#dbeafe;color:#1d4ed8;font-size:8.5pt;padding:1px 5px;border-radius:3px;margin-left:4px;font-weight:600;">[Nexus 360]</span>; triage decision log; capacity reports.</p>
+
+  <h2>5. References</h2>
+  <p>ASA Standard cl. 4.4.1 - 4.4.3, 5.4.1 - 5.4.5.</p>
+
+  <h2>Document Control & Approval <span class="clause-tag">ASA 4.3</span></h2>
+  <div class="signoff">
+    <div class="sign-cell"><strong>Prepared by</strong><br>Name:<br>Role:<br>Signature / Date:</div>
+    <div class="sign-cell"><strong>Reviewed by (Quality Manager)</strong><br>Name:<br>Signature / Date:</div>
+    <div class="sign-cell"><strong>Authorised by (Medical Director)</strong><br>Name:<br>Signature / Date:</div>
+  </div>
+  
+  <div class="callout" style="margin-top:16px;font-size:9.5pt;"><strong>Revision history:</strong> Rev 1.1 (May 2026) — Updated to reflect Nexus 360 quality management system integration. Steps supported by Nexus 360 are identified throughout.</div>
+  <div class="footer">Controlled document - uncontrolled when printed. SOP-PSG-001 Rev 1.1 - Page 1 of 1.</div>
+</div>
+</body>
+</html>

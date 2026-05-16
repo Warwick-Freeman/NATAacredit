@@ -87,3 +87,21 @@ public class ActivityEntry
     public string Time { get; set; } = "";
     public string Kind { get; set; } = "";
 }
+
+public class Document
+{
+    public int Id { get; set; }
+    public string DocId { get; set; } = "";
+    public string Title { get; set; } = "";
+    public string Version { get; set; } = "1.0";
+    public string Status { get; set; } = "Draft";
+    public string Folder { get; set; } = "sops";
+    public string Owner { get; set; } = "";
+    public string Clauses { get; set; } = "";
+    public string ReviewDue { get; set; } = "—";
+    public string Updated { get; set; } = "";
+    public string? FileType { get; set; }
+    public string? FileName { get; set; }
+    public string? StoredFileName { get; set; }
+    public string Workflow { get; set; } = "[]";
+}

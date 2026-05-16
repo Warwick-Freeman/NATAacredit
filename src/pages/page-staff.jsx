@@ -1,24 +1,48 @@
 import React, { useState } from 'react';
 import Icon from '../icons';
-import { PageHeader, Pill, Avatar, Tabs } from '../components';
+import { PageHeader, Pill, Avatar, Tabs, Drawer } from '../components';
+import StaffFormDrawer from '../staff-form-drawer';
+import { useTaskContext } from '../TaskContext';
+
+const INITIAL_STAFF = [
+  { name: "Dr. R. Okafor",  role: "Medical Director",           site: "All",              bls: { ok: true,  expires: "Aug 2026"   }, eqa: "—",                training: 100 },
+  { name: "Dr. L. Hartono", role: "Paediatric Sleep Physician", site: "Eastside Paed.",   bls: { ok: true,  expires: "Sep 2026"   }, eqa: "—",                training: 100, paedsBLS: true },
+  { name: "Dr. F. Liu",     role: "Reporting Physician",        site: "All",              bls: { ok: true,  expires: "Nov 2026"   }, eqa: "—",                training: 95  },
+  { name: "K. Patel",       role: "Quality Manager",            site: "All",              bls: { ok: true,  expires: "Jul 2026"   }, eqa: "—",                training: 100 },
+  { name: "M. Chen",        role: "Senior Technologist",        site: "Riverside Main",   bls: { ok: true,  expires: "Mar 2027"   }, eqa: "Current · 96%",   training: 100, rpsgt: true },
+  { name: "A. Singh",       role: "Scoring Technologist",       site: "Riverside Main",   bls: { ok: true,  expires: "Jun 2026"   }, eqa: "Current · 91%",   training: 92,  rpsgt: true },
+  { name: "J. Owusu",       role: "Scoring Technologist",       site: "Eastside Paed.",   bls: { ok: false, expires: "Lapsed 14d" }, eqa: "Investigate · 78%", training: 88 },
+  { name: "P. Tan",         role: "Recording Tech",             site: "Riverside Main",   bls: { ok: true,  expires: "May 2026"   }, eqa: "—",                training: 90  },
+  { name: "S. Nakamura",    role: "Recording Tech",             site: "Eastside Paed.",   bls: { ok: false, expires: "Lapsed 3d"  }, eqa: "—",                training: 85, paedsBLS: true },
+  { name: "L. Diaz",        role: "Reception / Bookings",       site: "All",              bls: { ok: true,  expires: "Aug 2026"   }, eqa: "—",                training: 100 },
+  { name: "T. Brooks",      role: "Recording Tech",             site: "Home Service N.",  bls: { ok: false, expires: "Lapsed 21d" }, eqa: "—",                training: 76  },
+  { name: "R. Patel",       role: "Recording Tech",             site: "Riverside Main",   bls: { ok: false, expires: "Lapsed 7d"  }, eqa: "—",                training: 82  },
+];
 
 const StaffPage = () => {
-  const [tab, setTab] = useState("staff");
+  const { openCreateTask } = useTaskContext();
+  const [tab, setTab]         = useState("staff");
+  const [staff, setStaff]     = useState(INITIAL_STAFF);
+  // null = closed, {} = add new, {...} = edit existing
+  const [formTarget, setFormTarget] = useState(null);
 
-  const staff = [
-    { name: "Dr. R. Okafor", role: "Medical Director", site: "All", bls: { ok: true, expires: "Aug 2026" }, eqa: "Current", training: 100 },
-    { name: "Dr. L. Hartono", role: "Paediatric Sleep Phys.", site: "Eastside Paed.", bls: { ok: true, expires: "Sep 2026" }, eqa: "Current", training: 100, paedsBLS: true },
-    { name: "Dr. F. Liu", role: "Reporting Physician", site: "All", bls: { ok: true, expires: "Nov 2026" }, eqa: "Current", training: 95 },
-    { name: "K. Patel", role: "Quality Manager", site: "All", bls: { ok: true, expires: "Jul 2026" }, eqa: "—", training: 100 },
-    { name: "M. Chen", role: "Senior Technologist", site: "Riverside Main", bls: { ok: true, expires: "Mar 2027" }, eqa: "Current · 96%", training: 100, rpsgt: true },
-    { name: "A. Singh", role: "Scoring Technologist", site: "Riverside Main", bls: { ok: true, expires: "Jun 2026" }, eqa: "Current · 91%", training: 92, rpsgt: true },
-    { name: "J. Owusu", role: "Scoring Technologist", site: "Eastside Paed.", bls: { ok: false, expires: "Lapsed 14d" }, eqa: "Investigate · 78%", training: 88 },
-    { name: "P. Tan", role: "Recording Tech", site: "Riverside Main", bls: { ok: true, expires: "May 2026" }, eqa: "—", training: 90 },
-    { name: "S. Nakamura", role: "Recording Tech", site: "Eastside Paed.", bls: { ok: false, expires: "Lapsed 3d" }, eqa: "—", training: 85, paedsBLS: true },
-    { name: "L. Diaz", role: "Reception / Bookings", site: "All", bls: { ok: true, expires: "Aug 2026" }, eqa: "—", training: 100 },
-    { name: "T. Brooks", role: "Recording Tech", site: "Home Service N.", bls: { ok: false, expires: "Lapsed 21d" }, eqa: "—", training: 76 },
-    { name: "R. Patel", role: "Recording Tech", site: "Riverside Main", bls: { ok: false, expires: "Lapsed 7d" }, eqa: "—", training: 82 },
-  ];
+  const openAdd  = () => setFormTarget({});
+  const openEdit = (member) => setFormTarget(member);
+  const closeForm = () => setFormTarget(null);
+
+  const handleSave = (saved) => {
+    setStaff(prev => {
+      const isEdit = formTarget && formTarget.name;
+      if (isEdit) {
+        return prev.map(s => s.name === formTarget.name ? saved : s);
+      }
+      return [...prev, saved];
+    });
+    closeForm();
+  };
+
+  const blsLapsed  = staff.filter(s => !s.bls.ok);
+  const avgTraining = Math.round(staff.reduce((s, x) => s + x.training, 0) / staff.length);
 
   return (
     <div className="page page-wide">
@@ -29,7 +53,9 @@ const StaffPage = () => {
         actions={
           <>
             <button className="btn"><Icon name="download" size={14} />Training register</button>
-            <button className="btn btn-primary"><Icon name="plus" size={14} />Add staff member</button>
+            <button className="btn btn-primary" onClick={openAdd}>
+              <Icon name="user_plus" size={14} />Add staff member
+            </button>
           </>
         }
       />
@@ -42,26 +68,26 @@ const StaffPage = () => {
         </div>
         <div className="stat">
           <div className="stat-label"><Icon name="alert" size={13} />BLS lapsed</div>
-          <div className="stat-value" style={{ color: 'var(--bad)' }}>{staff.filter(s => !s.bls.ok).length}</div>
+          <div className="stat-value" style={{ color: blsLapsed.length ? 'var(--bad)' : 'var(--good)' }}>{blsLapsed.length}</div>
           <div className="stat-meta">target 100% currency</div>
         </div>
         <div className="stat">
           <div className="stat-label"><Icon name="check" size={13} />RPSGT credentialed</div>
           <div className="stat-value">{staff.filter(s => s.rpsgt).length}</div>
-          <div className="stat-meta">of 5 scorers</div>
+          <div className="stat-meta">of {staff.filter(s => ['Senior Technologist', 'Scoring Technologist'].includes(s.role)).length} scorers</div>
         </div>
         <div className="stat">
           <div className="stat-label"><Icon name="chart" size={13} />Avg training completion</div>
-          <div className="stat-value">{Math.round(staff.reduce((s, x) => s + x.training, 0) / staff.length)}%</div>
+          <div className="stat-value">{avgTraining}%</div>
           <div className="stat-meta up">+4% vs Q4</div>
         </div>
       </div>
 
       <Tabs value={tab} onChange={setTab} tabs={[
-        { id: "staff", label: "Staff register", count: staff.length },
-        { id: "ratios", label: "Rostering ratios" },
-        { id: "bls", label: "BLS / competency" },
-        { id: "appraisal", label: "Appraisals" },
+        { id: "staff",    label: "Staff register", count: staff.length },
+        { id: "ratios",   label: "Rostering ratios" },
+        { id: "bls",      label: "BLS / competency" },
+        { id: "appraisal",label: "Appraisals" },
       ]} />
 
       {tab === "staff" && (
@@ -72,7 +98,7 @@ const StaffPage = () => {
             </thead>
             <tbody>
               {staff.map((s, i) => (
-                <tr key={s.name} className="row-clickable">
+                <tr key={s.name} className="row-clickable" onClick={() => openEdit(s)}>
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                       <Avatar name={s.name} size={28} idx={i} />
@@ -83,7 +109,7 @@ const StaffPage = () => {
                   <td className="muted">{s.site}</td>
                   <td>
                     <div style={{ display: 'flex', gap: 4 }}>
-                      {s.rpsgt && <Pill kind="info">RPSGT</Pill>}
+                      {s.rpsgt    && <Pill kind="info">RPSGT</Pill>}
                       {s.paedsBLS && <Pill kind="accent">Paeds BLS</Pill>}
                     </div>
                   </td>
@@ -170,7 +196,15 @@ const StaffPage = () => {
                   <td><Pill kind={s.bls.ok ? "warn" : "bad"} dot>{s.bls.expires}</Pill></td>
                   <td>{s.paedsBLS ? <Pill kind="good"><Icon name="check" size={10} /></Pill> : <span className="muted">—</span>}</td>
                   <td className="muted">{s.bls.ok ? "Apr 2025" : "Apr 2024"}</td>
-                  <td><button className="btn" style={{ fontSize: 11, padding: '3px 8px' }}>Book recert</button></td>
+                  <td><button className="btn" style={{ fontSize: 11, padding: '3px 8px' }}
+                    onClick={() => openCreateTask({
+                      title: `Book BLS recertification — ${s.name}`,
+                      clause: '5.1.4',
+                      source: 'BLS',
+                      sourceType: 'staff',
+                      priority: s.bls.ok ? 'medium' : 'high',
+                      assignedTo: 'K. Patel',
+                    })}>Book recert</button></td>
                 </tr>
               ))}
             </tbody>
@@ -200,6 +234,10 @@ const StaffPage = () => {
           </div>
         </div>
       )}
+
+      <Drawer open={formTarget !== null} onClose={closeForm}>
+        <StaffFormDrawer staff={formTarget} onSave={handleSave} onClose={closeForm} />
+      </Drawer>
     </div>
   );
 };

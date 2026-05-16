@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>FRM-025 - Home / Ambulatory Sleep Study Report</title>
+<style>
+@page { size: A4; margin: 18mm 16mm 22mm 16mm; }
+body { font-family: "Segoe UI", Arial, sans-serif; font-size: 11pt; color: #1f2933; line-height: 1.45; margin: 0; padding: 24px; background: #f5f7fa; }
+.page { max-width: 920px; margin: 0 auto; background: #ffffff; padding: 32px 40px; border: 1px solid #d6dde6; border-radius: 6px; box-shadow: 0 2px 6px rgba(0,0,0,0.04); }
+.doc-header { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 18px; border-bottom: 3px solid #14406b; padding-bottom: 10px; margin-bottom: 18px; }
+.doc-header .kind { grid-column: 1 / span 2; font-size: 9.5pt; color: #506478; text-transform: uppercase; letter-spacing: 1.5px; }
+.doc-header .title { grid-column: 1 / span 2; font-size: 18pt; font-weight: 700; color: #14406b; margin: 0 0 4px 0; }
+.doc-header .subtitle { grid-column: 1 / span 2; font-size: 10.5pt; color: #506478; margin-bottom: 6px; }
+.doc-header .field { font-size: 9.5pt; color: #1f2933; border-bottom: 1px dotted #ccd4dc; padding-bottom: 3px; }
+.doc-header .field strong { display: inline-block; width: 130px; color: #506478; font-weight: 600; }
+h2 { font-size: 12.5pt; color: #14406b; margin-top: 22px; margin-bottom: 8px; border-left: 4px solid #14406b; padding: 2px 0 2px 8px; background: #eef3f9; }
+h3 { font-size: 11pt; color: #1f2933; margin-top: 16px; margin-bottom: 4px; }
+p, li { font-size: 10.5pt; }
+ul, ol { margin: 4px 0 8px 22px; padding: 0; }
+table { width: 100%; border-collapse: collapse; margin: 8px 0 12px 0; font-size: 10pt; }
+th, td { border: 1px solid #c5cfdb; padding: 6px 8px; text-align: left; vertical-align: top; }
+th { background: #eef3f9; color: #14406b; font-weight: 600; }
+.callout { background: #fff7e0; border: 1px solid #f0d27e; border-left: 4px solid #d49b1c; padding: 8px 12px; margin: 10px 0; font-size: 10pt; }
+.callout.warn { background: #fdecea; border-color: #f0a99e; border-left-color: #c0392b; }
+.callout.nexus { background: #eef6ff; border: 1px solid #93c5fd; border-left: 4px solid #2563eb; padding: 8px 12px; margin: 10px 0; font-size: 10pt; }
+.callout.nexus strong { color: #1d4ed8; }
+.signoff { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 14px; }
+.sign-cell { border: 1px solid #c5cfdb; padding: 8px; min-height: 60px; font-size: 9.5pt; color: #506478; }
+.sign-cell strong { color: #1f2933; }
+.footer { border-top: 1px solid #c5cfdb; margin-top: 24px; padding-top: 8px; font-size: 9pt; color: #506478; text-align: center; }
+.clause-tag { display: inline-block; background: #14406b; color: #fff; font-size: 8.5pt; padding: 1px 6px; border-radius: 3px; margin-left: 4px; vertical-align: middle; }
+.fill { display: inline-block; min-width: 180px; border-bottom: 1px solid #1f2933; height: 14px; }
+.fill.lg { min-width: 360px; }
+.fill.sm { min-width: 80px; }
+.box { border: 1px solid #1f2933; display: inline-block; width: 12px; height: 12px; vertical-align: middle; margin-right: 4px; }
+.section-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 18px; margin: 8px 0; }
+.section-grid .cell { font-size: 10pt; border-bottom: 1px dotted #ccd4dc; padding-bottom: 4px; }
+.section-grid .cell strong { color: #506478; font-weight: 600; display: block; font-size: 9pt; }
+@media print { body { background: #ffffff; padding: 0; } .page { box-shadow: none; border: none; padding: 0; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="doc-header">
+    <div class="kind">Controlled Form</div>
+    <div class="title">Home / Ambulatory Sleep Study Report</div>
+    <div class="subtitle">Linked SOP: SOP-PSG-004. Used for Type 2, 3 and 4 studies.</div>
+    <div class="field"><strong>Form ID:</strong> FRM-025</div>
+    <div class="field"><strong>Revision:</strong> 1.1</div>
+    <div class="field"><strong>Linked SOP:</strong> see below</div>
+    <div class="field"><strong>Retention:</strong> per Records SOP</div>
+  </header>
+
+  <div class="callout nexus"><strong>&#x2139;&#xFE0F; Nexus 360 Integration:</strong> Study reports and their status are tracked in Nexus 360 Studies &amp; Reports module. Report turnaround time is monitored as a quality indicator in Nexus 360.</div>
+
+  <h2>Identification</h2>
+  <p>Service <span class="fill"></span> Site <span class="fill"></span> Study ID <span class="fill"></span> Date <span class="fill sm"></span></p>
+  <p>Patient <span class="fill"></span> DOB <span class="fill sm"></span> MRN <span class="fill"></span></p>
+  <h2>Device & technical</h2>
+  <p>Device type: <span class="box"></span> Type 2 &nbsp; <span class="box"></span> Type 3 &nbsp; <span class="box"></span> Type 4 &nbsp; Model / serial <span class="fill"></span></p>
+  <p>Total recording time <span class="fill sm"></span> min &nbsp; Technically adequate? <span class="box"></span> Yes / <span class="box"></span> No</p>
+  <h2>Results</h2>
+  <table>
+    <thead><tr><th>Parameter</th><th>Result</th></tr></thead>
+    <tbody>
+      <tr><td>Estimated TST (Type 2) / Monitoring time</td><td></td></tr>
+      <tr><td>AHI / REI</td><td></td></tr>
+      <tr><td>ODI 3% / 4%</td><td></td></tr>
+      <tr><td>Mean / nadir SpO<sub>2</sub></td><td></td></tr>
+      <tr><td>Snore index</td><td></td></tr>
+      <tr><td>Body position summary</td><td></td></tr>
+    </tbody>
+  </table>
+  <h2>Limitations / device-class caveat</h2>
+  <p>Type 3/4 devices cannot reliably rule out OSA - consider attended PSG if clinical suspicion persists.</p>
+  <h2>Interpretation & recommendation</h2>
+  <p><span class="fill lg"></span></p>
+  <h2>Reporting physician</h2>
+  <p>Name <span class="fill"></span> Signature <span class="fill"></span> Date <span class="fill sm"></span></p>
+
+  
+  <div class="callout" style="margin-top:16px;font-size:9.5pt;"><strong>Revision history:</strong> Rev 1.1 (May 2026) — Updated to reflect Nexus 360 quality management system integration. Steps supported by Nexus 360 are identified throughout.</div>
+  <div class="footer">Controlled form - uncontrolled when printed. FRM-025 Rev 1.1 - Page 1 of 1.</div>
+</div>
+</body>
+</html>

@@ -1,9 +1,237 @@
+using System.Text.Json;
 using NexusApi.Models;
 
 namespace NexusApi.Data;
 
 public static class SeedData
 {
+    // Serialise workflow step list to JSON for storage
+    private static string Wf(params object[] steps) =>
+        JsonSerializer.Serialize(steps, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+
+    private static object Step(string step, string who, string date = "—",
+        bool done = false, bool active = false, bool rejected = false, string comment = "") =>
+        new { step, who, date, done, active, rejected, comment };
+
+    public static void ImportSopDirectory(NexusDbContext db, string sopDir, string dataDir)
+    {
+        if (!Directory.Exists(sopDir)) return;
+
+        var files = Directory.GetFiles(sopDir, "*.html");
+        var existingIds = db.Documents.Select(d => d.DocId).ToHashSet();
+        bool anyAdded = false;
+
+        foreach (var filePath in files.OrderBy(f => f))
+        {
+            var baseName = Path.GetFileNameWithoutExtension(filePath);
+
+            // Split on first underscore: everything before is DocId, after is title
+            var sep = baseName.IndexOf('_');
+            if (sep <= 0) continue;
+            var docId = baseName[..sep];
+            var titleRaw = baseName[(sep + 1)..];
+
+            // Only accept proper numbered IDs like FRM-001, SOP-PSG-001, REG-001
+            if (!docId.Contains('-')) continue;
+
+            if (existingIds.Contains(docId)) continue;
+
+            var title = titleRaw.Replace('_', ' ').Trim();
+            var folder = docId.StartsWith("FRM") ? "forms"
+                       : docId.StartsWith("REG") ? "records"
+                       : "sops";
+            var status = folder == "forms" ? "Live form" : "Issued";
+            var owner = docId switch
+            {
+                _ when docId.StartsWith("SOP-PSG") => "Dr. R. Okafor",
+                _ when docId.StartsWith("SOP-EQ")  => "M. Chen",
+                _ when docId.StartsWith("SOP-RPT") => "Dr. R. Okafor",
+                _ when docId.StartsWith("SOP-TX")  => "Dr. R. Okafor",
+                _ when docId.StartsWith("SOP-QC")  => "Dr. R. Okafor",
+                _ => "K. Patel",
+            };
+
+            var storedName = docId + ".html";
+            var destPath = Path.Combine(dataDir, storedName);
+            File.Copy(filePath, destPath, overwrite: true);
+
+            db.Documents.Add(new Document
+            {
+                DocId          = docId,
+                Title          = title,
+                Version        = "1.0",
+                Status         = status,
+                Folder         = folder,
+                Owner          = owner,
+                Clauses        = "",
+                ReviewDue      = "—",
+                Updated        = File.GetLastWriteTime(filePath).ToString("dd MMM yyyy"),
+                FileType       = "html",
+                FileName       = Path.GetFileName(filePath),
+                StoredFileName = storedName,
+                Workflow       = "[]",
+            });
+
+            existingIds.Add(docId);
+            anyAdded = true;
+        }
+
+        if (anyAdded) db.SaveChanges();
+    }
+
+    public static void SeedDocuments(NexusDbContext db)
+    {
+        if (db.Documents.Any()) return;
+
+        db.Documents.AddRange(
+            new Document
+            {
+                DocId = "SOP-PSG-031", Title = "Pre-study bio-signal verification",
+                Version = "3.2", Status = "Issued", Folder = "sops", ReviewDue = "12 Mar 2027",
+                Owner = "M. Chen", Clauses = "5.3.4,5.5.2", Updated = "21 Apr 2026",
+                Workflow = Wf(
+                    Step("Draft",           "M. Chen",       "01 Mar 2026", done: true),
+                    Step("Peer review",     "K. Patel",      "08 Mar 2026", done: true, comment: "Reviewed — no issues."),
+                    Step("Approval",        "Dr. R. Okafor", "12 Mar 2026", done: true, comment: "Approved for issue."),
+                    Step("Issue",           "K. Patel",      "21 Apr 2026", done: true),
+                    Step("Periodic review", "+24 mo",        "12 Mar 2027"))
+            },
+            new Document
+            {
+                DocId = "SOP-PSG-014", Title = "Adult attended PSG protocol",
+                Version = "3.2", Status = "Issued", Folder = "sops", ReviewDue = "08 Jul 2026",
+                Owner = "Dr. R. Okafor", Clauses = "5.5.3", Updated = "14 Apr 2026",
+                Workflow = Wf(
+                    Step("Draft",           "Dr. R. Okafor", "01 Mar 2026", done: true),
+                    Step("Peer review",     "M. Chen",       "10 Mar 2026", done: true, comment: "Reviewed."),
+                    Step("Approval",        "Dr. R. Okafor", "15 Mar 2026", done: true),
+                    Step("Issue",           "K. Patel",      "14 Apr 2026", done: true),
+                    Step("Periodic review", "+24 mo",        "08 Jul 2027"))
+            },
+            new Document
+            {
+                DocId = "SOP-PED-007", Title = "Paediatric attended PSG protocol",
+                Version = "2.1", Status = "Issued", Folder = "sops", ReviewDue = "22 Sep 2026",
+                Owner = "Dr. L. Hartono", Clauses = "5.5.3.2,5.8.5", Updated = "18 Mar 2026",
+                Workflow = Wf(
+                    Step("Draft",           "Dr. L. Hartono", "01 Feb 2026", done: true),
+                    Step("Peer review",     "M. Chen",        "10 Feb 2026", done: true),
+                    Step("Approval",        "Dr. R. Okafor",  "18 Feb 2026", done: true),
+                    Step("Issue",           "K. Patel",       "18 Mar 2026", done: true),
+                    Step("Periodic review", "+24 mo",         "22 Sep 2027"))
+            },
+            new Document
+            {
+                DocId = "SOP-EQP-004", Title = "Equipment acceptance testing",
+                Version = "1.4", Status = "Issued", Folder = "sops", ReviewDue = "01 Jun 2026",
+                Owner = "M. Chen", Clauses = "5.3.2", Updated = "30 Mar 2026",
+                Workflow = Wf(
+                    Step("Draft",           "M. Chen",       "01 Feb 2026", done: true),
+                    Step("Peer review",     "K. Patel",      "10 Feb 2026", done: true),
+                    Step("Approval",        "Dr. R. Okafor", "20 Feb 2026", done: true),
+                    Step("Issue",           "K. Patel",      "30 Mar 2026", done: true),
+                    Step("Periodic review", "+24 mo",        "01 Jun 2028"))
+            },
+            new Document
+            {
+                DocId = "SOP-EQP-012", Title = "Decontamination of removed equipment",
+                Version = "2.0", Status = "Draft", Folder = "sops", ReviewDue = "Overdue 8d",
+                Owner = "M. Chen", Clauses = "5.3.5", Updated = "09 May 2026",
+                Workflow = Wf(
+                    Step("Draft",           "M. Chen",  active: true),
+                    Step("Peer review",     "K. Patel", "05 May 2026", rejected: true,
+                         comment: "Section 4.2 incomplete — mobile equipment decon procedure missing. Please revise before resubmission."),
+                    Step("Approval",        "Dr. R. Okafor"),
+                    Step("Issue",           "K. Patel"),
+                    Step("Periodic review", "+24 mo"))
+            },
+            new Document
+            {
+                DocId = "SOP-EMG-001", Title = "Emergency & escalation protocol",
+                Version = "4.0", Status = "Under review", Folder = "sops", ReviewDue = "—",
+                Owner = "K. Patel", Clauses = "5.5.1", Updated = "10 May 2026",
+                Workflow = Wf(
+                    Step("Draft",           "K. Patel", "10 May 2026", done: true,
+                         comment: "Revised per new BLS requirements and expanded escalation criteria."),
+                    Step("Peer review",     "M. Chen",        active: true),
+                    Step("Approval",        "Dr. R. Okafor"),
+                    Step("Issue",           "K. Patel"),
+                    Step("Periodic review", "+24 mo"))
+            },
+            new Document
+            {
+                DocId = "SOP-CPAP-002", Title = "Split-night titration protocol",
+                Version = "1.2", Status = "Issued", Folder = "sops", ReviewDue = "15 Jan 2027",
+                Owner = "Dr. R. Okafor", Clauses = "5.5.3.4", Updated = "20 Feb 2026",
+                Workflow = Wf(
+                    Step("Draft",           "Dr. R. Okafor", "01 Jan 2026", done: true),
+                    Step("Peer review",     "M. Chen",       "10 Jan 2026", done: true),
+                    Step("Approval",        "Dr. R. Okafor", "18 Jan 2026", done: true),
+                    Step("Issue",           "K. Patel",      "20 Feb 2026", done: true),
+                    Step("Periodic review", "+24 mo",        "15 Jan 2028"))
+            },
+            new Document
+            {
+                DocId = "POL-QMS-001", Title = "Quality policy",
+                Version = "2.3", Status = "Issued", Folder = "policies", ReviewDue = "31 Dec 2026",
+                Owner = "Dr. R. Okafor", Clauses = "4.2.1", Updated = "15 Jan 2026",
+                Workflow = Wf(
+                    Step("Draft",           "Dr. R. Okafor", "10 Jan 2026", done: true),
+                    Step("Peer review",     "K. Patel",      "12 Jan 2026", done: true),
+                    Step("Approval",        "Dr. R. Okafor", "14 Jan 2026", done: true),
+                    Step("Issue",           "K. Patel",      "15 Jan 2026", done: true),
+                    Step("Periodic review", "+24 mo",        "31 Dec 2027"))
+            },
+            new Document
+            {
+                DocId = "POL-CONF-002", Title = "Confidentiality & data handling",
+                Version = "1.5", Status = "Issued", Folder = "policies", ReviewDue = "20 Nov 2026",
+                Owner = "K. Patel", Clauses = "4.1.6,4.13", Updated = "20 Nov 2025",
+                Workflow = Wf(
+                    Step("Draft",           "K. Patel",      "01 Nov 2025", done: true),
+                    Step("Peer review",     "Dr. R. Okafor", "10 Nov 2025", done: true),
+                    Step("Approval",        "Dr. R. Okafor", "15 Nov 2025", done: true),
+                    Step("Issue",           "K. Patel",      "20 Nov 2025", done: true),
+                    Step("Periodic review", "+24 mo",        "20 Nov 2027"))
+            },
+            new Document
+            {
+                DocId = "POL-VAL-003", Title = "Validation & verification policy",
+                Version = "1.0", Status = "Under review", Folder = "policies", ReviewDue = "Overdue 14d",
+                Owner = "M. Chen", Clauses = "5.3", Updated = "20 Apr 2026",
+                Workflow = Wf(
+                    Step("Draft",           "M. Chen",  "01 Mar 2026", done: true,
+                         comment: "Initial version per new equipment fleet scope."),
+                    Step("Peer review",     "K. Patel", "20 Apr 2026", done: true,
+                         comment: "Reviewed — scope updated, OK to proceed to approval."),
+                    Step("Approval",        "Dr. R. Okafor", active: true),
+                    Step("Issue",           "K. Patel"),
+                    Step("Periodic review", "+24 mo"))
+            },
+            new Document
+            {
+                DocId = "FRM-CoI-2026", Title = "Conflict of interest declaration 2026",
+                Version = "—", Status = "Live form", Folder = "forms", ReviewDue = "Annual",
+                Owner = "K. Patel", Clauses = "4.1.5", Updated = "01 Jan 2026",
+                Workflow = "[]"
+            },
+            new Document
+            {
+                DocId = "MAN-QMS-001", Title = "Quality manual",
+                Version = "5.1", Status = "Issued", Folder = "manual", ReviewDue = "12 Aug 2026",
+                Owner = "Dr. R. Okafor", Clauses = "4.2", Updated = "10 Feb 2026",
+                Workflow = Wf(
+                    Step("Draft",           "Dr. R. Okafor", "01 Jan 2026", done: true),
+                    Step("Peer review",     "K. Patel",      "20 Jan 2026", done: true),
+                    Step("Approval",        "Dr. R. Okafor", "05 Feb 2026", done: true),
+                    Step("Issue",           "K. Patel",      "10 Feb 2026", done: true),
+                    Step("Periodic review", "+24 mo",        "12 Aug 2028"))
+            }
+        );
+
+        db.SaveChanges();
+    }
+
     public static void Seed(NexusDbContext db)
     {
         if (db.Studies.Any()) return;

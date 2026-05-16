@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>MASTER Document Register</title>
+<style>
+@page { size: A4; margin: 18mm 16mm 22mm 16mm; }
+body { font-family: "Segoe UI", Arial, sans-serif; font-size: 11pt; color: #1f2933; line-height: 1.45; margin: 0; padding: 24px; background: #f5f7fa; }
+.page { max-width: 920px; margin: 0 auto; background: #ffffff; padding: 32px 40px; border: 1px solid #d6dde6; border-radius: 6px; box-shadow: 0 2px 6px rgba(0,0,0,0.04); }
+.doc-header { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 18px; border-bottom: 3px solid #14406b; padding-bottom: 10px; margin-bottom: 18px; }
+.doc-header .kind { grid-column: 1 / span 2; font-size: 9.5pt; color: #506478; text-transform: uppercase; letter-spacing: 1.5px; }
+.doc-header .title { grid-column: 1 / span 2; font-size: 18pt; font-weight: 700; color: #14406b; margin: 0 0 4px 0; }
+.doc-header .subtitle { grid-column: 1 / span 2; font-size: 10.5pt; color: #506478; margin-bottom: 6px; }
+.doc-header .field { font-size: 9.5pt; color: #1f2933; border-bottom: 1px dotted #ccd4dc; padding-bottom: 3px; }
+.doc-header .field strong { display: inline-block; width: 130px; color: #506478; font-weight: 600; }
+h2 { font-size: 12.5pt; color: #14406b; margin-top: 22px; margin-bottom: 8px; border-left: 4px solid #14406b; padding: 2px 0 2px 8px; background: #eef3f9; }
+h3 { font-size: 11pt; color: #1f2933; margin-top: 16px; margin-bottom: 4px; }
+p, li { font-size: 10.5pt; }
+ul, ol { margin: 4px 0 8px 22px; padding: 0; }
+table { width: 100%; border-collapse: collapse; margin: 8px 0 12px 0; font-size: 10pt; }
+th, td { border: 1px solid #c5cfdb; padding: 6px 8px; text-align: left; vertical-align: top; }
+th { background: #eef3f9; color: #14406b; font-weight: 600; }
+.callout { background: #fff7e0; border: 1px solid #f0d27e; border-left: 4px solid #d49b1c; padding: 8px 12px; margin: 10px 0; font-size: 10pt; }
+.callout.warn { background: #fdecea; border-color: #f0a99e; border-left-color: #c0392b; }
+.callout.nexus { background: #eef6ff; border: 1px solid #93c5fd; border-left: 4px solid #2563eb; padding: 8px 12px; margin: 10px 0; font-size: 10pt; }
+.callout.nexus strong { color: #1d4ed8; }
+.signoff { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 14px; }
+.sign-cell { border: 1px solid #c5cfdb; padding: 8px; min-height: 60px; font-size: 9.5pt; color: #506478; }
+.sign-cell strong { color: #1f2933; }
+.footer { border-top: 1px solid #c5cfdb; margin-top: 24px; padding-top: 8px; font-size: 9pt; color: #506478; text-align: center; }
+.clause-tag { display: inline-block; background: #14406b; color: #fff; font-size: 8.5pt; padding: 1px 6px; border-radius: 3px; margin-left: 4px; vertical-align: middle; }
+.fill { display: inline-block; min-width: 180px; border-bottom: 1px solid #1f2933; height: 14px; }
+.fill.lg { min-width: 360px; }
+.fill.sm { min-width: 80px; }
+.box { border: 1px solid #1f2933; display: inline-block; width: 12px; height: 12px; vertical-align: middle; margin-right: 4px; }
+.section-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 18px; margin: 8px 0; }
+.section-grid .cell { font-size: 10pt; border-bottom: 1px dotted #ccd4dc; padding-bottom: 4px; }
+.section-grid .cell strong { color: #506478; font-weight: 600; display: block; font-size: 9pt; }
+@media print { body { background: #ffffff; padding: 0; } .page { box-shadow: none; border: none; padding: 0; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="doc-header">
+    <div class="kind">Controlled Register</div>
+    <div class="title">Master Document Register</div>
+    <div class="subtitle">Controlled list of all SOPs and forms in the QMS - ASA cl. 4.3.2.1</div>
+    <div class="field"><strong>Document ID:</strong> REG-001</div>
+    <div class="field"><strong>Revision:</strong> 1.1</div>
+    <div class="field"><strong>Effective date:</strong> _____ / _____ / _______</div>
+    <div class="field"><strong>Review date:</strong> _____ / _____ / _______</div>
+    <div class="field"><strong>Owner:</strong> Quality Manager</div>
+    <div class="field"><strong>Page:</strong> 1 of 1</div>
+  </header>
+
+  <h2>1. Purpose <span class="clause-tag">ASA 4.3.2.1</span></h2>
+  <p>The Master Document Register is the single controlled list of all current SOPs, policies and forms maintained under the QMS. It identifies for each document the owner, authoriser, mapped ASA clause(s), linked SOP/Form, current revision and next review date. The definitive controlled-document register is maintained in Nexus 360 Documents &amp; SOPs module <span style="background:#dbeafe;color:#1d4ed8;font-size:8.5pt;padding:1px 5px;border-radius:3px;margin-left:4px;font-weight:600;">[Nexus 360]</span>; this printed register is a reference copy.</p>
+
+  <div class="callout nexus"><strong>&#x2139;&#xFE0F; Nexus 360 Integration:</strong> Steps in this procedure that are performed or supported by the Nexus 360 quality management system are identified with [Nexus 360] throughout this document. Staff must access Nexus 360 at <code>http://localhost:5173</code> to complete these steps. The system audit trail satisfies record-keeping requirements for all digitally recorded activities.</div>
+
+  <h2>2. Maintenance</h2>
+  <p>Maintained by the Quality Manager. Updated whenever a document is issued, revised or made obsolete (per SOP-QMS-002). Reviewed at every management review.</p>
+  <h2>3. Register</h2>
+  <table>
+    <thead><tr><th>Type</th><th>ID</th><th>Title</th><th>Owner</th><th>Authoriser</th><th>ASA clause(s)</th><th>Linked doc</th><th>Rev</th><th>Next review</th></tr></thead>
+    <tbody><tr><td>SOP</td><td>SOP-QMS-001</td><td>Quality Management System</td><td>Quality Manager</td><td>Medical Director</td><td>4.1, 4.2</td><td>-</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>SOP</td><td>SOP-QMS-002</td><td>Document Control</td><td>Quality Manager</td><td>Quality Manager</td><td>4.3</td><td>FRM-027</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>SOP</td><td>SOP-QMS-003</td><td>Records Management & Retention</td><td>Quality Manager</td><td>Quality Manager</td><td>4.13</td><td>-</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>SOP</td><td>SOP-QMS-004</td><td>Internal Audit Programme</td><td>Quality Manager</td><td>Quality Manager</td><td>4.14</td><td>FRM-009</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>SOP</td><td>SOP-QMS-005</td><td>Management Review</td><td>Medical Director</td><td>Medical Director</td><td>4.15</td><td>FRM-010</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>SOP</td><td>SOP-QMS-006</td><td>Complaints Management</td><td>Quality Manager</td><td>Quality Manager</td><td>4.8</td><td>FRM-011</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>SOP</td><td>SOP-QMS-007</td><td>Feedback Management</td><td>Quality Manager</td><td>Quality Manager</td><td>4.7</td><td>FRM-012, FRM-013</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>SOP</td><td>SOP-QMS-008</td><td>Nonconformance Identification & Control</td><td>Quality Manager</td><td>Quality Manager</td><td>4.9</td><td>FRM-007</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>SOP</td><td>SOP-QMS-009</td><td>Corrective & Preventive Action</td><td>Quality Manager</td><td>Quality Manager</td><td>4.10, 4.11</td><td>FRM-008</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>SOP</td><td>SOP-QMS-010</td><td>Continual Improvement</td><td>Quality Manager</td><td>Medical Director</td><td>4.12, 4.14.5</td><td>FRM-028</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>SOP</td><td>SOP-QMS-011</td><td>Subcontracting & Onward Referral</td><td>Medical Director</td><td>Medical Director</td><td>4.5</td><td>FRM-018</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>SOP</td><td>SOP-QMS-012</td><td>External Services & Purchasing</td><td>Quality Manager</td><td>Quality Manager</td><td>4.6</td><td>-</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>SOP</td><td>SOP-HR-001</td><td>Staff Training & Competency</td><td>Tech Lead</td><td>Medical Director</td><td>5.1</td><td>FRM-014, FRM-016</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>SOP</td><td>SOP-HR-002</td><td>Conflict of Interest & Confidentiality</td><td>Quality Manager</td><td>Medical Director</td><td>4.1.5</td><td>FRM-015</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>SOP</td><td>SOP-EQ-001</td><td>Equipment Selection & Acceptance Testing</td><td>Tech Lead</td><td>Tech Lead</td><td>5.3.1, 5.3.2</td><td>FRM-004, FRM-005</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>SOP</td><td>SOP-EQ-002</td><td>Equipment Verification & Calibration</td><td>Tech Lead</td><td>Tech Lead</td><td>5.3.4</td><td>FRM-005</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>SOP</td><td>SOP-EQ-003</td><td>Equipment Maintenance, Repair & Decontamination</td><td>Tech Lead</td><td>Tech Lead</td><td>5.3.5</td><td>FRM-004</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>SOP</td><td>SOP-EQ-004</td><td>Equipment Adverse Incident Reporting</td><td>Tech Lead</td><td>Medical Director</td><td>5.3.6</td><td>FRM-006</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>SOP</td><td>SOP-EQ-005</td><td>Consumables Inventory Management</td><td>Tech Lead</td><td>Tech Lead</td><td>5.3.8</td><td>-</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>SOP</td><td>SOP-PSG-001</td><td>Referral Handling & Prioritisation</td><td>Reception</td><td>Medical Director</td><td>4.4, 5.4</td><td>FRM-001</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>SOP</td><td>SOP-PSG-002</td><td>Patient Identification (3-ID)</td><td>Tech Lead</td><td>Quality Manager</td><td>5.4.4, 5.4.5</td><td>FRM-002</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>SOP</td><td>SOP-PSG-003</td><td>Attended Polysomnography Methodology</td><td>Tech Lead</td><td>Medical Director</td><td>5.5.3</td><td>FRM-021, FRM-022</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>SOP</td><td>SOP-PSG-004</td><td>Home / Unattended Sleep Study</td><td>Tech Lead</td><td>Medical Director</td><td>5.5.4, 4.4.3, 4.5</td><td>FRM-025</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>SOP</td><td>SOP-PSG-005</td><td>Pre-Study Bio-Signal Verification</td><td>Tech Lead</td><td>Medical Director</td><td>5.3.4.2, 5.5.5.3</td><td>biocal sheet</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>SOP</td><td>SOP-PSG-006</td><td>CPAP / PAP Titration & Efficacy</td><td>Tech Lead</td><td>Medical Director</td><td>5.5.3.4</td><td>FRM-017, FRM-023</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>SOP</td><td>SOP-PSG-007</td><td>MSLT and MWT</td><td>Tech Lead</td><td>Medical Director</td><td>5.5.3.3</td><td>FRM-024</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>SOP</td><td>SOP-PSG-008</td><td>Paediatric Sleep Study</td><td>Paed. Tech Lead</td><td>Paed. Sleep Physician</td><td>5.1, 5.2.1, 5.5, 5.7.1.5</td><td>FRM-022</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>SOP</td><td>SOP-PSG-009</td><td>Emergency Escalation & Patient Safety</td><td>Tech Lead</td><td>Medical Director</td><td>5.5.1.1, 5.2.1</td><td>-</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>SOP</td><td>SOP-PSG-010</td><td>Method Validation & Verification</td><td>Tech Lead</td><td>Medical Director</td><td>5.5.5, 5.5.6</td><td>-</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>SOP</td><td>SOP-DATA-001</td><td>Data Control, Backup & Confidentiality</td><td>Quality Manager</td><td>Quality Manager</td><td>5.5.8</td><td>-</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>SOP</td><td>SOP-QC-001</td><td>Internal QC & Proficiency Testing</td><td>Quality Manager</td><td>Quality Manager</td><td>5.6</td><td>FRM-019, FRM-020</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>SOP</td><td>SOP-RPT-001</td><td>Analysis & Reporting</td><td>Medical Director</td><td>Medical Director</td><td>5.8.1 - 5.8.10</td><td>FRM-021..025</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>SOP</td><td>SOP-RPT-002</td><td>Revised / Amended Reports</td><td>Medical Director</td><td>Medical Director</td><td>5.8.11</td><td>FRM-026</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>SOP</td><td>SOP-RPT-003</td><td>Secure Report Transmission</td><td>Quality Manager</td><td>Quality Manager</td><td>5.8.12</td><td>-</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>SOP</td><td>SOP-TX-001</td><td>Post-Study Care & Therapy Management</td><td>Medical Director</td><td>Medical Director</td><td>5.7</td><td>FRM-017</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>Form</td><td>FRM-001</td><td>Referral & Patient Intake</td><td>Reception</td><td>-</td><td>4.4, 5.4</td><td>SOP-PSG-001</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>Form</td><td>FRM-002</td><td>Three-Identifier Patient Check</td><td>Tech Lead</td><td>-</td><td>5.4.4</td><td>SOP-PSG-002</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>Form</td><td>FRM-003</td><td>Patient Consent</td><td>Reception</td><td>-</td><td>4.1.5(e), 5.5.8</td><td>SOP-PSG-001</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>Form</td><td>FRM-004</td><td>Equipment Register Entry</td><td>Tech Lead</td><td>-</td><td>5.3.7</td><td>SOP-EQ-001</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>Form</td><td>FRM-005</td><td>Equipment Verification Log</td><td>Tech Lead</td><td>-</td><td>5.3.4</td><td>SOP-EQ-002</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>Form</td><td>FRM-006</td><td>Equipment Adverse Incident Report</td><td>Tech Lead</td><td>-</td><td>5.3.6</td><td>SOP-EQ-004</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>Form</td><td>FRM-007</td><td>Nonconformance Report</td><td>All staff</td><td>-</td><td>4.9</td><td>SOP-QMS-008</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>Form</td><td>FRM-008</td><td>CAPA Report</td><td>Quality Manager</td><td>-</td><td>4.10, 4.11</td><td>SOP-QMS-009</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>Form</td><td>FRM-009</td><td>Internal Audit Report</td><td>Auditor</td><td>-</td><td>4.14</td><td>SOP-QMS-004</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>Form</td><td>FRM-010</td><td>Management Review Minutes</td><td>Quality Manager</td><td>-</td><td>4.15</td><td>SOP-QMS-005</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>Form</td><td>FRM-011</td><td>Complaint Report</td><td>Quality Manager</td><td>-</td><td>4.8</td><td>SOP-QMS-006</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>Form</td><td>FRM-012</td><td>Patient Feedback Survey</td><td>Quality Manager</td><td>-</td><td>4.7</td><td>SOP-QMS-007</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>Form</td><td>FRM-013</td><td>Referrer Feedback Survey</td><td>Quality Manager</td><td>-</td><td>4.7</td><td>SOP-QMS-007</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>Form</td><td>FRM-014</td><td>Training & Competency Record</td><td>Tech Lead</td><td>-</td><td>5.1.3</td><td>SOP-HR-001</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>Form</td><td>FRM-015</td><td>Conflict of Interest Declaration</td><td>Quality Manager</td><td>-</td><td>4.1.5</td><td>SOP-HR-002</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>Form</td><td>FRM-016</td><td>Job Description Template</td><td>Medical Director</td><td>-</td><td>5.1.2</td><td>SOP-HR-001</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>Form</td><td>FRM-017</td><td>Provisional CPAP Prescription</td><td>Tech Lead</td><td>-</td><td>5.7.1.4</td><td>SOP-PSG-006</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>Form</td><td>FRM-018</td><td>Subcontractor Evaluation</td><td>Medical Director</td><td>-</td><td>4.5</td><td>SOP-QMS-011</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>Form</td><td>FRM-019</td><td>Quality Indicator Tracking</td><td>Quality Manager</td><td>-</td><td>5.6.3 - 5.6.5</td><td>SOP-QC-001</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>Form</td><td>FRM-020</td><td>Proficiency Testing Result Log</td><td>Quality Manager</td><td>-</td><td>5.6.8</td><td>SOP-QC-001</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>Form</td><td>FRM-021</td><td>Adult PSG Report</td><td>Reporting physician</td><td>-</td><td>5.8.7</td><td>SOP-RPT-001</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>Form</td><td>FRM-022</td><td>Paediatric PSG Report</td><td>Paed. sleep physician</td><td>-</td><td>5.8.5, 5.8.7</td><td>SOP-PSG-008</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>Form</td><td>FRM-023</td><td>CPAP / PAP Titration Report</td><td>Reporting physician</td><td>-</td><td>5.5.3.4, 5.8.7</td><td>SOP-PSG-006</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>Form</td><td>FRM-024</td><td>MSLT / MWT Report</td><td>Reporting physician</td><td>-</td><td>5.5.3.3, 5.8.7</td><td>SOP-PSG-007</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>Form</td><td>FRM-025</td><td>Home / Ambulatory Sleep Study Report</td><td>Reporting physician</td><td>-</td><td>5.5.4, 5.8.7</td><td>SOP-PSG-004</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>Form</td><td>FRM-026</td><td>Amended Report Cover</td><td>Reporting physician</td><td>-</td><td>5.8.11</td><td>SOP-RPT-002</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>Form</td><td>FRM-027</td><td>Document Change Request</td><td>All staff</td><td>-</td><td>4.3</td><td>SOP-QMS-002</td><td>1.1</td><td>_____/_____/_____</td></tr><tr><td>Form</td><td>FRM-028</td><td>Staff Suggestion / Improvement Idea</td><td>All staff</td><td>-</td><td>4.12, 4.14.5</td><td>SOP-QMS-010</td><td>1.1</td><td>_____/_____/_____</td></tr></tbody>
+  </table>
+  <h2>4. Summary by ASA clause coverage</h2>
+  <table>
+    <thead><tr><th>ASA section</th><th>Documents</th></tr></thead>
+    <tbody>
+      <tr><td>4.1 Organisation & management</td><td>SOP-QMS-001, SOP-HR-002, FRM-015, FRM-016</td></tr>
+      <tr><td>4.2 Quality management system</td><td>SOP-QMS-001</td></tr>
+      <tr><td>4.3 Document control</td><td>SOP-QMS-002, FRM-027, Master Register</td></tr>
+      <tr><td>4.4 Referral review</td><td>SOP-PSG-001, FRM-001</td></tr>
+      <tr><td>4.5 Subcontracting</td><td>SOP-QMS-011, FRM-018</td></tr>
+      <tr><td>4.6 External services & supplies</td><td>SOP-QMS-012</td></tr>
+      <tr><td>4.7 Feedback</td><td>SOP-QMS-007, FRM-012, FRM-013</td></tr>
+      <tr><td>4.8 Complaints</td><td>SOP-QMS-006, FRM-011</td></tr>
+      <tr><td>4.9 Nonconformities</td><td>SOP-QMS-008, FRM-007</td></tr>
+      <tr><td>4.10 - 4.11 CAPA</td><td>SOP-QMS-009, FRM-008</td></tr>
+      <tr><td>4.12 Continual improvement</td><td>SOP-QMS-010, FRM-028</td></tr>
+      <tr><td>4.13 Records</td><td>SOP-QMS-003</td></tr>
+      <tr><td>4.14 Audits</td><td>SOP-QMS-004, FRM-009</td></tr>
+      <tr><td>4.15 Management review</td><td>SOP-QMS-005, FRM-010</td></tr>
+      <tr><td>5.1 Staff</td><td>SOP-HR-001, FRM-014, FRM-016</td></tr>
+      <tr><td>5.2 Accommodation</td><td>SOP-PSG-009 (safety), SOP-PSG-008 (paediatric)</td></tr>
+      <tr><td>5.3 Equipment</td><td>SOP-EQ-001..005, FRM-004, FRM-005, FRM-006</td></tr>
+      <tr><td>5.4 Pre-study procedures</td><td>SOP-PSG-001, SOP-PSG-002, FRM-001, FRM-002</td></tr>
+      <tr><td>5.5 Sleep disorders services processes</td><td>SOP-PSG-003..010, SOP-DATA-001</td></tr>
+      <tr><td>5.6 Assuring quality</td><td>SOP-QC-001, FRM-019, FRM-020</td></tr>
+      <tr><td>5.7 Post-study & therapy</td><td>SOP-TX-001, FRM-017</td></tr>
+      <tr><td>5.8 Reporting</td><td>SOP-RPT-001..003, FRM-021..026</td></tr>
+    </tbody>
+  </table>
+
+  
+  <div class="callout" style="margin-top:16px;font-size:9.5pt;"><strong>Revision history:</strong> Rev 1.1 (May 2026) — Updated to reflect Nexus 360 quality management system integration. Steps supported by Nexus 360 are identified throughout.</div>
+  <div class="footer">Controlled register - uncontrolled when printed. REG-001 Rev 1.1 - Page 1 of 1.</div>
+</div>
+</body>
+</html>

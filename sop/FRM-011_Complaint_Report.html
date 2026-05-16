@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>FRM-011 - Complaint Report</title>
+<style>
+@page { size: A4; margin: 18mm 16mm 22mm 16mm; }
+body { font-family: "Segoe UI", Arial, sans-serif; font-size: 11pt; color: #1f2933; line-height: 1.45; margin: 0; padding: 24px; background: #f5f7fa; }
+.page { max-width: 920px; margin: 0 auto; background: #ffffff; padding: 32px 40px; border: 1px solid #d6dde6; border-radius: 6px; box-shadow: 0 2px 6px rgba(0,0,0,0.04); }
+.doc-header { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 18px; border-bottom: 3px solid #14406b; padding-bottom: 10px; margin-bottom: 18px; }
+.doc-header .kind { grid-column: 1 / span 2; font-size: 9.5pt; color: #506478; text-transform: uppercase; letter-spacing: 1.5px; }
+.doc-header .title { grid-column: 1 / span 2; font-size: 18pt; font-weight: 700; color: #14406b; margin: 0 0 4px 0; }
+.doc-header .subtitle { grid-column: 1 / span 2; font-size: 10.5pt; color: #506478; margin-bottom: 6px; }
+.doc-header .field { font-size: 9.5pt; color: #1f2933; border-bottom: 1px dotted #ccd4dc; padding-bottom: 3px; }
+.doc-header .field strong { display: inline-block; width: 130px; color: #506478; font-weight: 600; }
+h2 { font-size: 12.5pt; color: #14406b; margin-top: 22px; margin-bottom: 8px; border-left: 4px solid #14406b; padding: 2px 0 2px 8px; background: #eef3f9; }
+h3 { font-size: 11pt; color: #1f2933; margin-top: 16px; margin-bottom: 4px; }
+p, li { font-size: 10.5pt; }
+ul, ol { margin: 4px 0 8px 22px; padding: 0; }
+table { width: 100%; border-collapse: collapse; margin: 8px 0 12px 0; font-size: 10pt; }
+th, td { border: 1px solid #c5cfdb; padding: 6px 8px; text-align: left; vertical-align: top; }
+th { background: #eef3f9; color: #14406b; font-weight: 600; }
+.callout { background: #fff7e0; border: 1px solid #f0d27e; border-left: 4px solid #d49b1c; padding: 8px 12px; margin: 10px 0; font-size: 10pt; }
+.callout.warn { background: #fdecea; border-color: #f0a99e; border-left-color: #c0392b; }
+.signoff { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 14px; }
+.sign-cell { border: 1px solid #c5cfdb; padding: 8px; min-height: 60px; font-size: 9.5pt; color: #506478; }
+.sign-cell strong { color: #1f2933; }
+.footer { border-top: 1px solid #c5cfdb; margin-top: 24px; padding-top: 8px; font-size: 9pt; color: #506478; text-align: center; }
+.clause-tag { display: inline-block; background: #14406b; color: #fff; font-size: 8.5pt; padding: 1px 6px; border-radius: 3px; margin-left: 4px; vertical-align: middle; }
+.fill { display: inline-block; min-width: 180px; border-bottom: 1px solid #1f2933; height: 14px; }
+.fill.lg { min-width: 360px; }
+.fill.sm { min-width: 80px; }
+.box { border: 1px solid #1f2933; display: inline-block; width: 12px; height: 12px; vertical-align: middle; margin-right: 4px; }
+.section-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 18px; margin: 8px 0; }
+.section-grid .cell { font-size: 10pt; border-bottom: 1px dotted #ccd4dc; padding-bottom: 4px; }
+.section-grid .cell strong { color: #506478; font-weight: 600; display: block; font-size: 9pt; }
+@media print { body { background: #ffffff; padding: 0; } .page { box-shadow: none; border: none; padding: 0; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="doc-header">
+    <div class="kind">Controlled Form</div>
+    <div class="title">Complaint Report</div>
+    <div class="subtitle">Linked SOP: SOP-QMS-006.</div>
+    <div class="field"><strong>Form ID:</strong> FRM-011</div>
+    <div class="field"><strong>Revision:</strong> 1.0</div>
+    <div class="field"><strong>Linked SOP:</strong> see below</div>
+    <div class="field"><strong>Retention:</strong> per Records SOP</div>
+  </header>
+
+  <h2>1. Receipt</h2>
+  <div class="section-grid">
+    <div class="cell"><strong>Complaint ID</strong><span class="fill"></span></div>
+    <div class="cell"><strong>Received date</strong><span class="fill sm"></span></div>
+    <div class="cell"><strong>Channel</strong><span class="fill"></span></div>
+    <div class="cell"><strong>Received by</strong><span class="fill"></span></div>
+    <div class="cell"><strong>Complainant</strong><span class="fill"></span></div>
+    <div class="cell"><strong>Contact</strong><span class="fill"></span></div>
+  </div>
+  <h2>2. Triage</h2>
+  <p><span class="box"></span> Minor &nbsp; <span class="box"></span> Significant &nbsp; <span class="box"></span> Major &nbsp; <span class="box"></span> Sentinel</p>
+  <p>Acknowledgement sent: <span class="box"></span> Yes - Date: <span class="fill sm"></span></p>
+  <h2>3. Complaint summary</h2>
+  <p><span class="fill lg"></span></p>
+  <h2>4. Investigation & response</h2>
+  <p>Investigator: <span class="fill"></span></p>
+  <p>Findings: <span class="fill lg"></span></p>
+  <p>Response date: <span class="fill sm"></span> &nbsp; Linked CAPA: <span class="fill"></span></p>
+  <h2>5. Closure</h2>
+  <p>Closed: <span class="box"></span> Yes - Date: <span class="fill sm"></span> &nbsp; Escalation pathway provided: <span class="box"></span> Yes</p>
+
+  <div class="footer">Controlled form - uncontrolled when printed. FRM-011 Rev 1.0 - Page 1 of 1.</div>
+</div>
+</body>
+</html>

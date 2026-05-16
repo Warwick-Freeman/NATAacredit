@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>FRM-004 - Equipment Register Entry</title>
+<style>
+@page { size: A4; margin: 18mm 16mm 22mm 16mm; }
+body { font-family: "Segoe UI", Arial, sans-serif; font-size: 11pt; color: #1f2933; line-height: 1.45; margin: 0; padding: 24px; background: #f5f7fa; }
+.page { max-width: 920px; margin: 0 auto; background: #ffffff; padding: 32px 40px; border: 1px solid #d6dde6; border-radius: 6px; box-shadow: 0 2px 6px rgba(0,0,0,0.04); }
+.doc-header { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 18px; border-bottom: 3px solid #14406b; padding-bottom: 10px; margin-bottom: 18px; }
+.doc-header .kind { grid-column: 1 / span 2; font-size: 9.5pt; color: #506478; text-transform: uppercase; letter-spacing: 1.5px; }
+.doc-header .title { grid-column: 1 / span 2; font-size: 18pt; font-weight: 700; color: #14406b; margin: 0 0 4px 0; }
+.doc-header .subtitle { grid-column: 1 / span 2; font-size: 10.5pt; color: #506478; margin-bottom: 6px; }
+.doc-header .field { font-size: 9.5pt; color: #1f2933; border-bottom: 1px dotted #ccd4dc; padding-bottom: 3px; }
+.doc-header .field strong { display: inline-block; width: 130px; color: #506478; font-weight: 600; }
+h2 { font-size: 12.5pt; color: #14406b; margin-top: 22px; margin-bottom: 8px; border-left: 4px solid #14406b; padding: 2px 0 2px 8px; background: #eef3f9; }
+h3 { font-size: 11pt; color: #1f2933; margin-top: 16px; margin-bottom: 4px; }
+p, li { font-size: 10.5pt; }
+ul, ol { margin: 4px 0 8px 22px; padding: 0; }
+table { width: 100%; border-collapse: collapse; margin: 8px 0 12px 0; font-size: 10pt; }
+th, td { border: 1px solid #c5cfdb; padding: 6px 8px; text-align: left; vertical-align: top; }
+th { background: #eef3f9; color: #14406b; font-weight: 600; }
+.callout { background: #fff7e0; border: 1px solid #f0d27e; border-left: 4px solid #d49b1c; padding: 8px 12px; margin: 10px 0; font-size: 10pt; }
+.callout.warn { background: #fdecea; border-color: #f0a99e; border-left-color: #c0392b; }
+.callout.nexus { background: #eef6ff; border: 1px solid #93c5fd; border-left: 4px solid #2563eb; padding: 8px 12px; margin: 10px 0; font-size: 10pt; }
+.callout.nexus strong { color: #1d4ed8; }
+.signoff { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 14px; }
+.sign-cell { border: 1px solid #c5cfdb; padding: 8px; min-height: 60px; font-size: 9.5pt; color: #506478; }
+.sign-cell strong { color: #1f2933; }
+.footer { border-top: 1px solid #c5cfdb; margin-top: 24px; padding-top: 8px; font-size: 9pt; color: #506478; text-align: center; }
+.clause-tag { display: inline-block; background: #14406b; color: #fff; font-size: 8.5pt; padding: 1px 6px; border-radius: 3px; margin-left: 4px; vertical-align: middle; }
+.fill { display: inline-block; min-width: 180px; border-bottom: 1px solid #1f2933; height: 14px; }
+.fill.lg { min-width: 360px; }
+.fill.sm { min-width: 80px; }
+.box { border: 1px solid #1f2933; display: inline-block; width: 12px; height: 12px; vertical-align: middle; margin-right: 4px; }
+.section-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 18px; margin: 8px 0; }
+.section-grid .cell { font-size: 10pt; border-bottom: 1px dotted #ccd4dc; padding-bottom: 4px; }
+.section-grid .cell strong { color: #506478; font-weight: 600; display: block; font-size: 9pt; }
+@media print { body { background: #ffffff; padding: 0; } .page { box-shadow: none; border: none; padding: 0; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="doc-header">
+    <div class="kind">Controlled Form</div>
+    <div class="title">Equipment Register Entry</div>
+    <div class="subtitle">Linked SOP: SOP-EQ-001. Single page per equipment item; updated through life of equipment + 7 years.</div>
+    <div class="field"><strong>Form ID:</strong> FRM-004</div>
+    <div class="field"><strong>Revision:</strong> 1.1</div>
+    <div class="field"><strong>Linked SOP:</strong> see below</div>
+    <div class="field"><strong>Retention:</strong> per Records SOP</div>
+  </header>
+
+  <div class="callout nexus"><strong>Nexus 360 Notice:</strong> This form is superseded as the primary equipment register by the Nexus 360 Equipment Register module. FRM-004 may be used for offline recording only, with data subsequently entered into Nexus 360. The Nexus 360 register is the definitive controlled record.</div>
+  <h2>1. Identification <span class="clause-tag">ASA 5.3.7(a)</span></h2>
+  <div class="section-grid">
+    <div class="cell"><strong>Equipment ID</strong><span class="fill"></span></div>
+    <div class="cell"><strong>Description</strong><span class="fill"></span></div>
+    <div class="cell"><strong>Manufacturer</strong><span class="fill"></span></div>
+    <div class="cell"><strong>Model</strong><span class="fill"></span></div>
+    <div class="cell"><strong>Serial number</strong><span class="fill"></span></div>
+    <div class="cell"><strong>ARTG number</strong><span class="fill"></span></div>
+    <div class="cell"><strong>Supplier / contact</strong><span class="fill"></span></div>
+    <div class="cell"><strong>Date in service</strong><span class="fill sm"></span></div>
+    <div class="cell"><strong>Location</strong><span class="fill"></span></div>
+    <div class="cell"><strong>Condition received</strong><span class="fill"></span></div>
+  </div>
+  <h2>2. Documentation</h2>
+  <ul>
+    <li>Manuals filed: <span class="box"></span> Yes</li>
+    <li>Acceptance test report (FRM-005 baseline): <span class="fill"></span></li>
+    <li>Preventive maintenance schedule: <span class="fill"></span></li>
+  </ul>
+  <h2>3. Verification & maintenance log</h2>
+  <table>
+    <thead><tr><th>Date</th><th>Activity</th><th>Result / value</th><th>Performed by</th><th>Action / NC</th></tr></thead>
+    <tbody><tr><td colspan="5">&nbsp;</td></tr><tr><td colspan="5">&nbsp;</td></tr><tr><td colspan="5">&nbsp;</td></tr></tbody>
+  </table>
+  <h2>4. Damage / malfunction / repair</h2>
+  <table>
+    <thead><tr><th>Date</th><th>Description</th><th>Action</th><th>Re-verification</th></tr></thead>
+    <tbody><tr><td colspan="4">&nbsp;</td></tr><tr><td colspan="4">&nbsp;</td></tr></tbody>
+  </table>
+  <h2>5. Decommissioning</h2>
+  <p>Date decommissioned: <span class="fill sm"></span> &nbsp; Reason: <span class="fill"></span> &nbsp; Decontamination: <span class="box"></span> Done</p>
+
+  
+  <div class="callout" style="margin-top:16px;font-size:9.5pt;"><strong>Revision history:</strong> Rev 1.1 (May 2026) — Updated to reflect Nexus 360 quality management system integration. Steps supported by Nexus 360 are identified throughout.</div>
+  <div class="footer">Controlled form - uncontrolled when printed. FRM-004 Rev 1.1 - Page 1 of 1.</div>
+</div>
+</body>
+</html>

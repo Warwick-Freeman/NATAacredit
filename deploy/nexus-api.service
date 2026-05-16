@@ -1,0 +1,16 @@
+[Unit]
+Description=Nexus 360 API
+After=network.target
+
+[Service]
+WorkingDirectory=/opt/nexus-api
+ExecStart=/usr/bin/dotnet /opt/nexus-api/api.dll
+Restart=always
+RestartSec=5
+Environment=ASPNETCORE_URLS=http://127.0.0.1:5000
+Environment=ASPNETCORE_ENVIRONMENT=Production
+User=www-data
+Group=www-data
+
+[Install]
+WantedBy=multi-user.target

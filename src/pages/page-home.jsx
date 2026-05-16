@@ -1,8 +1,204 @@
 import React from 'react';
 import Icon from '../icons';
 import { PageHeader, Pill, Avatar, Donut } from '../components';
+import { useTaskContext } from '../TaskContext';
+import { useAuth } from '../AuthContext';
+import { useLocation } from '../LocationContext';
+
+function exportEvidencePack(D, site, user) {
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' });
+  const timeStr = now.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' });
+
+  const totalClauses   = D.complianceBySection.reduce((s, x) => s + x.total, 0);
+  const totalCompliant = D.complianceBySection.reduce((s, x) => s + x.compliant, 0);
+  const totalPartial   = D.complianceBySection.reduce((s, x) => s + x.partial, 0);
+  const totalNc        = D.complianceBySection.reduce((s, x) => s + x.nc, 0);
+  const pct = ((totalCompliant / totalClauses) * 100).toFixed(1);
+
+  const ncClauses      = (D.clauses ?? []).filter(c => c.status === 'nc');
+  const partialClauses = (D.clauses ?? []).filter(c => c.status === 'partial');
+  const overdueEquip   = (D.equipment ?? []).filter(e => e.verifyStatus === 'bad');
+  const pendingStudies = (D.studies ?? []).filter(s => s.status !== 'Final');
+
+  const complianceColor = pct >= 90 ? '#16a34a' : pct >= 75 ? '#ca8a04' : '#dc2626';
+
+  const sectionRows = D.complianceBySection.map(s => {
+    const cPct = (s.compliant / s.total * 100).toFixed(0);
+    const pPct = (s.partial  / s.total * 100).toFixed(0);
+    const nPct = (s.nc       / s.total * 100).toFixed(0);
+    return `<tr>
+      <td><strong>${s.id}</strong></td><td>${s.name}</td>
+      <td style="color:#16a34a;font-weight:600">${s.compliant}</td>
+      <td style="color:#ca8a04;font-weight:600">${s.partial}</td>
+      <td style="color:${s.nc > 0 ? '#dc2626' : '#6b7280'};font-weight:600">${s.nc}</td>
+      <td>${s.total}</td>
+      <td style="min-width:90px">
+        <div style="font-size:11px;color:#6b7280;margin-bottom:3px">${cPct}%</div>
+        <div style="height:6px;background:#f3f4f6;border-radius:3px;overflow:hidden;display:flex">
+          <div style="width:${cPct}%;background:#16a34a"></div>
+          <div style="width:${pPct}%;background:#ca8a04"></div>
+          <div style="width:${nPct}%;background:#dc2626"></div>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+
+  const issueRows = [...ncClauses, ...partialClauses].map(c => `<tr>
+    <td><strong>${c.id}</strong></td><td>${c.title}</td>
+    <td><span class="pill ${c.status === 'nc' ? 'bad' : 'warn'}">${c.status === 'nc' ? 'Non-conformant' : 'Partial'}</span></td>
+    <td>${c.owner ?? '—'}</td><td>${c.lastReviewed ?? '—'}</td>
+    <td style="color:#6b7280;max-width:200px">${c.evidence ?? '—'}</td>
+  </tr>`).join('');
+
+  const equipRows = overdueEquip.map(e => `<tr>
+    <td><strong>${e.id}</strong></td><td>${e.name}</td><td>${e.type ?? '—'}</td>
+    <td>${e.site ?? '—'}</td><td>${e.lastVerify ?? '—'}</td>
+    <td><span class="pill bad">${e.nextVerify ?? 'Overdue'}</span></td>
+  </tr>`).join('');
+
+  const studyRows = pendingStudies.map(s => `<tr>
+    <td><strong>${s.id}</strong></td><td>${s.type ?? '—'}</td><td>${s.physician ?? '—'}</td>
+    <td><span class="pill ${s.status === 'Awaiting sign-off' ? 'warn' : 'neutral'}">${s.status}</span></td>
+    <td><span class="pill ${s.sla === 'bad' ? 'bad' : s.sla === 'warn' ? 'warn' : 'good'}">${s.due === 0 ? 'Due today' : s.due > 0 ? `${s.due}d remaining` : `${Math.abs(s.due)}d overdue`}</span></td>
+  </tr>`).join('');
+
+  const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/>
+<title>Evidence Pack — ${site.name}</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:13px;color:#111;background:#fff}
+@media print{@page{margin:18mm 16mm}.no-print{display:none!important}}
+.cover{padding:60px 48px;min-height:100vh;display:flex;flex-direction:column;page-break-after:always}
+.brand{font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#6b7280;margin-bottom:48px}
+h1{font-size:36px;font-weight:800;line-height:1.1}
+.sub{font-size:18px;color:#6b7280;margin-top:6px}
+.score-box{margin-top:40px;padding:24px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;display:inline-block}
+.score-num{font-size:52px;font-weight:800;line-height:1;color:${complianceColor}}
+.score-pills{display:flex;gap:16px;margin-top:8px;font-size:12px}
+.meta-grid{margin-top:auto;padding-top:32px;border-top:2px solid #e5e7eb;display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+.meta-item label{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#9ca3af;display:block;margin-bottom:3px}
+.meta-item span{font-size:14px;font-weight:600}
+.section{padding:36px 48px;border-top:1px solid #e5e7eb}
+h2{font-size:17px;font-weight:700;margin-bottom:3px}
+.sec-sub{font-size:12px;color:#6b7280;margin-bottom:18px}
+.stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px}
+.stat-card{border:1px solid #e5e7eb;border-radius:8px;padding:14px}
+.stat-card .n{font-size:28px;font-weight:700}.stat-card .l{font-size:11px;color:#6b7280;margin-top:2px}
+.stat-card.good{border-color:#bbf7d0;background:#f0fdf4}.stat-card.good .n{color:#16a34a}
+.stat-card.warn{border-color:#fef08a;background:#fefce8}.stat-card.warn .n{color:#ca8a04}
+.stat-card.bad{border-color:#fecaca;background:#fef2f2}.stat-card.bad .n{color:#dc2626}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:#9ca3af;padding:8px 10px;border-bottom:2px solid #e5e7eb}
+td{padding:9px 10px;border-bottom:1px solid #f3f4f6;font-size:12px;vertical-align:top}
+tr:last-child td{border-bottom:none}
+.pill{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
+.pill.good{background:#dcfce7;color:#15803d}.pill.warn{background:#fef9c3;color:#854d0e}
+.pill.bad{background:#fee2e2;color:#b91c1c}.pill.neutral{background:#f3f4f6;color:#6b7280}
+.footer{padding:18px 48px;border-top:1px solid #e5e7eb;font-size:11px;color:#9ca3af;display:flex;justify-content:space-between}
+.print-btn{position:fixed;bottom:24px;right:24px;background:#2563eb;color:#fff;border:none;padding:12px 22px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;box-shadow:0 4px 16px rgba(37,99,235,.3)}
+</style></head><body>
+<button class="print-btn no-print" onclick="window.print()">Print / Save as PDF</button>
+
+<div class="cover">
+  <div class="brand">Nexus 360 · Accreditation</div>
+  <h1>NATA Evidence Pack</h1>
+  <div class="sub">${site.name}</div>
+  <div class="score-box">
+    <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#9ca3af;margin-bottom:6px">Overall compliance</div>
+    <div class="score-num">${pct}%</div>
+    <div class="score-pills">
+      <span style="color:#16a34a">● ${totalCompliant} compliant</span>
+      <span style="color:#ca8a04">● ${totalPartial} partial</span>
+      <span style="color:#dc2626">● ${totalNc} NC</span>
+    </div>
+  </div>
+  <div class="meta-grid">
+    <div class="meta-item"><label>Certificate No.</label><span>${D.service.accreditation?.certNo ?? '—'}</span></div>
+    <div class="meta-item"><label>Next assessment</label><span>${D.service.nextAssessment}</span></div>
+    <div class="meta-item"><label>Generated</label><span>${dateStr}, ${timeStr}</span></div>
+    <div class="meta-item"><label>Prepared by</label><span>${user?.name ?? '—'}</span></div>
+    <div class="meta-item"><label>ABN</label><span>${D.service.abn ?? '—'}</span></div>
+    <div class="meta-item"><label>Accredited since</label><span>${D.service.accreditation?.since ?? '—'}</span></div>
+  </div>
+</div>
+
+<div class="section">
+  <h2>Compliance summary</h2>
+  <div class="sec-sub">ASA Standard March 2019 · ${totalClauses} clauses across ${D.complianceBySection.length} sections</div>
+  <div class="stat-row">
+    <div class="stat-card"><div class="n">${totalClauses}</div><div class="l">Total clauses</div></div>
+    <div class="stat-card good"><div class="n">${totalCompliant}</div><div class="l">Compliant</div></div>
+    <div class="stat-card warn"><div class="n">${totalPartial}</div><div class="l">Partial</div></div>
+    <div class="stat-card bad"><div class="n">${totalNc}</div><div class="l">Non-conformant</div></div>
+  </div>
+  <table>
+    <thead><tr><th>§</th><th>Section</th><th>Compliant</th><th>Partial</th><th>NC</th><th>Total</th><th>Coverage</th></tr></thead>
+    <tbody>${sectionRows}</tbody>
+  </table>
+</div>
+
+${issueRows ? `<div class="section">
+  <h2>Non-conformances &amp; partial compliance</h2>
+  <div class="sec-sub">${ncClauses.length} non-conformant · ${partialClauses.length} partial · requires corrective action</div>
+  <table>
+    <thead><tr><th>Clause</th><th>Title</th><th>Status</th><th>Owner</th><th>Last reviewed</th><th>Evidence</th></tr></thead>
+    <tbody>${issueRows}</tbody>
+  </table>
+</div>` : ''}
+
+${equipRows ? `<div class="section">
+  <h2>Equipment — verification overdue</h2>
+  <div class="sec-sub">${overdueEquip.length} item${overdueEquip.length > 1 ? 's' : ''} past scheduled verification date</div>
+  <table>
+    <thead><tr><th>Asset ID</th><th>Name</th><th>Type</th><th>Site</th><th>Last verified</th><th>Due</th></tr></thead>
+    <tbody>${equipRows}</tbody>
+  </table>
+</div>` : ''}
+
+${studyRows ? `<div class="section">
+  <h2>Studies pending finalisation</h2>
+  <div class="sec-sub">${pendingStudies.length} stud${pendingStudies.length > 1 ? 'ies' : 'y'} not yet finalised · clause 5.8.1</div>
+  <table>
+    <thead><tr><th>Study ID</th><th>Type</th><th>Physician</th><th>Status</th><th>SLA</th></tr></thead>
+    <tbody>${studyRows}</tbody>
+  </table>
+</div>` : ''}
+
+<div class="footer">
+  <span>${D.service.name} · ABN ${D.service.abn ?? '—'}</span>
+  <span>Generated by Nexus 360 · ${dateStr}</span>
+</div>
+</body></html>`;
+
+  const blob = new Blob([html], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  const win = window.open(url, '_blank');
+  if (!win) {
+    // Fallback if popup blocked: trigger download instead
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `evidence-pack-${now.toISOString().slice(0, 10)}.html`;
+    a.click();
+  }
+  setTimeout(() => URL.revokeObjectURL(url), 15000);
+}
+
+const greeting = () => {
+  const h = new Date().getHours();
+  if (h < 12) return 'Good morning';
+  if (h < 17) return 'Good afternoon';
+  return 'Good evening';
+};
 
 const HomePage = ({ data: D, goTo, openClause }) => {
+  const { user } = useAuth();
+  const { site } = useLocation();
+  const { tasks, openCreateTask } = useTaskContext();
+  const firstName = user?.name?.split(' ')[0] ?? user?.name ?? '';
+  const myTasks = tasks.filter(t => t.assignedTo === user?.name && t.status !== 'done').slice(0, 6);
+  const criticalCount = tasks.filter(t => t.status !== 'done' && t.priority === 'critical').length;
+
   const totalClauses = D.complianceBySection.reduce((s, x) => s + x.total, 0);
   const totalCompliant = D.complianceBySection.reduce((s, x) => s + x.compliant, 0);
   const totalPartial = D.complianceBySection.reduce((s, x) => s + x.partial, 0);
@@ -12,12 +208,12 @@ const HomePage = ({ data: D, goTo, openClause }) => {
   return (
     <div className="page page-wide">
       <PageHeader
-        eyebrow="Good morning, Kavya"
-        title="Riverside Sleep & Respiratory Centre"
+        eyebrow={`${greeting()}${firstName ? `, ${firstName}` : ''}`}
+        title={site.name}
         subtitle={`NATA assessment in ${D.service.daysToAssessment} days · ${D.service.nextAssessment}`}
         actions={
           <>
-            <button className="btn"><Icon name="download" size={14} />Export evidence pack</button>
+            <button className="btn" onClick={() => exportEvidencePack(D, site, user)}><Icon name="download" size={14} />Export evidence pack</button>
             <button className="btn btn-primary" onClick={() => goTo('accreditation')}>
               <Icon name="shield" size={14} />Open accreditation workspace
             </button>
@@ -173,25 +369,36 @@ const HomePage = ({ data: D, goTo, openClause }) => {
             <div className="card-head">
               <div className="card-title">My tasks</div>
               <div className="topbar-spacer" />
-              <Pill kind="bad">{D.tasks.filter(t => t.priority === 'critical').length} critical</Pill>
+              {criticalCount > 0 && <Pill kind="bad">{criticalCount} critical</Pill>}
+              <button className="btn btn-ghost" style={{ padding: '4px 8px', fontSize: 11 }} onClick={() => goTo('tasks')}>All tasks</button>
             </div>
             <div>
-              {D.tasks.map(t => (
-                <div key={t.id} style={{ padding: '11px 18px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-                  <input type="checkbox" style={{ marginTop: 2 }} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 500 }}>{t.title}</div>
-                    <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2, display: 'flex', gap: 8 }}>
-                      <span style={{ color: t.due.includes('Overdue') ? 'var(--bad)' : 'var(--ink-3)' }}>{t.due}</span>
-                      <span>·</span>
-                      <span className="mono" style={{ cursor: 'pointer', color: 'var(--accent-ink)' }} onClick={() => openClause(t.clause)}>cl. {t.clause}</span>
+              {myTasks.length === 0 ? (
+                <div style={{ padding: '20px 18px', fontSize: 12, color: 'var(--ink-3)', textAlign: 'center' }}>No open tasks assigned to you.</div>
+              ) : myTasks.map(t => {
+                const diff = Math.round((new Date(t.dueDate) - new Date()) / 86400000);
+                const dueText = diff < 0 ? `Overdue ${Math.abs(diff)}d` : diff === 0 ? 'Due today' : `Due in ${diff}d`;
+                const dueColor = diff <= 0 ? 'var(--bad)' : diff <= 3 ? 'var(--warn)' : 'var(--ink-3)';
+                return (
+                  <div key={t.id} style={{ padding: '11px 18px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 500 }}>{t.title}</div>
+                      <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2, display: 'flex', gap: 8 }}>
+                        <span style={{ color: dueColor }}>{dueText}</span>
+                        {t.clause && <><span>·</span><span className="mono" style={{ cursor: 'pointer', color: 'var(--accent-ink)' }} onClick={() => openClause(t.clause)}>cl. {t.clause}</span></>}
+                      </div>
                     </div>
+                    <span className={`pill ${t.priority === 'critical' ? 'bad' : t.priority === 'high' ? 'warn' : 'outline'}`}>
+                      {t.priority}
+                    </span>
                   </div>
-                  <span className={`pill ${t.priority === 'critical' ? 'bad' : t.priority === 'high' ? 'warn' : 'outline'}`}>
-                    {t.priority}
-                  </span>
-                </div>
-              ))}
+                );
+              })}
+            </div>
+            <div style={{ padding: '10px 18px', borderTop: '1px solid var(--border)' }}>
+              <button className="btn" style={{ fontSize: 11, width: '100%' }} onClick={() => openCreateTask({ assignedTo: user?.name, sourceType: 'manual' })}>
+                <Icon name="plus" size={12} />New task
+              </button>
             </div>
           </div>
 
