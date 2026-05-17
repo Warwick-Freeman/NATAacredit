@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import Icon from '../icons';
 import { PageHeader, Pill, Avatar, Donut } from '../components';
 import { useTaskContext } from '../TaskContext';
@@ -184,6 +184,28 @@ ${studyRows ? `<div class="section">
   setTimeout(() => URL.revokeObjectURL(url), 15000);
 }
 
+const WIDGETS = [
+  { id: 'stats',            label: 'Key metrics',       desc: 'Compliance %, clauses, SLA, open NCs' },
+  { id: 'banner',           label: 'Attention banner',  desc: 'Items requiring immediate action' },
+  { id: 'section_coverage', label: 'Section coverage',  desc: 'Compliance heatmap by ASA section' },
+  { id: 'reporting_sla',    label: 'Reporting SLA',     desc: 'Studies queue and 10-day SLA status' },
+  { id: 'my_tasks',         label: 'My tasks',          desc: 'Tasks currently assigned to you' },
+  { id: 'recent_activity',  label: 'Recent activity',   desc: 'Latest audit trail entries' },
+];
+
+function useDashboardPrefs(userEmail) {
+  const key = `nexus_dash_${userEmail ?? 'default'}`;
+  const [hidden, setHidden] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(key)) ?? []; } catch { return []; }
+  });
+  const toggle = (id) => setHidden(prev => {
+    const next = prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id];
+    localStorage.setItem(key, JSON.stringify(next));
+    return next;
+  });
+  return { hidden, toggle };
+}
+
 const greeting = () => {
   const h = new Date().getHours();
   if (h < 12) return 'Good morning';
@@ -195,6 +217,8 @@ const HomePage = ({ data: D, goTo, openClause }) => {
   const { user } = useAuth();
   const { site } = useLocation();
   const { tasks, openCreateTask } = useTaskContext();
+  const { hidden, toggle } = useDashboardPrefs(user?.email);
+  const [customizing, setCustomizing] = useState(false);
   const firstName = user?.name?.split(' ')[0] ?? user?.name ?? '';
   const myTasks = tasks.filter(t => t.assignedTo === user?.name && t.status !== 'done').slice(0, 6);
   const criticalCount = tasks.filter(t => t.status !== 'done' && t.priority === 'critical').length;
@@ -205,6 +229,8 @@ const HomePage = ({ data: D, goTo, openClause }) => {
   const totalNc = D.complianceBySection.reduce((s, x) => s + x.nc, 0);
   const pct = ((totalCompliant / totalClauses) * 100).toFixed(1);
 
+  const show = (id) => !hidden.includes(id);
+
   return (
     <div className="page page-wide">
       <PageHeader
@@ -213,6 +239,53 @@ const HomePage = ({ data: D, goTo, openClause }) => {
         subtitle={`NATA assessment in ${D.service.daysToAssessment} days · ${D.service.nextAssessment}`}
         actions={
           <>
+            <div style={{ position: 'relative' }}>
+              <button className="btn" onClick={() => setCustomizing(o => !o)}>
+                <Icon name="settings" size={14} />Customise
+              </button>
+              {customizing && (
+                <>
+                  <div style={{ position: 'fixed', inset: 0, zIndex: 49 }} onClick={() => setCustomizing(false)} />
+                  <div style={{
+                    position: 'absolute', top: 'calc(100% + 6px)', right: 0,
+                    width: 290, background: 'var(--surface)', border: '1px solid var(--border)',
+                    borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,0.18)', zIndex: 60, overflow: 'hidden',
+                  }}>
+                    <div style={{ padding: '11px 14px', borderBottom: '1px solid var(--border)' }}>
+                      <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--ink)' }}>Customise dashboard</div>
+                      <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>Choose which widgets to display</div>
+                    </div>
+                    {WIDGETS.map(w => (
+                      <div key={w.id} onClick={() => toggle(w.id)} style={{
+                        display: 'flex', alignItems: 'center', gap: 12, padding: '9px 14px',
+                        cursor: 'pointer', borderBottom: '1px solid var(--border)',
+                        transition: 'background 0.1s',
+                      }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-2)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                      >
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--ink)' }}>{w.label}</div>
+                          <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{w.desc}</div>
+                        </div>
+                        <div style={{
+                          width: 32, height: 18, borderRadius: 9, flexShrink: 0,
+                          background: show(w.id) ? 'var(--accent)' : 'var(--surface-3)',
+                          position: 'relative', transition: 'background 0.2s',
+                        }}>
+                          <div style={{
+                            width: 14, height: 14, borderRadius: '50%', background: '#fff',
+                            position: 'absolute', top: 2, transition: 'left 0.15s',
+                            left: show(w.id) ? 16 : 2,
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
+                          }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
             <button className="btn" onClick={() => exportEvidencePack(D, site, user)}><Icon name="download" size={14} />Export evidence pack</button>
             <button className="btn btn-primary" onClick={() => goTo('accreditation')}>
               <Icon name="shield" size={14} />Open accreditation workspace
@@ -222,7 +295,7 @@ const HomePage = ({ data: D, goTo, openClause }) => {
       />
 
       {/* Top stats */}
-      <div className="stat-grid">
+      {show('stats') && <div className="stat-grid">
         <div className="stat">
           <div className="stat-label">
             <Icon name="shield" size={13} />
@@ -252,27 +325,27 @@ const HomePage = ({ data: D, goTo, openClause }) => {
           <div className="stat-value">7</div>
           <div className="stat-meta">3 critical · 4 standard</div>
         </div>
-      </div>
+      </div>}
 
-      <div className="spacer-md" />
+      {show('stats') && <div className="spacer-md" />}
 
       {/* Banner */}
-      <div className="banner warn">
+      {show('banner') && <div className="banner warn">
         <Icon name="alert" size={18} />
         <div style={{ flex: 1 }}>
           <strong>3 items need attention before NATA assessment.</strong> &nbsp;
           HSAT-NOX-014 verification overdue · 4 staff BLS lapsed · 1 subcontractor evidence missing.
         </div>
         <button className="btn btn-ghost" onClick={() => goTo('tasks')}>Review &nbsp;<Icon name="arrow_right" size={13} /></button>
-      </div>
+      </div>}
 
-      <div className="spacer-md" />
+      {(show('banner') || show('stats')) && <div className="spacer-md" />}
 
       {/* Two-column main */}
       <div className="grid-2-1">
         <div className="col">
           {/* Compliance heatmap */}
-          <div className="card">
+          {show('section_coverage') && <div className="card">
             <div className="card-head">
               <div>
                 <div className="card-title">Section coverage</div>
@@ -314,10 +387,10 @@ const HomePage = ({ data: D, goTo, openClause }) => {
                 })}
               </div>
             </div>
-          </div>
+          </div>}
 
           {/* Studies queue snapshot */}
-          <div className="card">
+          {show('reporting_sla') && <div className="card">
             <div className="card-head">
               <div>
                 <div className="card-title">Reporting SLA · 10 business-day window</div>
@@ -360,12 +433,12 @@ const HomePage = ({ data: D, goTo, openClause }) => {
                 ))}
               </tbody>
             </table>
-          </div>
+          </div>}
         </div>
 
         {/* Right column */}
         <div className="col">
-          <div className="card">
+          {show('my_tasks') && <div className="card">
             <div className="card-head">
               <div className="card-title">My tasks</div>
               <div className="topbar-spacer" />
@@ -400,9 +473,9 @@ const HomePage = ({ data: D, goTo, openClause }) => {
                 <Icon name="plus" size={12} />New task
               </button>
             </div>
-          </div>
+          </div>}
 
-          <div className="card">
+          {show('recent_activity') && <div className="card">
             <div className="card-head">
               <div className="card-title">Recent activity</div>
               <div className="topbar-spacer" />
@@ -418,7 +491,7 @@ const HomePage = ({ data: D, goTo, openClause }) => {
                 ))}
               </div>
             </div>
-          </div>
+          </div>}
         </div>
       </div>
     </div>
