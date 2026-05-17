@@ -45,6 +45,9 @@ if ($Reseed) {
 
 ssh -i $KeyPath $server "sudo systemctl restart nexus-api"
 
+Write-Host "==> Ensuring TLS certificate exists..."
+ssh -i $KeyPath $server 'if [ ! -f /etc/ssl/certs/nexus.crt ]; then sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /tmp/nexus.key -out /tmp/nexus.crt -subj "/CN=18.221.101.26/O=Nexus360/C=AU" && sudo mv /tmp/nexus.key /etc/ssl/private/nexus.key && sudo mv /tmp/nexus.crt /etc/ssl/certs/nexus.crt && sudo chmod 600 /etc/ssl/private/nexus.key; fi'
+
 Write-Host "==> Installing nginx config..."
 scp -i $KeyPath deploy/nginx.conf "${server}:/tmp/nexus-nginx.conf"
 ssh -i $KeyPath $server "sudo mv /tmp/nexus-nginx.conf /etc/nginx/sites-available/nexus"
@@ -53,4 +56,5 @@ ssh -i $KeyPath $server "sudo rm -f /etc/nginx/sites-enabled/default"
 ssh -i $KeyPath $server "sudo nginx -t && sudo systemctl reload nginx"
 
 Write-Host ""
-Write-Host "Deployed to http://18.221.101.26"
+Write-Host 'Deployed to https://18.221.101.26'
+Write-Host 'Note: browser will warn about self-signed cert. Accept the exception, or replace with a CA cert once a domain is assigned.'

@@ -7,6 +7,8 @@ const DEMO_ACCOUNTS = [
   { email: 'meilin.chen@nexus360.com',   role: 'Senior Technologist' },
 ];
 
+const DEMO_PASSWORD = 'demo';
+
 const LoginPage = () => {
   const { signIn } = useAuth();
   const [email, setEmail]       = useState('');
@@ -14,20 +16,18 @@ const LoginPage = () => {
   const [error, setError]       = useState('');
   const [loading, setLoading]   = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
-    setTimeout(() => {
-      const ok = signIn(email.trim(), password);
-      if (!ok) setError('Incorrect email or password.');
-      setLoading(false);
-    }, 350);
+    const ok = await signIn(email.trim(), password);
+    if (!ok) setError('Incorrect email or password.');
+    setLoading(false);
   };
 
   const fillDemo = (acc) => {
     setEmail(acc.email);
-    setPassword('demo');
+    setPassword(DEMO_PASSWORD);
     setError('');
   };
 
@@ -89,7 +89,7 @@ const LoginPage = () => {
 
         <div className="login-demo">
           <div style={{ fontSize: 11, color: 'var(--ink-4)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>
-            Demo accounts · password: <span style={{ fontFamily: 'monospace' }}>demo</span>
+            Demo accounts
           </div>
           {DEMO_ACCOUNTS.map(acc => (
             <button key={acc.email} type="button" className="login-demo-row" onClick={() => fillDemo(acc)}>

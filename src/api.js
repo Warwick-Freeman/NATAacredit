@@ -1,7 +1,12 @@
 const BASE = import.meta.env.VITE_API_URL ?? '';
 
+function authHeaders() {
+  const token = localStorage.getItem('nexus_token');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 async function get(path) {
-  const res = await fetch(`${BASE}${path}`);
+  const res = await fetch(`${BASE}${path}`, { headers: authHeaders() });
   if (!res.ok) throw new Error(`API error ${res.status}: ${path}`);
   return res.json();
 }
@@ -110,7 +115,7 @@ function normaliseActivity(a) {
 export async function patchStudyStatus(id, status, signedDays) {
   const res = await fetch(`${BASE}/api/studies/${id}/status`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify({ status, signedDays: signedDays ?? null }),
   });
   if (!res.ok) throw new Error(`API error ${res.status}`);

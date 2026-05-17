@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text.Json;
 using NexusApi.Models;
 
@@ -11,6 +12,35 @@ public static class SeedData
     private static object Step(string step, string who, string date = "—",
         bool done = false, bool active = false, bool rejected = false, string comment = "") =>
         new { step, who, date, done, active, rejected, comment };
+
+    public static void SeedUsers(NexusDbContext db)
+    {
+        if (db.Users.Any()) return;
+
+        var seedUsers = new[]
+        {
+            new AppUser { Email = "kavya.patel@nexus360.com",   Name = "K. Patel",                  Role = "Quality Manager",           Mfa = true, Auth = "Local" },
+            new AppUser { Email = "rafael.okafor@nexus360.com", Name = "Dr. R. Okafor",              Role = "Medical Director",           Mfa = true, Auth = "Local" },
+            new AppUser { Email = "lily.hartono@nexus360.com",  Name = "Dr. L. Hartono",             Role = "Paediatric Sleep Physician", Mfa = true, Auth = "Local" },
+            new AppUser { Email = "meilin.chen@nexus360.com",   Name = "M. Chen",                    Role = "Senior Technologist",        Mfa = true, Auth = "Local" },
+            new AppUser { Email = "arjun.singh@nexus360.com",   Name = "A. Singh",                   Role = "Scoring Technologist",       Mfa = true, Auth = "Local" },
+            new AppUser { Email = "j.roy@nexus360.com",         Name = "J. Roy",                     Role = "External Auditor",           Mfa = true, Auth = "Local" },
+            new AppUser { Email = "assessor@nata.gov.au",       Name = "NATA Assessor (time-boxed)", Role = "External Assessor",          Mfa = true, Auth = "Local" },
+        };
+
+        foreach (var u in seedUsers)
+            u.PasswordHash = HashPassword("demo");
+
+        db.Users.AddRange(seedUsers);
+        db.SaveChanges();
+    }
+
+    private static string HashPassword(string password)
+    {
+        var salt = RandomNumberGenerator.GetBytes(16);
+        var hash = Rfc2898DeriveBytes.Pbkdf2(password, salt, 100_000, HashAlgorithmName.SHA256, 32);
+        return $"{Convert.ToBase64String(salt)}.{Convert.ToBase64String(hash)}";
+    }
 
     public static void ImportSopDirectory(NexusDbContext db, string sopDir, string dataDir)
     {

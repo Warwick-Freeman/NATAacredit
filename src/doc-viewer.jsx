@@ -87,7 +87,12 @@ const DocViewer = ({ doc, onClose, onAttach }) => {
         {/* Content */}
         <div className="doc-viewer-body">
           {hasFile ? (
-            <iframe src={doc.fileUrl} className="doc-frame" title={doc.title} />
+            <iframe
+              src={doc.fileUrl}
+              className="doc-frame"
+              title={doc.title}
+              {...(!isPdf && { sandbox: "allow-scripts allow-forms allow-popups allow-downloads" })}
+            />
           ) : (
             <div className="doc-no-file">
               <div style={{ width: 56, height: 56, borderRadius: 14, background: 'var(--surface-2)', display: 'grid', placeItems: 'center' }}>

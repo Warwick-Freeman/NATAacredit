@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useRef } from 'react';
+import React, { createContext, useContext, useState, useRef, useEffect } from 'react';
 
 export const ROLE_LEVEL = {
   'Medical Director':           5,
@@ -30,33 +30,32 @@ export function can(role, permission) {
   return !!(ROLE_PERMISSIONS[role]?.[permission]);
 }
 
-function initials(name) {
-  return name.split(' ').filter(Boolean).map(w => w[0]).join('').toUpperCase().slice(0, 2);
+const BASE = import.meta.env.VITE_API_URL ?? '';
+
+function getToken() {
+  return localStorage.getItem('nexus_token');
 }
 
-const SEED_USERS = [
-  { id: 1, email: 'kavya.patel@nexus360.com',   password: 'demo', name: 'K. Patel',                     role: 'Quality Manager',            mfa: true,  auth: 'Okta',       lastSeen: 'now'        },
-  { id: 2, email: 'rafael.okafor@nexus360.com',  password: 'demo', name: 'Dr. R. Okafor',                role: 'Medical Director',            mfa: true,  auth: 'Okta',       lastSeen: '1 h ago'    },
-  { id: 3, email: 'lily.hartono@nexus360.com',   password: 'demo', name: 'Dr. L. Hartono',               role: 'Paediatric Sleep Physician',  mfa: true,  auth: 'Okta',       lastSeen: '3 h ago'    },
-  { id: 4, email: 'meilin.chen@nexus360.com',    password: 'demo', name: 'M. Chen',                      role: 'Senior Technologist',         mfa: true,  auth: 'Okta',       lastSeen: '5 h ago'    },
-  { id: 5, email: 'arjun.singh@nexus360.com',    password: 'demo', name: 'A. Singh',                     role: 'Scoring Technologist',        mfa: true,  auth: 'Okta',       lastSeen: '2 d ago'    },
-  { id: 6, email: 'j.roy@nexus360.com',          password: 'demo', name: 'J. Roy',                       role: 'External Auditor',            mfa: true,  auth: 'Local',      lastSeen: '16 Mar 2026'},
-  { id: 7, email: 'assessor@nata.gov.au',        password: 'demo', name: 'NATA Assessor (time-boxed)',   role: 'External Assessor',           mfa: true,  auth: 'Magic link',  lastSeen: '—'          },
-];
+function isTokenValid() {
+  const token = getToken();
+  if (!token) return false;
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return payload.exp ? payload.exp * 1000 > Date.now() : false;
+  } catch {
+    return false;
+  }
+}
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [users, setUsers] = useState(SEED_USERS);
-  const usersRef = useRef(SEED_USERS);
-
-  // Keep ref in sync so signIn closure is never stale
-  const syncUsers = (next) => {
-    usersRef.current = next;
-    setUsers(next);
-  };
-
   const [user, setUser] = useState(() => {
+    if (!isTokenValid()) {
+      localStorage.removeItem('nexus_token');
+      localStorage.removeItem('nexus_user');
+      return null;
+    }
     try {
       const stored = localStorage.getItem('nexus_user');
       return stored ? JSON.parse(stored) : null;
@@ -65,23 +64,42 @@ export function AuthProvider({ children }) {
     }
   });
 
-  function signIn(email, password) {
-    const match = usersRef.current.find(u => u.email === email && u.password === password);
-    if (!match) return false;
-    const session = {
-      id:       match.id,
-      name:     match.name,
-      role:     match.role,
-      initials: initials(match.name),
-      email:    match.email,
-    };
-    setUser(session);
-    localStorage.setItem('nexus_user', JSON.stringify(session));
+  const [users, setUsers] = useState([]);
+  const usersRef = useRef([]);
+
+  const syncUsers = (next) => {
+    usersRef.current = next;
+    setUsers(next);
+  };
+
+  // Load user list from API once logged in
+  useEffect(() => {
+    if (!user) return;
+    const token = getToken();
+    fetch(`${BASE}/api/users`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : [])
+      .then(list => syncUsers(list.map(u => ({ ...u, password: undefined }))))
+      .catch(() => {});
+  }, [user]);
+
+  async function signIn(email, password) {
+    const res = await fetch(`${BASE}/api/auth/login`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ email, password }),
+    });
+    if (!res.ok) return false;
+    const { token, user: u } = await res.json();
+    localStorage.setItem('nexus_token', token);
+    localStorage.setItem('nexus_user', JSON.stringify(u));
+    setUser(u);
     return true;
   }
 
   function signOut() {
     setUser(null);
+    syncUsers([]);
+    localStorage.removeItem('nexus_token');
     localStorage.removeItem('nexus_user');
   }
 
@@ -89,25 +107,18 @@ export function AuthProvider({ children }) {
     return can(user?.role, permission);
   }
 
+  // Local-only user management (UI state only — persisted server-side via API in a future iteration)
   function addUser(data) {
-    const next = [...usersRef.current, {
-      id:       Date.now(),
-      password: 'demo',
-      mfa:      data.mfa ?? false,
-      auth:     data.auth || 'Local',
-      lastSeen: '—',
-      ...data,
-    }];
+    const next = [...usersRef.current, { id: Date.now(), mfa: data.mfa ?? false, auth: data.auth || 'Local', lastSeen: '—', ...data }];
     syncUsers(next);
   }
 
   function updateUser(id, changes) {
     const next = usersRef.current.map(u => u.id === id ? { ...u, ...changes } : u);
     syncUsers(next);
-    // If editing the logged-in user, refresh session
     if (user?.id === id) {
       const updated = next.find(u => u.id === id);
-      const session = { id: updated.id, name: updated.name, role: updated.role, initials: initials(updated.name), email: updated.email };
+      const session = { id: updated.id, name: updated.name, role: updated.role, email: updated.email };
       setUser(session);
       localStorage.setItem('nexus_user', JSON.stringify(session));
     }

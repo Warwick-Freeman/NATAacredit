@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations.Schema;
+
 namespace NexusApi.Models;
 
 public class Study
@@ -86,6 +88,19 @@ public class ActivityEntry
     public string Target { get; set; } = "";
     public string Time { get; set; } = "";
     public string Kind { get; set; } = "";
+}
+
+[Table("Users")]
+public class AppUser
+{
+    public int Id { get; set; }
+    public string Email { get; set; } = "";
+    public string PasswordHash { get; set; } = "";
+    public string Name { get; set; } = "";
+    public string Role { get; set; } = "";
+    public bool Mfa { get; set; }
+    public string Auth { get; set; } = "Local";
+    public string LastSeen { get; set; } = "—";
 }
 
 public class Document
