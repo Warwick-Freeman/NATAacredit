@@ -93,6 +93,7 @@ export function AuthProvider({ children }) {
     localStorage.setItem('nexus_token', token);
     localStorage.setItem('nexus_user', JSON.stringify(u));
     setUser(u);
+    window.dispatchEvent(new CustomEvent('nexus:signIn'));
     return true;
   }
 

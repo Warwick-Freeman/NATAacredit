@@ -36,10 +36,23 @@ export function NexusDataProvider({ children }) {
   };
 
   useEffect(() => {
+    if (!localStorage.getItem('nexus_token')) { setLoading(false); return; }
     fetchAll()
       .then(setData)
       .catch(err => setError(err.message))
       .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    function handleSignIn() {
+      setLoading(true);
+      fetchAll()
+        .then(setData)
+        .catch(err => setError(err.message))
+        .finally(() => setLoading(false));
+    }
+    window.addEventListener('nexus:signIn', handleSignIn);
+    return () => window.removeEventListener('nexus:signIn', handleSignIn);
   }, []);
 
   const refreshData = () => {

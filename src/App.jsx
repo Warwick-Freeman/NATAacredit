@@ -48,11 +48,11 @@ const App = () => {
     return () => document.removeEventListener('keydown', handler);
   }, []);
 
+  const { data, loading, error, refreshData } = useNexusData();
+
   const goTo = (r) => { setRoute(r); setSidebarOpen(false); window.scrollTo({ top: 0 }); };
 
   if (!user) return <LoginPage />;
-
-  const { data, loading, error, refreshData } = useNexusData();
 
   const criticalTaskCount = tasks.filter(t => t.status !== 'done' && t.priority === 'critical').length;
 
