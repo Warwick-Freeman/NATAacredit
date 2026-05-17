@@ -56,6 +56,7 @@ const Icon = ({ name, size = 16, strokeWidth = 1.75 }) => {
     activity: <path d="M3 12h4l3-8 4 16 3-8h4" />,
     wifi: <><path d="M5 12.5A10 10 0 0 1 19 12.5"/><path d="M8.5 15.5a5 5 0 0 1 7 0"/><path d="M2 9a14 14 0 0 1 20 0"/><circle cx="12" cy="19" r="1" fill="currentColor"/></>,
     user: <><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></>,
+    menu: <><path d="M3 6h18M3 12h18M3 18h18" /></>,
   };
   return <svg {...props}>{paths[name] || null}</svg>;
 };

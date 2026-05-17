@@ -30,6 +30,7 @@ const App = () => {
   const [openClauseId, setOpenClauseId] = useState(null);
   const [openStudyId, setOpenStudyId] = useState(null);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [tweaks, setTweak] = useTweaks({
     "palette": "default",
     "density": "comfortable"
@@ -47,7 +48,7 @@ const App = () => {
     return () => document.removeEventListener('keydown', handler);
   }, []);
 
-  const goTo = (r) => { setRoute(r); window.scrollTo({ top: 0 }); };
+  const goTo = (r) => { setRoute(r); setSidebarOpen(false); window.scrollTo({ top: 0 }); };
 
   if (!user) return <LoginPage />;
 
@@ -152,9 +153,10 @@ const App = () => {
   return (
     <>
       <div className="shell" data-density={tweaks.density}>
-        <Sidebar current={route} setCurrent={goTo} badges={badges} user={user} onSignOut={signOut} />
+        {sidebarOpen && <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)} />}
+        <Sidebar current={route} setCurrent={goTo} badges={badges} user={user} onSignOut={signOut} open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
         <div className="main">
-          <Topbar crumbs={crumbsFor[route] || ["Home"]} onSearch={() => setSearchOpen(true)} notifications={notifications} goTo={goTo} />
+          <Topbar crumbs={crumbsFor[route] || ["Home"]} onSearch={() => setSearchOpen(true)} notifications={notifications} goTo={goTo} onMenuToggle={() => setSidebarOpen(o => !o)} />
           {renderPage()}
         </div>
 

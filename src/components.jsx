@@ -84,7 +84,7 @@ export const Avatar = ({ name, size = 22, idx }) => {
 };
 
 // === Sidebar ===
-export const Sidebar = ({ current, setCurrent, badges, user, onSignOut }) => {
+export const Sidebar = ({ current, setCurrent, badges, user, onSignOut, open, onClose }) => {
   const { siteId, setSiteId, site, SITES } = useLocation();
   const [siteOpen, setSiteOpen] = useState(false);
 
@@ -108,8 +108,10 @@ export const Sidebar = ({ current, setCurrent, badges, user, onSignOut }) => {
     { id: "trail", label: "Audit trail", icon: "clipboard" },
   ];
 
+  const navigate = (id) => { setCurrent(id); onClose?.(); };
+
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar${open ? ' open' : ''}`}>
       <div className="brand">
         <div className="brand-mark">N</div>
         <div>
@@ -176,7 +178,7 @@ export const Sidebar = ({ current, setCurrent, badges, user, onSignOut }) => {
           return (
             <div key={it.id}
               className={`nav-item ${current === it.id ? 'active' : ''}`}
-              onClick={() => setCurrent(it.id)}>
+              onClick={() => navigate(it.id)}>
               <span className="icon"><Icon name={it.icon} size={15} /></span>
               <span>{it.label}</span>
               {it.badge ? <span className={`badge ${it.badgeKind || ''}`}>{it.badge}</span> : null}
@@ -201,7 +203,7 @@ export const Sidebar = ({ current, setCurrent, badges, user, onSignOut }) => {
 };
 
 // === Topbar ===
-export const Topbar = ({ crumbs, actions, onSearch, notifications = [], goTo }) => {
+export const Topbar = ({ crumbs, actions, onSearch, notifications = [], goTo, onMenuToggle }) => {
   const [notifOpen, setNotifOpen] = useState(false);
   const [readCount, setReadCount] = useState(0);
   const ref = useRef(null);
@@ -219,6 +221,9 @@ export const Topbar = ({ crumbs, actions, onSearch, notifications = [], goTo }) 
 
   return (
     <div className="topbar">
+      <button className="topbar-menu-btn" onClick={onMenuToggle} aria-label="Menu">
+        <Icon name="menu" size={16} />
+      </button>
       <div className="crumbs">
         {crumbs.map((c, i) => (
           <React.Fragment key={i}>
