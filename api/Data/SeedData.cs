@@ -439,19 +439,14 @@ public static class SeedData
             new NexusTask { TaskId = "T-006", Title = "Assemble Q2 2026 management review pack",            Clause = "4.15.2", Due = "in 1 day", Priority = "medium"   }
         );
 
+        var now = DateTime.Now;
         db.Activity.AddRange(
-            // references clause 5.3.5 which has status "review"
-            new ActivityEntry { Who = "K. Patel",       Action = "updated self-assessment",  Target = "cl. 5.3.5 to 'under review'",        Time = "2 min ago",  Kind = "edit"   },
-            // references clause 5.3.4 which is nonconformant
-            new ActivityEntry { Who = "M. Chen",        Action = "linked evidence to",        Target = "cl. 5.3.4 — verification log added",  Time = "18 min ago", Kind = "link"   },
-            // references PSG-2026-0437 which has Status=Final, SignedDays=7, Physician=Dr. F. Liu
-            new ActivityEntry { Who = "Dr. F. Liu",     Action = "signed final report",       Target = "PSG-2026-0437 — A. Park",             Time = "1 h ago",    Kind = "sign"   },
-            // references HSAT-NOX-014 which has VerifyStatus=bad
-            new ActivityEntry { Who = "System",         Action = "raised NC",                 Target = "HSAT-NOX-014 — verification overdue", Time = "2 h ago",    Kind = "alert"  },
-            // references PSG-2026-0438 which has Status=Preliminary, Scorer=A. Singh
-            new ActivityEntry { Who = "A. Singh",       Action = "submitted scoring for",     Target = "PSG-2026-0438 — D. Mitchell",         Time = "3 h ago",    Kind = "submit" },
-            // references audit activity — routine
-            new ActivityEntry { Who = "K. Patel",       Action = "uploaded audit report",     Target = "AUD-2026-Q1 internal audit findings",  Time = "yesterday",  Kind = "upload" }
+            new ActivityEntry { Who = "K. Patel",   Action = "updated self-assessment",  Target = "cl. 5.3.5 to 'under review'",        Kind = "edit",   Module = "accreditation", Detail = "Previous status: compliant. Evidence count: 2.",                          Ts = now.AddHours(-0.5).ToString("yyyy-MM-ddTHH:mm"), Time = now.AddHours(-0.5).ToString("dd MMM yyyy, HH:mm") },
+            new ActivityEntry { Who = "M. Chen",    Action = "linked evidence to",        Target = "cl. 5.3.4 — verification log added",  Kind = "link",   Module = "accreditation", Detail = "Evidence item added: calibration log. Total evidence: 3.",               Ts = now.AddHours(-1  ).ToString("yyyy-MM-ddTHH:mm"), Time = now.AddHours(-1  ).ToString("dd MMM yyyy, HH:mm") },
+            new ActivityEntry { Who = "Dr. F. Liu", Action = "signed final report",       Target = "PSG-2026-0437 — A. Park",             Kind = "sign",   Module = "studies",       Detail = "Report finalised. Turnaround: 7 business days.",                         Ts = now.AddHours(-2  ).ToString("yyyy-MM-ddTHH:mm"), Time = now.AddHours(-2  ).ToString("dd MMM yyyy, HH:mm") },
+            new ActivityEntry { Who = "System",     Action = "raised NC",                 Target = "HSAT-NOX-014 — verification overdue", Kind = "alert",  Module = "equipment",     Detail = "No verification record found after 2026-01-02. NC-2026-0111 created.",   Ts = now.AddHours(-3  ).ToString("yyyy-MM-ddTHH:mm"), Time = now.AddHours(-3  ).ToString("dd MMM yyyy, HH:mm") },
+            new ActivityEntry { Who = "A. Singh",   Action = "submitted scoring for",     Target = "PSG-2026-0438 — D. Mitchell",         Kind = "edit",   Module = "studies",       Detail = "Epoch count: 1,132. Ready for physician review.",                        Ts = now.AddHours(-4  ).ToString("yyyy-MM-ddTHH:mm"), Time = now.AddHours(-4  ).ToString("dd MMM yyyy, HH:mm") },
+            new ActivityEntry { Who = "K. Patel",   Action = "uploaded audit report",     Target = "AUD-2026-Q1 internal audit findings",  Kind = "upload", Module = "audits",        Detail = "3 findings logged: 1 major (cl. 5.3.4), 1 minor, 1 observation.",       Ts = now.AddDays( -1  ).ToString("yyyy-MM-ddTHH:mm"), Time = now.AddDays( -1  ).ToString("dd MMM yyyy, HH:mm") }
         );
 
         db.SaveChanges();

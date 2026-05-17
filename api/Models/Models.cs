@@ -88,6 +88,9 @@ public class ActivityEntry
     public string Target { get; set; } = "";
     public string Time { get; set; } = "";
     public string Kind { get; set; } = "";
+    public string Ts { get; set; } = "";
+    public string Module { get; set; } = "";
+    public string Detail { get; set; } = "";
 }
 
 [Table("Users")]

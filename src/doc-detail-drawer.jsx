@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Icon from './icons';
 import { Pill, Avatar } from './components';
 import { useAuth } from './AuthContext';
+import { useNexusData } from './NexusDataContext';
 
 const STATUS_KIND = { Issued: 'good', Draft: 'outline', 'Under review': 'warn', 'Live form': 'info', Obsolete: 'bad' };
 
@@ -54,6 +55,7 @@ const StepCircle = ({ index, step, isLast }) => {
 
 const DocDetailDrawer = ({ doc, onUpdate, onClose, onView, onEdit }) => {
   const { hasPerm, user, users } = useAuth();
+  const { refreshData } = useNexusData();
 
   const wf = doc.workflow || [];
   const activeIdx = wf.findIndex(s => s.active && !s.done);
@@ -84,6 +86,7 @@ const DocDetailDrawer = ({ doc, onUpdate, onClose, onView, onEdit }) => {
     const newStatus   = allCoreDone ? 'Issued' : STEP_STATUS[activeIdx] || doc.status;
     const newReviewDue = allCoreDone ? addMonths(24) : doc.reviewDue;
     onUpdate({ ...doc, workflow: wfNext, status: newStatus, reviewDue: newReviewDue, updated: 'today' });
+    refreshData();
     setPendingAction(null);
     setComment('');
   };
@@ -97,6 +100,7 @@ const DocDetailDrawer = ({ doc, onUpdate, onClose, onView, onEdit }) => {
       return { ...s, done: false, active: false, rejected: false };
     });
     onUpdate({ ...doc, workflow: wfNext, status: 'Draft', updated: 'today' });
+    refreshData();
     setPendingAction(null);
     setComment('');
   };

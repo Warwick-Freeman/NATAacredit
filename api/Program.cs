@@ -99,6 +99,16 @@ using (var scope = app.Services.CreateScope())
         )
         """);
 
+    // Add columns introduced after initial schema creation (idempotent)
+    foreach (var col in new[] {
+        "ALTER TABLE Activity ADD COLUMN Ts     TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE Activity ADD COLUMN Module TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE Activity ADD COLUMN Detail TEXT NOT NULL DEFAULT ''",
+    })
+    {
+        try { db.Database.ExecuteSqlRaw(col); } catch { /* column already exists */ }
+    }
+
     SeedData.Seed(db);
     SeedData.SeedDocuments(db);
     SeedData.SeedUsers(db);
@@ -119,9 +129,8 @@ app.MapPost("/api/auth/login", async (LoginDto dto, NexusDbContext db) =>
     if (user == null || !VerifyPassword(dto.Password, user.PasswordHash))
         return Results.Unauthorized();
 
-    var now = DateTime.Now.ToString("dd MMM yyyy, HH:mm");
-    user.LastSeen = now;
-    db.Activity.Add(new ActivityEntry { Who = user.Name, Action = "signed in", Target = "Nexus 360", Time = now, Kind = "login" });
+    user.LastSeen = DateTime.Now.ToString("dd MMM yyyy, HH:mm");
+    db.Activity.Add(MakeActivity(user.Name, "signed in", "Nexus 360", "login", "login", $"Role: {user.Role}"));
     await db.SaveChangesAsync();
 
     var claims = new[]
@@ -194,14 +203,14 @@ app.MapPatch("/api/studies/{id}/status", async (string id, StudyStatusDto dto, N
     if (study == null) return Results.NotFound();
     study.Status = dto.Status;
     if (dto.SignedDays.HasValue) study.SignedDays = dto.SignedDays;
-    var now = DateTime.Now.ToString("dd MMM yyyy, HH:mm");
-    db.Activity.Add(new ActivityEntry {
-        Who    = ActorName(principal),
-        Action = dto.Status == "Final" ? "signed final report" : "updated study status",
-        Target = $"{id} → {dto.Status}",
-        Time   = now,
-        Kind   = dto.Status == "Final" ? "sign" : "edit",
-    });
+    db.Activity.Add(MakeActivity(
+        ActorName(principal),
+        dto.Status == "Final" ? "signed final report" : "updated study status",
+        $"{id} — {study.Patient} → {dto.Status}",
+        dto.Status == "Final" ? "sign" : "edit",
+        "studies",
+        dto.Status == "Final" ? $"Report finalised. Turnaround: {dto.SignedDays ?? 0} business days." : ""
+    ));
     await db.SaveChangesAsync();
     return Results.Ok(study);
 }).RequireAuthorization();
@@ -214,7 +223,25 @@ app.MapGet("/api/clauses/{id}", async (string id, NexusDbContext db) =>
         is { } clause ? Results.Ok(clause) : Results.NotFound()).RequireAuthorization();
 app.MapGet("/api/compliance",  async (NexusDbContext db) => await db.ComplianceSections.ToListAsync()).RequireAuthorization();
 app.MapGet("/api/tasks",       async (NexusDbContext db) => await db.Tasks.ToListAsync()).RequireAuthorization();
-app.MapGet("/api/activity",    async (NexusDbContext db) => await db.Activity.ToListAsync()).RequireAuthorization();
+app.MapGet("/api/activity", async (NexusDbContext db) =>
+{
+    var entries = await db.Activity.OrderByDescending(a => a.Ts).ThenByDescending(a => a.Id).ToListAsync();
+    return entries.Select(a => new {
+        id     = a.Id,
+        who    = a.Who,
+        action = a.Action,
+        target = a.Target,
+        time   = a.Time,
+        kind   = a.Kind,
+        ts     = a.Ts,
+        module = a.Module,
+        detail = a.Detail,
+        hash   = Convert.ToHexString(
+            System.Security.Cryptography.SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes($"{a.Id}|{a.Who}|{a.Action}|{a.Target}|{a.Ts}"))
+        )[..16].ToLower(),
+    });
+}).RequireAuthorization();
 
 // ── Documents ─────────────────────────────────────────────────────────────────
 
@@ -261,13 +288,8 @@ app.MapPost("/api/documents", async (HttpRequest req, NexusDbContext db, ClaimsP
     }
 
     db.Documents.Add(doc);
-    db.Activity.Add(new ActivityEntry {
-        Who    = ActorName(principal),
-        Action = "created document",
-        Target = $"{doc.DocId} — {doc.Title}",
-        Time   = DateTime.Now.ToString("dd MMM yyyy, HH:mm"),
-        Kind   = "create",
-    });
+    db.Activity.Add(MakeActivity(ActorName(principal), "created document", $"{doc.DocId} — {doc.Title}", "create", "documents",
+        $"Status: {doc.Status}. Owner: {doc.Owner}."));
     await db.SaveChangesAsync();
     return Results.Ok(ToDto(doc));
 }).RequireAuthorization();
@@ -287,13 +309,14 @@ app.MapPut("/api/documents/{id}", async (string id, DocumentUpdateDto dto, Nexus
     doc.ReviewDue = dto.ReviewDue;
     doc.Updated   = dto.Updated;
     doc.Workflow  = dto.Workflow;
-    db.Activity.Add(new ActivityEntry {
-        Who    = ActorName(principal),
-        Action = dto.Status == "Issued" ? "issued document" : "updated document",
-        Target = $"{id} — {dto.Title}",
-        Time   = DateTime.Now.ToString("dd MMM yyyy, HH:mm"),
-        Kind   = dto.Status == "Issued" ? "sign" : "edit",
-    });
+    db.Activity.Add(MakeActivity(
+        ActorName(principal),
+        dto.Status == "Issued" ? "issued document" : "updated document",
+        $"{id} — {dto.Title}",
+        dto.Status == "Issued" ? "sign" : "edit",
+        "documents",
+        dto.Status == "Issued" ? $"Document issued. Review due: {dto.ReviewDue}." : $"Status: {dto.Status}."
+    ));
     await db.SaveChangesAsync();
     return Results.Ok(ToDto(doc));
 }).RequireAuthorization();
@@ -322,13 +345,8 @@ app.MapPost("/api/documents/{id}/file", async (string id, HttpRequest req, Nexus
     doc.FileName       = Path.GetFileName(file.FileName);
     doc.StoredFileName = stored;
     doc.Updated        = DateTime.Now.ToString("dd MMM yyyy");
-    db.Activity.Add(new ActivityEntry {
-        Who    = ActorName(principal),
-        Action = "uploaded file to",
-        Target = $"{id} — {Path.GetFileName(file.FileName)}",
-        Time   = DateTime.Now.ToString("dd MMM yyyy, HH:mm"),
-        Kind   = "upload",
-    });
+    db.Activity.Add(MakeActivity(ActorName(principal), "uploaded file to", $"{id} — {Path.GetFileName(file.FileName)}", "upload", "documents",
+        $"File: {Path.GetFileName(file.FileName)} · {file.Length / 1024} KB."));
     await db.SaveChangesAsync();
     return Results.Ok(ToDto(doc));
 }).RequireAuthorization();
@@ -388,6 +406,21 @@ string ActorName(ClaimsPrincipal p) =>
 
 string ActorRole(ClaimsPrincipal p) =>
     p.FindFirstValue("role") ?? "";
+
+ActivityEntry MakeActivity(string who, string action, string target, string kind, string module, string detail = "")
+{
+    var now = DateTime.Now;
+    return new ActivityEntry {
+        Who    = who,
+        Action = action,
+        Target = target,
+        Kind   = kind,
+        Module = module,
+        Detail = detail,
+        Ts     = now.ToString("yyyy-MM-ddTHH:mm"),
+        Time   = now.ToString("dd MMM yyyy, HH:mm"),
+    };
+}
 
 // ── DTOs ──────────────────────────────────────────────────────────────────────
 

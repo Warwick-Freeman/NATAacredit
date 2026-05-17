@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import Icon from '../icons';
 import { PageHeader, Pill, Avatar } from '../components';
 import { useAuth } from '../AuthContext';
+import { useNexusData } from '../NexusDataContext';
 
 // ─── Seed data ─────────────────────────────────────────────────────────────────
 // ~70 events covering all modules over 28 days. Ordered newest-first.
@@ -120,8 +121,6 @@ const KIND_LABELS = {
   login: 'Access', logout: 'Access', reject: 'Rejected', close: 'Closed',
 };
 
-const ALL_USERS = ['K. Patel', 'M. Chen', 'Dr. R. Okafor', 'Dr. L. Hartono', 'A. Singh', 'J. Roy', 'System', 'Unknown'];
-const ALL_MODULES = Object.keys(MODULE_META);
 const ALL_KINDS = Object.keys(KIND_LABELS);
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -164,6 +163,8 @@ const PAGE_SIZE = 25;
 
 const AuditTrailPage = () => {
   const { user } = useAuth();
+  const { data } = useNexusData();
+  const events = data?.activity ?? [];
 
   const [moduleFilter, setModuleFilter] = useState('all');
   const [userFilter, setUserFilter]     = useState('all');
@@ -175,17 +176,20 @@ const AuditTrailPage = () => {
   const [expandedId, setExpandedId]     = useState(null);
   const [exportToast, setExportToast]   = useState(false);
 
+  const allUsers   = useMemo(() => [...new Set(events.map(e => e.who))].sort(), [events]);
+  const allModules = useMemo(() => [...new Set(events.map(e => e.module).filter(Boolean))].sort(), [events]);
+
   const cutoff = useMemo(() => {
-    const d = new Date('2026-05-12');
-    if (dateFilter === '7d')  d.setDate(d.getDate() - 7);
-    else if (dateFilter === '30d') d.setDate(d.getDate() - 30);
-    else if (dateFilter === 'today') d.setHours(0, 0, 0, 0);
-    else return null;
-    return d.toISOString().slice(0, 10);
+    const d = new Date();
+    if (dateFilter === '7d')    { d.setDate(d.getDate() - 7); return d.toISOString().slice(0, 10); }
+    if (dateFilter === '30d')   { d.setDate(d.getDate() - 30); return d.toISOString().slice(0, 10); }
+    if (dateFilter === 'today') { d.setHours(0, 0, 0, 0); return d.toISOString().slice(0, 10); }
+    return null;
   }, [dateFilter]);
 
   const filtered = useMemo(() => {
-    return SEED_EVENTS.filter(ev => {
+    return events.filter(ev => {
+      if (!ev.ts) return false;
       if (moduleFilter !== 'all' && ev.module !== moduleFilter) return false;
       if (userFilter   !== 'all' && ev.who    !== userFilter)   return false;
       if (kindFilter   !== 'all' && ev.kind   !== kindFilter)   return false;
@@ -196,7 +200,7 @@ const AuditTrailPage = () => {
       }
       return true;
     });
-  }, [moduleFilter, userFilter, kindFilter, cutoff, search]);
+  }, [events, moduleFilter, userFilter, kindFilter, cutoff, search]);
 
   const paged = filtered.slice(0, page * PAGE_SIZE);
   const hasMore = paged.length < filtered.length;
@@ -316,7 +320,7 @@ const AuditTrailPage = () => {
           onChange={e => { setModuleFilter(e.target.value); setPage(1); }}
         >
           <option value="all">All modules</option>
-          {ALL_MODULES.map(m => <option key={m} value={m}>{MODULE_META[m].label}</option>)}
+          {allModules.map(m => <option key={m} value={m}>{MODULE_META[m]?.label ?? m}</option>)}
         </select>
 
         {/* User */}
@@ -327,7 +331,7 @@ const AuditTrailPage = () => {
           onChange={e => { setUserFilter(e.target.value); setPage(1); }}
         >
           <option value="all">All users</option>
-          {ALL_USERS.map(u => <option key={u} value={u}>{u}</option>)}
+          {allUsers.map(u => <option key={u} value={u}>{u}</option>)}
         </select>
 
         {/* Kind */}

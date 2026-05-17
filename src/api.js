@@ -109,13 +109,18 @@ function normaliseTask(t) {
 
 function normaliseActivity(a) {
   return {
-    who: a.who,
-    what: a.action,
-    when: a.time,
-    kind: a.kind,
+    id:     a.id,
+    who:    a.who,
+    what:   a.action,
+    when:   a.time,
+    kind:   a.kind,
     action: a.action,
     target: a.target,
-    time: a.time,
+    time:   a.time,
+    ts:     a.ts,
+    module: a.module || 'system',
+    detail: a.detail || '',
+    hash:   a.hash   || '',
   };
 }
 
