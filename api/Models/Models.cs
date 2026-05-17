@@ -106,6 +106,35 @@ public class AppUser
     public string LastSeen { get; set; } = "—";
 }
 
+public class Appointment
+{
+    public int Id { get; set; }
+    public string SiteId { get; set; } = "";
+    public string Type { get; set; } = "psg"; // psg | titration | hsat | consult
+    public string PatientName { get; set; } = "";
+    public string PatientId { get; set; } = "";
+    public string Start { get; set; } = "";   // ISO "2026-05-17T21:00"
+    public string End { get; set; } = "";     // ISO "2026-05-18T07:00"
+    public string RoomId { get; set; } = "";
+    public string EquipmentId { get; set; } = "";
+    public string Physician { get; set; } = "";
+    public string Technician { get; set; } = "";
+    public string Notes { get; set; } = "";
+    public string Status { get; set; } = "scheduled"; // scheduled | confirmed | completed | cancelled
+    public string CreatedBy { get; set; } = "";
+    public string CreatedAt { get; set; } = "";
+}
+
+public class SiteRoom
+{
+    public int Id { get; set; }
+    public string SiteId { get; set; } = "";
+    public string RoomId { get; set; } = "";
+    public string Name { get; set; } = "";
+    public string Type { get; set; } = "general"; // psg | titration | consult | general
+    public int SortOrder { get; set; } = 0;
+}
+
 public class Document
 {
     public int Id { get; set; }

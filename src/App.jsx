@@ -18,6 +18,7 @@ import SettingsPage from './pages/page-settings';
 import AuditTrailPage from './pages/page-audit-trail';
 import TasksPage from './pages/page-tasks';
 import PatientsPage from './pages/page-patients';
+import SchedulerPage from './pages/page-scheduler';
 import TaskFormDrawer from './task-form-drawer';
 import ClauseDrawer from './clause-drawer';
 import StudyDrawer from './study-drawer';
@@ -110,6 +111,7 @@ const App = () => {
     documents: ["Compliance", "Documents & SOPs"],
     audits: ["Compliance", "Audits & reviews"],
     ncr: ["Compliance", "NC & CAPA"],
+    scheduler: ["Operations", "Scheduler"],
     patients: ["Operations", "Patients"],
     studies: ["Operations", "Studies & reports"],
     indicators: ["Operations", "Quality indicators"],
@@ -125,6 +127,7 @@ const App = () => {
       case "tasks": return <TasksPage />;
       case "accreditation": return <AccreditationPage data={data} openClause={setOpenClauseId} />;
       case "indicators": return <IndicatorsPage data={data} />;
+      case "scheduler": return <SchedulerPage />;
       case "patients": return <PatientsPage openStudy={setOpenStudyId} />;
       case "studies": return <StudiesPage data={data} openStudy={setOpenStudyId} />;
       case "equipment": return <EquipmentPage />;

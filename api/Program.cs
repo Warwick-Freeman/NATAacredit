@@ -101,17 +101,50 @@ using (var scope = app.Services.CreateScope())
 
     // Add columns introduced after initial schema creation (idempotent)
     foreach (var col in new[] {
-        "ALTER TABLE Activity ADD COLUMN Ts     TEXT NOT NULL DEFAULT ''",
-        "ALTER TABLE Activity ADD COLUMN Module TEXT NOT NULL DEFAULT ''",
-        "ALTER TABLE Activity ADD COLUMN Detail TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE Activity ADD COLUMN Ts        TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE Activity ADD COLUMN Module    TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE Activity ADD COLUMN Detail    TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE Appointments ADD COLUMN PatientId TEXT NOT NULL DEFAULT ''",
     })
     {
         try { db.Database.ExecuteSqlRaw(col); } catch { /* column already exists */ }
     }
 
+    db.Database.ExecuteSqlRaw("""
+        CREATE TABLE IF NOT EXISTS Appointments (
+            Id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            SiteId      TEXT NOT NULL DEFAULT '',
+            Type        TEXT NOT NULL DEFAULT 'psg',
+            PatientName TEXT NOT NULL DEFAULT '',
+            Start       TEXT NOT NULL DEFAULT '',
+            End         TEXT NOT NULL DEFAULT '',
+            RoomId      TEXT NOT NULL DEFAULT '',
+            EquipmentId TEXT NOT NULL DEFAULT '',
+            Physician   TEXT NOT NULL DEFAULT '',
+            Technician  TEXT NOT NULL DEFAULT '',
+            Notes       TEXT NOT NULL DEFAULT '',
+            Status      TEXT NOT NULL DEFAULT 'scheduled',
+            CreatedBy   TEXT NOT NULL DEFAULT '',
+            CreatedAt   TEXT NOT NULL DEFAULT ''
+        )
+        """);
+
+    db.Database.ExecuteSqlRaw("""
+        CREATE TABLE IF NOT EXISTS Rooms (
+            Id        INTEGER PRIMARY KEY AUTOINCREMENT,
+            SiteId    TEXT NOT NULL DEFAULT '',
+            RoomId    TEXT NOT NULL DEFAULT '',
+            Name      TEXT NOT NULL DEFAULT '',
+            Type      TEXT NOT NULL DEFAULT 'general',
+            SortOrder INTEGER NOT NULL DEFAULT 0
+        )
+        """);
+
     SeedData.Seed(db);
     SeedData.SeedDocuments(db);
     SeedData.SeedUsers(db);
+    SeedData.SeedRooms(db);
+    SeedData.SeedAppointments(db);
 
     var sopDir = Path.Combine(app.Environment.ContentRootPath, "..", "sop");
     SeedData.ImportSopDirectory(db, sopDir, dataDir);
@@ -361,6 +394,95 @@ app.MapGet("/api/documents/{id}/file", async (string id, NexusDbContext db) =>
     return Results.File(path, contentType);
 }).RequireAuthorization();
 
+// ── Rooms ─────────────────────────────────────────────────────────────────────
+
+app.MapGet("/api/rooms", async (string? siteId, NexusDbContext db) =>
+{
+    var q = db.Rooms.AsQueryable();
+    if (!string.IsNullOrEmpty(siteId)) q = q.Where(r => r.SiteId == siteId);
+    return await q.OrderBy(r => r.SortOrder).ThenBy(r => r.Name).ToListAsync();
+}).RequireAuthorization();
+
+app.MapPost("/api/rooms", async (SiteRoomDto dto, NexusDbContext db, ClaimsPrincipal principal) =>
+{
+    var maxOrder = await db.Rooms.Where(r => r.SiteId == dto.SiteId).MaxAsync(r => (int?)r.SortOrder) ?? 0;
+    var room = new SiteRoom { SiteId = dto.SiteId, RoomId = Guid.NewGuid().ToString()[..8], Name = dto.Name, Type = dto.Type, SortOrder = maxOrder + 1 };
+    db.Rooms.Add(room);
+    await db.SaveChangesAsync();
+    return Results.Ok(room);
+}).RequireAuthorization();
+
+app.MapPut("/api/rooms/{id:int}", async (int id, SiteRoomDto dto, NexusDbContext db) =>
+{
+    var room = await db.Rooms.FindAsync(id);
+    if (room == null) return Results.NotFound();
+    room.Name = dto.Name; room.Type = dto.Type;
+    await db.SaveChangesAsync();
+    return Results.Ok(room);
+}).RequireAuthorization();
+
+app.MapDelete("/api/rooms/{id:int}", async (int id, NexusDbContext db) =>
+{
+    var room = await db.Rooms.FindAsync(id);
+    if (room == null) return Results.NotFound();
+    db.Rooms.Remove(room);
+    await db.SaveChangesAsync();
+    return Results.NoContent();
+}).RequireAuthorization();
+
+// ── Appointments ──────────────────────────────────────────────────────────────
+
+app.MapGet("/api/appointments", async (string? siteId, string? from, string? to, NexusDbContext db) =>
+{
+    var q = db.Appointments.AsQueryable();
+    if (!string.IsNullOrEmpty(siteId) && siteId != "all") q = q.Where(a => a.SiteId == siteId);
+    if (!string.IsNullOrEmpty(from)) q = q.Where(a => string.Compare(a.Start, from, StringComparison.Ordinal) >= 0);
+    if (!string.IsNullOrEmpty(to))   q = q.Where(a => string.Compare(a.Start, to,   StringComparison.Ordinal) <= 0);
+    return await q.OrderBy(a => a.Start).ToListAsync();
+}).RequireAuthorization();
+
+app.MapPost("/api/appointments", async (AppointmentDto dto, NexusDbContext db, ClaimsPrincipal principal) =>
+{
+    var appt = new Appointment {
+        SiteId = dto.SiteId, Type = dto.Type, PatientName = dto.PatientName,
+        PatientId = dto.PatientId ?? "",
+        Start = dto.Start, End = dto.End, RoomId = dto.RoomId ?? "",
+        EquipmentId = dto.EquipmentId ?? "", Physician = dto.Physician ?? "",
+        Technician = dto.Technician ?? "", Notes = dto.Notes ?? "",
+        Status = dto.Status ?? "scheduled",
+        CreatedBy = ActorName(principal), CreatedAt = DateTime.Now.ToString("yyyy-MM-ddTHH:mm"),
+    };
+    db.Appointments.Add(appt);
+    db.Activity.Add(MakeActivity(ActorName(principal), "scheduled appointment", $"{dto.Type.ToUpper()} — {dto.PatientName} at {dto.Start[..10]}", "create", "scheduler"));
+    await db.SaveChangesAsync();
+    return Results.Ok(appt);
+}).RequireAuthorization();
+
+app.MapPut("/api/appointments/{id:int}", async (int id, AppointmentDto dto, NexusDbContext db, ClaimsPrincipal principal) =>
+{
+    var appt = await db.Appointments.FindAsync(id);
+    if (appt == null) return Results.NotFound();
+    appt.SiteId = dto.SiteId; appt.Type = dto.Type; appt.PatientName = dto.PatientName;
+    appt.PatientId = dto.PatientId ?? "";
+    appt.Start = dto.Start; appt.End = dto.End; appt.RoomId = dto.RoomId ?? "";
+    appt.EquipmentId = dto.EquipmentId ?? ""; appt.Physician = dto.Physician ?? "";
+    appt.Technician = dto.Technician ?? ""; appt.Notes = dto.Notes ?? "";
+    appt.Status = dto.Status ?? appt.Status;
+    db.Activity.Add(MakeActivity(ActorName(principal), "updated appointment", $"{dto.Type.ToUpper()} — {dto.PatientName} at {dto.Start[..10]}", "edit", "scheduler"));
+    await db.SaveChangesAsync();
+    return Results.Ok(appt);
+}).RequireAuthorization();
+
+app.MapDelete("/api/appointments/{id:int}", async (int id, NexusDbContext db, ClaimsPrincipal principal) =>
+{
+    var appt = await db.Appointments.FindAsync(id);
+    if (appt == null) return Results.NotFound();
+    db.Activity.Add(MakeActivity(ActorName(principal), "cancelled appointment", $"{appt.Type.ToUpper()} — {appt.PatientName} at {appt.Start[..10]}", "edit", "scheduler"));
+    db.Appointments.Remove(appt);
+    await db.SaveChangesAsync();
+    return Results.NoContent();
+}).RequireAuthorization();
+
 app.Run();
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -436,3 +558,12 @@ record DocumentUpdateDto(
     string Title, string Version, string Status, string Folder,
     string Owner, string Clauses, string ReviewDue, string Updated,
     string Workflow);
+
+record SiteRoomDto(string SiteId, string Name, string Type);
+
+record AppointmentDto(
+    string SiteId, string Type, string PatientName, string? PatientId,
+    string Start, string End,
+    string? RoomId, string? EquipmentId,
+    string? Physician, string? Technician,
+    string? Notes, string? Status);

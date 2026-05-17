@@ -9,7 +9,7 @@ import { DME_PROVIDERS, DX_LIST, initDxFromDiagnoses, generateOrderHtml } from '
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
-const ageFromDob = (dob) => {
+export const ageFromDob = (dob) => {
   const today = new Date();
   const b = new Date(dob);
   let age = today.getFullYear() - b.getFullYear();
@@ -25,7 +25,7 @@ export const studyStatusKind = (status) =>
 
 // ─── seed data ────────────────────────────────────────────────────────────────
 
-const SEED_PATIENTS = [
+export const SEED_PATIENTS = [
   // Matches study PSG-2026-0441 (Awaiting sign-off, Dr. R. Okafor)
   {
     id: 'PAT-001', initials: 'RK', name: 'R. Kingston', dob: '1974-06-12', age: ageFromDob('1974-06-12'), sex: 'M',

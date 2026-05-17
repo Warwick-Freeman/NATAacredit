@@ -136,6 +136,67 @@ export async function patchStudyStatus(id, status, signedDays) {
   return res.json();
 }
 
+// ── Scheduler ─────────────────────────────────────────────────────────────────
+
+export async function fetchRooms(siteId) {
+  const qs = siteId && siteId !== 'all' ? `?siteId=${siteId}` : '';
+  return get(`/api/rooms${qs}`);
+}
+
+export async function createRoom(data) {
+  const res = await fetch(`${BASE}/api/rooms`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(`API error ${res.status}`);
+  return res.json();
+}
+
+export async function updateRoom(id, data) {
+  const res = await fetch(`${BASE}/api/rooms/${id}`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(`API error ${res.status}`);
+  return res.json();
+}
+
+export async function deleteRoom(id) {
+  const res = await fetch(`${BASE}/api/rooms/${id}`, { method: 'DELETE', headers: authHeaders() });
+  if (!res.ok) throw new Error(`API error ${res.status}`);
+}
+
+export async function fetchAppointments(siteId, from, to) {
+  const params = new URLSearchParams();
+  if (siteId && siteId !== 'all') params.set('siteId', siteId);
+  if (from) params.set('from', from);
+  if (to)   params.set('to',   to);
+  return get(`/api/appointments?${params}`);
+}
+
+export async function createAppointment(data) {
+  const res = await fetch(`${BASE}/api/appointments`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(`API error ${res.status}`);
+  return res.json();
+}
+
+export async function updateAppointment(id, data) {
+  const res = await fetch(`${BASE}/api/appointments/${id}`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(`API error ${res.status}`);
+  return res.json();
+}
+
+export async function deleteAppointment(id) {
+  const res = await fetch(`${BASE}/api/appointments/${id}`, { method: 'DELETE', headers: authHeaders() });
+  if (!res.ok) throw new Error(`API error ${res.status}`);
+}
+
 export async function fetchAll() {
   const [studies, equipment, indicators, clauses, compliance, tasks, activity] =
     await Promise.all([

@@ -98,6 +98,7 @@ export const Sidebar = ({ current, setCurrent, badges, user, onSignOut, open, on
     { id: "audits", label: "Audits & reviews", icon: "audit" },
     { id: "ncr", label: "NC & CAPA", icon: "alert", badge: badges.ncr },
     { section: "Operations" },
+    { id: "scheduler", label: "Scheduler", icon: "calendar" },
     { id: "patients", label: "Patients", icon: "heart" },
     { id: "studies", label: "Studies & reports", icon: "paper", badge: badges.studies, badgeKind: "warn" },
     { id: "indicators", label: "Quality indicators", icon: "chart" },

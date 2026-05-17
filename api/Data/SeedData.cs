@@ -451,4 +451,111 @@ public static class SeedData
 
         db.SaveChanges();
     }
+
+    public static void SeedRooms(NexusDbContext db)
+    {
+        if (db.Rooms.Any()) return;
+        db.Rooms.AddRange(
+            new SiteRoom { SiteId = "RML", RoomId = "rml-1", Name = "Room 1",     Type = "psg",       SortOrder = 1 },
+            new SiteRoom { SiteId = "RML", RoomId = "rml-2", Name = "Room 2",     Type = "psg",       SortOrder = 2 },
+            new SiteRoom { SiteId = "RML", RoomId = "rml-3", Name = "Room 3",     Type = "titration", SortOrder = 3 },
+            new SiteRoom { SiteId = "RML", RoomId = "rml-4", Name = "Consult A",  Type = "consult",   SortOrder = 4 },
+            new SiteRoom { SiteId = "EPL", RoomId = "epl-1", Name = "Room 1",     Type = "psg",       SortOrder = 1 },
+            new SiteRoom { SiteId = "EPL", RoomId = "epl-2", Name = "Consult",    Type = "consult",   SortOrder = 2 }
+        );
+        db.SaveChanges();
+    }
+
+    public static void SeedAppointments(NexusDbContext db)
+    {
+        if (db.Appointments.Any()) return;
+
+        // Anchor to start of current week (Monday)
+        var today = DateTime.Today;
+        var monday = today.AddDays(-(int)today.DayOfWeek == 0 ? 6 : (int)today.DayOfWeek - 1);
+
+        var appts = new List<Appointment>
+        {
+            // Mon night — PSG Room 1
+            new Appointment { SiteId = "RML", Type = "psg", PatientName = "T. Nguyen",
+                Start = monday.AddDays(0).AddHours(21).ToString("yyyy-MM-ddTHH:mm"),
+                End   = monday.AddDays(1).AddHours(7 ).ToString("yyyy-MM-ddTHH:mm"),
+                RoomId = "rml-1", EquipmentId = "PSG-COMP-001",
+                Physician = "Dr. R. Okafor", Technician = "M. Chen", Status = "confirmed" },
+
+            // Mon night — PSG Room 2
+            new Appointment { SiteId = "RML", Type = "psg", PatientName = "R. Kim",
+                Start = monday.AddDays(0).AddHours(21).ToString("yyyy-MM-ddTHH:mm"),
+                End   = monday.AddDays(1).AddHours(7 ).ToString("yyyy-MM-ddTHH:mm"),
+                RoomId = "rml-2", EquipmentId = "PSG-COMP-002",
+                Physician = "Dr. R. Okafor", Technician = "A. Singh", Status = "confirmed" },
+
+            // Tue morning — HSAT setup
+            new Appointment { SiteId = "HSN", Type = "hsat", PatientName = "P. Brown",
+                Start = monday.AddDays(1).AddHours(9).ToString("yyyy-MM-ddTHH:mm"),
+                End   = monday.AddDays(1).AddHours(9).AddMinutes(30).ToString("yyyy-MM-ddTHH:mm"),
+                EquipmentId = "HSAT-NOX-012",
+                Physician = "Dr. R. Okafor", Technician = "M. Chen", Status = "scheduled",
+                Notes = "Patient address: 14 River St, Northside. Deliver and set up device." },
+
+            // Tue afternoon — Consultation
+            new Appointment { SiteId = "RML", Type = "consult", PatientName = "A. Patel",
+                Start = monday.AddDays(1).AddHours(14).ToString("yyyy-MM-ddTHH:mm"),
+                End   = monday.AddDays(1).AddHours(15).ToString("yyyy-MM-ddTHH:mm"),
+                RoomId = "rml-4",
+                Physician = "Dr. R. Okafor", Status = "scheduled" },
+
+            // Tue night — Titration
+            new Appointment { SiteId = "RML", Type = "titration", PatientName = "S. Chen",
+                Start = monday.AddDays(1).AddHours(21).ToString("yyyy-MM-ddTHH:mm"),
+                End   = monday.AddDays(2).AddHours(6 ).ToString("yyyy-MM-ddTHH:mm"),
+                RoomId = "rml-3", EquipmentId = "CPAP-RES-004",
+                Physician = "Dr. R. Okafor", Technician = "M. Chen", Status = "confirmed" },
+
+            // Wed night — PSG Room 1
+            new Appointment { SiteId = "RML", Type = "psg", PatientName = "D. Mitchell",
+                Start = monday.AddDays(2).AddHours(21).ToString("yyyy-MM-ddTHH:mm"),
+                End   = monday.AddDays(3).AddHours(7 ).ToString("yyyy-MM-ddTHH:mm"),
+                RoomId = "rml-1", EquipmentId = "PSG-COMP-001",
+                Physician = "Dr. R. Okafor", Technician = "A. Singh", Status = "scheduled" },
+
+            // Wed morning — HSAT retrieval
+            new Appointment { SiteId = "HSN", Type = "hsat", PatientName = "M. Torres",
+                Start = monday.AddDays(2).AddHours(8).AddMinutes(30).ToString("yyyy-MM-ddTHH:mm"),
+                End   = monday.AddDays(2).AddHours(9).ToString("yyyy-MM-ddTHH:mm"),
+                EquipmentId = "HSAT-NOX-013",
+                Technician = "M. Chen", Status = "scheduled",
+                Notes = "Retrieve device from patient. Download and check data quality." },
+
+            // Thu — Paediatric PSG at Eastside
+            new Appointment { SiteId = "EPL", Type = "psg", PatientName = "L. Wang",
+                Start = monday.AddDays(3).AddHours(19).ToString("yyyy-MM-ddTHH:mm"),
+                End   = monday.AddDays(4).AddHours(7 ).ToString("yyyy-MM-ddTHH:mm"),
+                RoomId = "epl-1", EquipmentId = "PSG-EMB-001",
+                Physician = "Dr. L. Hartono", Technician = "M. Chen", Status = "confirmed" },
+
+            // Thu morning — Consultation at Eastside
+            new Appointment { SiteId = "EPL", Type = "consult", PatientName = "B. Gupta",
+                Start = monday.AddDays(3).AddHours(10).ToString("yyyy-MM-ddTHH:mm"),
+                End   = monday.AddDays(3).AddHours(11).ToString("yyyy-MM-ddTHH:mm"),
+                RoomId = "epl-2",
+                Physician = "Dr. L. Hartono", Status = "scheduled" },
+
+            // Fri night — PSG Room 1
+            new Appointment { SiteId = "RML", Type = "psg", PatientName = "J. Harrison",
+                Start = monday.AddDays(4).AddHours(21).ToString("yyyy-MM-ddTHH:mm"),
+                End   = monday.AddDays(5).AddHours(7 ).ToString("yyyy-MM-ddTHH:mm"),
+                RoomId = "rml-1", EquipmentId = "PSG-COMP-001",
+                Physician = "Dr. R. Okafor", Technician = "A. Singh", Status = "scheduled" },
+        };
+
+        foreach (var a in appts)
+        {
+            a.CreatedBy = "System";
+            a.CreatedAt = DateTime.Now.AddDays(-3).ToString("yyyy-MM-ddTHH:mm");
+        }
+
+        db.Appointments.AddRange(appts);
+        db.SaveChanges();
+    }
 }

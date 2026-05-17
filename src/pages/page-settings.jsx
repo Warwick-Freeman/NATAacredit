@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Icon from '../icons';
 import { PageHeader, Pill, Avatar, Tabs, Drawer } from '../components';
 import { useAuth, ROLE_LEVEL, ROLE_PERMISSIONS } from '../AuthContext';
 import UserFormDrawer from '../user-form-drawer';
 import { useNexusData } from '../NexusDataContext';
+import { fetchRooms, createRoom, updateRoom, deleteRoom } from '../api';
 
 // ─── Toggle switch ─────────────────────────────────────────────────────────────
 
@@ -111,6 +112,20 @@ const SettingsPage = () => {
   const [siteDraft, setSiteDraft] = useState({ code: '', name: '', type: '', beds: '' });
   const [newSite, setNewSite] = useState({ code: '', name: '', type: '', beds: '' });
 
+  // Rooms
+  const [rooms, setRooms] = useState([]);
+  const [roomSite, setRoomSite] = useState('RML');
+  const [addRoomOpen, setAddRoomOpen] = useState(false);
+  const [newRoom, setNewRoom] = useState({ name: '', type: 'psg' });
+  const [roomEditId, setRoomEditId] = useState(null);
+  const [roomEditName, setRoomEditName] = useState('');
+  const [roomEditType, setRoomEditType] = useState('psg');
+  const [roomSaving, setRoomSaving] = useState(false);
+
+  useEffect(() => {
+    fetchRooms(null).then(r => setRooms(r ?? [])).catch(() => {});
+  }, []);
+
   // Integrations
   const [integrations, setIntegrations] = useState(SEED_INTEGRATIONS);
   const [expandedInt, setExpandedInt] = useState(null);
@@ -173,6 +188,34 @@ const SettingsPage = () => {
     showSaved();
   }
   function removeSite(id) { setSites(prev => prev.filter(s => s.id !== id)); }
+
+  // ── Room helpers ─────────────────────────────────────────────────────────────
+
+  async function handleAddRoom() {
+    if (!newRoom.name.trim()) return;
+    setRoomSaving(true);
+    try {
+      const created = await createRoom({ siteId: roomSite, name: newRoom.name.trim(), type: newRoom.type });
+      setRooms(prev => [...prev, created]);
+      setNewRoom({ name: '', type: 'psg' });
+      setAddRoomOpen(false);
+    } finally { setRoomSaving(false); }
+  }
+
+  async function handleUpdateRoom(id) {
+    setRoomSaving(true);
+    try {
+      const updated = await updateRoom(id, { siteId: roomSite, name: roomEditName.trim(), type: roomEditType });
+      setRooms(prev => prev.map(r => r.id === id ? updated : r));
+      setRoomEditId(null);
+      showSaved();
+    } finally { setRoomSaving(false); }
+  }
+
+  async function handleDeleteRoom(id) {
+    await deleteRoom(id);
+    setRooms(prev => prev.filter(r => r.id !== id));
+  }
 
   // ── Integration helpers ───────────────────────────────────────────────────────
 
@@ -367,6 +410,112 @@ const SettingsPage = () => {
                 </div>
               ))}
             </div>
+          </div>
+        </div>
+
+        {/* Rooms */}
+        <div className="card" style={{ marginTop: 16 }}>
+          <div className="card-head">
+            <div>
+              <div className="card-title">Rooms</div>
+              <div className="card-sub">Physical rooms available for booking at each site</div>
+            </div>
+            <div className="topbar-spacer" />
+            <button className="btn" style={{ fontSize: 11, padding: '3px 8px' }} onClick={() => { setAddRoomOpen(v => !v); setRoomEditId(null); }}>
+              <Icon name="plus" size={11} />Add room
+            </button>
+          </div>
+
+          {/* Site selector */}
+          <div style={{ padding: '10px 18px 0', display: 'flex', gap: 6 }}>
+            {SEED_SITES.filter(s => s.code !== 'HSN').concat([{ id: 3, code: 'HSN', name: 'Home Service – North' }]).map(s => (
+              <button
+                key={s.code}
+                onClick={() => { setRoomSite(s.code); setAddRoomOpen(false); setRoomEditId(null); }}
+                style={{
+                  padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 500, cursor: 'pointer',
+                  border: `1.5px solid ${roomSite === s.code ? 'var(--accent)' : 'var(--border)'}`,
+                  background: roomSite === s.code ? 'var(--accent-soft)' : 'var(--surface)',
+                  color: roomSite === s.code ? 'var(--accent-ink)' : 'var(--ink-2)',
+                }}
+              >
+                {s.code}
+                {rooms.filter(r => r.siteId === s.code).length > 0 && (
+                  <span style={{ marginLeft: 5, fontSize: 10, opacity: 0.7 }}>
+                    {rooms.filter(r => r.siteId === s.code).length}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+
+          <div className="card-pad" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {/* Add room form */}
+            {addRoomOpen && (
+              <div style={{ background: 'var(--surface-2)', borderRadius: 8, padding: 12, border: '1px solid var(--accent)' }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent-ink)', marginBottom: 10 }}>
+                  New room · {SEED_SITES.find(s => s.code === roomSite)?.name ?? roomSite}
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 130px', gap: 8, marginBottom: 8 }}>
+                  <div>
+                    <label style={{ fontSize: 11, color: 'var(--ink-3)', display: 'block', marginBottom: 3 }}>Room name</label>
+                    <input className="input" style={{ width: '100%', boxSizing: 'border-box' }} placeholder="e.g. PSG Lab 1" value={newRoom.name} onChange={e => setNewRoom(p => ({ ...p, name: e.target.value }))} onKeyDown={e => e.key === 'Enter' && handleAddRoom()} autoFocus />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 11, color: 'var(--ink-3)', display: 'block', marginBottom: 3 }}>Type</label>
+                    <select className="input" style={{ width: '100%', boxSizing: 'border-box' }} value={newRoom.type} onChange={e => setNewRoom(p => ({ ...p, type: e.target.value }))}>
+                      <option value="psg">PSG</option>
+                      <option value="titration">Titration</option>
+                      <option value="consult">Consult</option>
+                      <option value="general">General</option>
+                    </select>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                  <button className="btn" onClick={() => setAddRoomOpen(false)}>Cancel</button>
+                  <button className="btn btn-primary" onClick={handleAddRoom} disabled={roomSaving || !newRoom.name.trim()}>Add</button>
+                </div>
+              </div>
+            )}
+
+            {/* Room list */}
+            {rooms.filter(r => r.siteId === roomSite).length === 0 && !addRoomOpen && (
+              <div style={{ fontSize: 12, color: 'var(--ink-3)', padding: '6px 0' }}>
+                No rooms configured for this site. Click "Add room" to get started.
+              </div>
+            )}
+            {rooms.filter(r => r.siteId === roomSite).map(r => (
+              <div key={r.id} style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+                {roomEditId === r.id ? (
+                  <div style={{ padding: 12, display: 'grid', gridTemplateColumns: '1fr 130px', gap: 8 }}>
+                    <input className="input" style={{ width: '100%', boxSizing: 'border-box' }} value={roomEditName} onChange={e => setRoomEditName(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleUpdateRoom(r.id)} autoFocus />
+                    <select className="input" style={{ width: '100%', boxSizing: 'border-box' }} value={roomEditType} onChange={e => setRoomEditType(e.target.value)}>
+                      <option value="psg">PSG</option>
+                      <option value="titration">Titration</option>
+                      <option value="consult">Consult</option>
+                      <option value="general">General</option>
+                    </select>
+                    <div style={{ display: 'flex', gap: 8, gridColumn: '1 / -1', justifyContent: 'flex-end' }}>
+                      <button className="btn" onClick={() => setRoomEditId(null)}>Cancel</button>
+                      <button className="btn btn-primary" onClick={() => handleUpdateRoom(r.id)} disabled={roomSaving}>Save</button>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, fontWeight: 500 }}>{r.name}</div>
+                      <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 1 }}>{r.type}</div>
+                    </div>
+                    <button className="btn-icon" title="Edit" onClick={() => { setRoomEditId(r.id); setRoomEditName(r.name); setRoomEditType(r.type); setAddRoomOpen(false); }}>
+                      <Icon name="edit" size={13} />
+                    </button>
+                    <button className="btn-icon" title="Remove" style={{ color: 'var(--bad)', opacity: 0.6 }} onClick={() => handleDeleteRoom(r.id)}>
+                      <Icon name="x" size={13} />
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         </div>
 
