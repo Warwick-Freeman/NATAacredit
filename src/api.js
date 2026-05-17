@@ -5,8 +5,15 @@ function authHeaders() {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+function clearSessionAndReload() {
+  localStorage.removeItem('nexus_token');
+  localStorage.removeItem('nexus_user');
+  window.location.reload();
+}
+
 async function get(path) {
   const res = await fetch(`${BASE}${path}`, { headers: authHeaders() });
+  if (res.status === 401) { clearSessionAndReload(); return; }
   if (!res.ok) throw new Error(`API error ${res.status}: ${path}`);
   return res.json();
 }
@@ -118,6 +125,8 @@ export async function patchStudyStatus(id, status, signedDays) {
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify({ status, signedDays: signedDays ?? null }),
   });
+  if (res.status === 401) { clearSessionAndReload(); return; }
+  if (res.status === 403) throw new Error('You do not have permission to perform this action.');
   if (!res.ok) throw new Error(`API error ${res.status}`);
   return res.json();
 }

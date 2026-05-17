@@ -73,7 +73,7 @@ const DocDetailDrawer = ({ doc, onUpdate, onClose, onView, onEdit }) => {
     if (activeIdx < 0) return;
     const t = today();
     const wfNext = wf.map((s, i) => {
-      if (i === activeIdx) return { ...s, done: true, active: false, date: t, comment };
+      if (i === activeIdx) return { ...s, done: true, active: false, date: t, comment, who: user.name };
       if (i === activeIdx + 1) {
         const who = (activeIdx === 0 && reviewer) ? reviewer : s.who;
         return { ...s, active: true, who };
@@ -92,7 +92,7 @@ const DocDetailDrawer = ({ doc, onUpdate, onClose, onView, onEdit }) => {
     if (activeIdx < 0) return;
     const t = today();
     const wfNext = wf.map((s, i) => {
-      if (i === activeIdx) return { ...s, done: false, active: false, rejected: true, date: t, comment };
+      if (i === activeIdx) return { ...s, done: false, active: false, rejected: true, date: t, comment, who: user.name };
       if (i === 0) return { ...s, done: false, active: true, date: t };
       return { ...s, done: false, active: false, rejected: false };
     });

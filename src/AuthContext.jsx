@@ -14,16 +14,16 @@ export const ROLE_LEVEL = {
 };
 
 export const ROLE_PERMISSIONS = {
-  'Medical Director':           { canCreateDoc: true,  canUploadDoc: true,  canPeerReviewDoc: true,  canApproveDoc: true,  canIssueDoc: true,  canManageUsers: true,  canInviteUsers: true  },
-  'Quality Manager':            { canCreateDoc: true,  canUploadDoc: true,  canPeerReviewDoc: true,  canApproveDoc: true,  canIssueDoc: true,  canManageUsers: true,  canInviteUsers: true  },
-  'Paediatric Sleep Physician': { canCreateDoc: true,  canUploadDoc: true,  canPeerReviewDoc: true,  canApproveDoc: true,  canIssueDoc: false, canManageUsers: false, canInviteUsers: false },
-  'Reporting Physician':        { canCreateDoc: true,  canUploadDoc: true,  canPeerReviewDoc: true,  canApproveDoc: true,  canIssueDoc: false, canManageUsers: false, canInviteUsers: false },
-  'Senior Technologist':        { canCreateDoc: true,  canUploadDoc: true,  canPeerReviewDoc: true,  canApproveDoc: false, canIssueDoc: false, canManageUsers: false, canInviteUsers: false },
-  'Scoring Technologist':       { canCreateDoc: false, canUploadDoc: false, canPeerReviewDoc: false, canApproveDoc: false, canIssueDoc: false, canManageUsers: false, canInviteUsers: false },
-  'Recording Tech':             { canCreateDoc: false, canUploadDoc: false, canPeerReviewDoc: false, canApproveDoc: false, canIssueDoc: false, canManageUsers: false, canInviteUsers: false },
-  'Reception / Bookings':       { canCreateDoc: false, canUploadDoc: false, canPeerReviewDoc: false, canApproveDoc: false, canIssueDoc: false, canManageUsers: false, canInviteUsers: false },
-  'External Auditor':           { canCreateDoc: false, canUploadDoc: false, canPeerReviewDoc: false, canApproveDoc: false, canIssueDoc: false, canManageUsers: false, canInviteUsers: false },
-  'External Assessor':          { canCreateDoc: false, canUploadDoc: false, canPeerReviewDoc: false, canApproveDoc: false, canIssueDoc: false, canManageUsers: false, canInviteUsers: false },
+  'Medical Director':           { canCreateDoc: true,  canUploadDoc: true,  canPeerReviewDoc: true,  canApproveDoc: true,  canIssueDoc: true,  canSignStudy: true,  canManageUsers: true,  canInviteUsers: true  },
+  'Quality Manager':            { canCreateDoc: true,  canUploadDoc: true,  canPeerReviewDoc: true,  canApproveDoc: true,  canIssueDoc: true,  canSignStudy: false, canManageUsers: true,  canInviteUsers: true  },
+  'Paediatric Sleep Physician': { canCreateDoc: true,  canUploadDoc: true,  canPeerReviewDoc: true,  canApproveDoc: true,  canIssueDoc: false, canSignStudy: true,  canManageUsers: false, canInviteUsers: false },
+  'Reporting Physician':        { canCreateDoc: true,  canUploadDoc: true,  canPeerReviewDoc: true,  canApproveDoc: true,  canIssueDoc: false, canSignStudy: true,  canManageUsers: false, canInviteUsers: false },
+  'Senior Technologist':        { canCreateDoc: true,  canUploadDoc: true,  canPeerReviewDoc: true,  canApproveDoc: false, canIssueDoc: false, canSignStudy: false, canManageUsers: false, canInviteUsers: false },
+  'Scoring Technologist':       { canCreateDoc: false, canUploadDoc: false, canPeerReviewDoc: false, canApproveDoc: false, canIssueDoc: false, canSignStudy: false, canManageUsers: false, canInviteUsers: false },
+  'Recording Tech':             { canCreateDoc: false, canUploadDoc: false, canPeerReviewDoc: false, canApproveDoc: false, canIssueDoc: false, canSignStudy: false, canManageUsers: false, canInviteUsers: false },
+  'Reception / Bookings':       { canCreateDoc: false, canUploadDoc: false, canPeerReviewDoc: false, canApproveDoc: false, canIssueDoc: false, canSignStudy: false, canManageUsers: false, canInviteUsers: false },
+  'External Auditor':           { canCreateDoc: false, canUploadDoc: false, canPeerReviewDoc: false, canApproveDoc: false, canIssueDoc: false, canSignStudy: false, canManageUsers: false, canInviteUsers: false },
+  'External Assessor':          { canCreateDoc: false, canUploadDoc: false, canPeerReviewDoc: false, canApproveDoc: false, canIssueDoc: false, canSignStudy: false, canManageUsers: false, canInviteUsers: false },
 };
 
 export function can(role, permission) {

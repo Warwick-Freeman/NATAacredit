@@ -63,7 +63,7 @@ function openDmeHtml(html, mrn) {
 
 const StudyDrawer = ({ data, studyId, onClose, onStudyUpdated }) => {
   const { site } = useLocation();
-  const { user } = useAuth();
+  const { user, hasPerm } = useAuth();
 
   const [rxOpen, setRxOpen] = useState(false);
   const [rx, setRx] = useState(null);
@@ -216,7 +216,13 @@ const StudyDrawer = ({ data, studyId, onClose, onStudyUpdated }) => {
         </div>
 
         {/* ─── Sign-off section ─────────────────────────────────────────────── */}
-        {(study.status === 'Awaiting sign-off' && !signed) && (
+        {(study.status === 'Awaiting sign-off' && !signed && !hasPerm('canSignStudy')) && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 8, marginBottom: 14, fontSize: 12, color: 'var(--ink-3)' }}>
+            <Icon name="info" size={14} style={{ flexShrink: 0 }} />
+            Awaiting physician sign-off — only a Reporting Physician or Medical Director can finalise this report.
+          </div>
+        )}
+        {(study.status === 'Awaiting sign-off' && !signed && hasPerm('canSignStudy')) && (
           <>
             {/* Signature box */}
             <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600, marginBottom: 8 }}>Sign final report</div>

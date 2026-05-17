@@ -119,6 +119,11 @@ app.MapPost("/api/auth/login", async (LoginDto dto, NexusDbContext db) =>
     if (user == null || !VerifyPassword(dto.Password, user.PasswordHash))
         return Results.Unauthorized();
 
+    var now = DateTime.Now.ToString("dd MMM yyyy, HH:mm");
+    user.LastSeen = now;
+    db.Activity.Add(new ActivityEntry { Who = user.Name, Action = "signed in", Target = "Nexus 360", Time = now, Kind = "login" });
+    await db.SaveChangesAsync();
+
     var claims = new[]
     {
         new Claim(JwtRegisteredClaimNames.Sub,   user.Id.ToString()),
@@ -165,6 +170,12 @@ app.MapGet("/api/users", async (NexusDbContext db) =>
 
 var validStudyStatuses = new HashSet<string>(StringComparer.Ordinal)
     { "Scoring", "Preliminary", "Awaiting sign-off", "Final" };
+var physicianRoles = new HashSet<string>(StringComparer.Ordinal)
+    { "Medical Director", "Paediatric Sleep Physician", "Reporting Physician" };
+var createDocRoles = new HashSet<string>(StringComparer.Ordinal)
+    { "Medical Director", "Quality Manager", "Paediatric Sleep Physician", "Reporting Physician", "Senior Technologist" };
+var issueDocRoles  = new HashSet<string>(StringComparer.Ordinal)
+    { "Medical Director", "Quality Manager" };
 
 app.MapGet("/api/studies", async (NexusDbContext db) =>
     await db.Studies.ToListAsync()).RequireAuthorization();
@@ -173,14 +184,24 @@ app.MapGet("/api/studies/{id}", async (string id, NexusDbContext db) =>
     await db.Studies.FirstOrDefaultAsync(s => s.StudyId == id)
         is { } study ? Results.Ok(study) : Results.NotFound()).RequireAuthorization();
 
-app.MapPatch("/api/studies/{id}/status", async (string id, StudyStatusDto dto, NexusDbContext db) =>
+app.MapPatch("/api/studies/{id}/status", async (string id, StudyStatusDto dto, NexusDbContext db, ClaimsPrincipal principal) =>
 {
     if (!validStudyStatuses.Contains(dto.Status))
         return Results.BadRequest("Invalid status value.");
+    if (dto.Status == "Final" && !physicianRoles.Contains(ActorRole(principal)))
+        return Results.Forbid();
     var study = await db.Studies.FirstOrDefaultAsync(s => s.StudyId == id);
     if (study == null) return Results.NotFound();
     study.Status = dto.Status;
     if (dto.SignedDays.HasValue) study.SignedDays = dto.SignedDays;
+    var now = DateTime.Now.ToString("dd MMM yyyy, HH:mm");
+    db.Activity.Add(new ActivityEntry {
+        Who    = ActorName(principal),
+        Action = dto.Status == "Final" ? "signed final report" : "updated study status",
+        Target = $"{id} → {dto.Status}",
+        Time   = now,
+        Kind   = dto.Status == "Final" ? "sign" : "edit",
+    });
     await db.SaveChangesAsync();
     return Results.Ok(study);
 }).RequireAuthorization();
@@ -209,8 +230,10 @@ app.MapGet("/api/documents/{id}", async (string id, NexusDbContext db) =>
     await db.Documents.FirstOrDefaultAsync(d => d.DocId == id) is { } doc
         ? Results.Ok(ToDto(doc)) : Results.NotFound()).RequireAuthorization();
 
-app.MapPost("/api/documents", async (HttpRequest req, NexusDbContext db) =>
+app.MapPost("/api/documents", async (HttpRequest req, NexusDbContext db, ClaimsPrincipal principal) =>
 {
+    if (!createDocRoles.Contains(ActorRole(principal))) return Results.Forbid();
+
     var form = await req.ReadFormAsync();
     var doc = new Document
     {
@@ -238,12 +261,21 @@ app.MapPost("/api/documents", async (HttpRequest req, NexusDbContext db) =>
     }
 
     db.Documents.Add(doc);
+    db.Activity.Add(new ActivityEntry {
+        Who    = ActorName(principal),
+        Action = "created document",
+        Target = $"{doc.DocId} — {doc.Title}",
+        Time   = DateTime.Now.ToString("dd MMM yyyy, HH:mm"),
+        Kind   = "create",
+    });
     await db.SaveChangesAsync();
     return Results.Ok(ToDto(doc));
 }).RequireAuthorization();
 
-app.MapPut("/api/documents/{id}", async (string id, DocumentUpdateDto dto, NexusDbContext db) =>
+app.MapPut("/api/documents/{id}", async (string id, DocumentUpdateDto dto, NexusDbContext db, ClaimsPrincipal principal) =>
 {
+    if (!createDocRoles.Contains(ActorRole(principal))) return Results.Forbid();
+    if (dto.Status == "Issued" && !issueDocRoles.Contains(ActorRole(principal))) return Results.Forbid();
     var doc = await db.Documents.FirstOrDefaultAsync(d => d.DocId == id);
     if (doc == null) return Results.NotFound();
     doc.Title     = dto.Title;
@@ -255,12 +287,21 @@ app.MapPut("/api/documents/{id}", async (string id, DocumentUpdateDto dto, Nexus
     doc.ReviewDue = dto.ReviewDue;
     doc.Updated   = dto.Updated;
     doc.Workflow  = dto.Workflow;
+    db.Activity.Add(new ActivityEntry {
+        Who    = ActorName(principal),
+        Action = dto.Status == "Issued" ? "issued document" : "updated document",
+        Target = $"{id} — {dto.Title}",
+        Time   = DateTime.Now.ToString("dd MMM yyyy, HH:mm"),
+        Kind   = dto.Status == "Issued" ? "sign" : "edit",
+    });
     await db.SaveChangesAsync();
     return Results.Ok(ToDto(doc));
 }).RequireAuthorization();
 
-app.MapPost("/api/documents/{id}/file", async (string id, HttpRequest req, NexusDbContext db) =>
+app.MapPost("/api/documents/{id}/file", async (string id, HttpRequest req, NexusDbContext db, ClaimsPrincipal principal) =>
 {
+    if (!createDocRoles.Contains(ActorRole(principal))) return Results.Forbid();
+
     var doc = await db.Documents.FirstOrDefaultAsync(d => d.DocId == id);
     if (doc == null) return Results.NotFound();
 
@@ -281,6 +322,13 @@ app.MapPost("/api/documents/{id}/file", async (string id, HttpRequest req, Nexus
     doc.FileName       = Path.GetFileName(file.FileName);
     doc.StoredFileName = stored;
     doc.Updated        = DateTime.Now.ToString("dd MMM yyyy");
+    db.Activity.Add(new ActivityEntry {
+        Who    = ActorName(principal),
+        Action = "uploaded file to",
+        Target = $"{id} — {Path.GetFileName(file.FileName)}",
+        Time   = DateTime.Now.ToString("dd MMM yyyy, HH:mm"),
+        Kind   = "upload",
+    });
     await db.SaveChangesAsync();
     return Results.Ok(ToDto(doc));
 }).RequireAuthorization();
@@ -334,6 +382,12 @@ string Initials(string name)
     var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
     return string.Concat(parts.Take(2).Select(w => char.ToUpper(w[0])));
 }
+
+string ActorName(ClaimsPrincipal p) =>
+    p.FindFirstValue("name") ?? p.FindFirstValue(ClaimTypes.Name) ?? "Unknown";
+
+string ActorRole(ClaimsPrincipal p) =>
+    p.FindFirstValue("role") ?? "";
 
 // ── DTOs ──────────────────────────────────────────────────────────────────────
 
