@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Icon from './icons';
 import { Avatar, StatusPill, Pill } from './components';
 import { useTaskContext } from './TaskContext';
 import { useNexusData } from './NexusDataContext';
 import { getStdCfg } from './standardConfig';
+import { fetchDocuments } from './api';
 
 // Full requirement text for all seeded clauses
 const REQUIREMENT = {
@@ -92,8 +93,16 @@ const ClauseDrawer = ({ data, clauseId, onClose, onUpdate }) => {
 
   // Evidence form
   const [addEvOpen,  setAddEvOpen] = useState(false);
+  const [evMode,     setEvMode]    = useState('docs'); // 'docs' | 'manual'
   const [newEv, setNewEv] = useState({ name: '', type: 'SOP', ref: '', date: new Date().toISOString().slice(0, 10), notes: '' });
   const setNev = (k, v) => setNewEv(n => ({ ...n, [k]: v }));
+
+  // Document picker state
+  const [docLib,       setDocLib]       = useState([]);
+  const [docLibLoading, setDocLibLoading] = useState(false);
+  const [docSearch,    setDocSearch]    = useState('');
+  const [pickedDoc,    setPickedDoc]    = useState(null);
+  const docSearchRef = useRef(null);
 
   // Status / notes editing
   const [editStatus, setEditStatus] = useState(clause.status);
@@ -107,7 +116,20 @@ const ClauseDrawer = ({ data, clauseId, onClose, onUpdate }) => {
     setPanel(null);
     setAddEvOpen(false);
     setActiveDoc(null);
+    setPickedDoc(null);
+    setDocSearch('');
+    setEvMode('docs');
   }, [clause.id]);
+
+  // Load document library when the add-evidence panel opens
+  useEffect(() => {
+    if (!addEvOpen || docLib.length > 0) return;
+    setDocLibLoading(true);
+    fetchDocuments()
+      .then(list => setDocLib(list.filter(d => d.status !== 'Obsolete')))
+      .catch(() => {})
+      .finally(() => setDocLibLoading(false));
+  }, [addEvOpen]);
 
   const handleStatusChange = (s) => { setEditStatus(s); setDirty(true); };
   const handleNotesChange  = (v) => { setEditNotes(v);  setDirty(true); };
@@ -116,6 +138,23 @@ const ClauseDrawer = ({ data, clauseId, onClose, onUpdate }) => {
     if (onUpdate) onUpdate({ ...clause, status: editStatus, notes: editNotes, lastReviewed: new Date().toLocaleDateString('en-AU', { month: 'short', year: 'numeric' }) });
     setDirty(false);
   };
+
+  const FOLDER_TYPE = { sops: 'SOP', forms: 'Form', manual: 'Policy', policies: 'Policy', records: 'Record' };
+
+  const handlePickDoc = (doc) => {
+    setPickedDoc(doc);
+    setNev('name', `${doc.id} — ${doc.title}`);
+    setNev('ref',  `${doc.id} v${doc.version}`);
+    setNev('type', FOLDER_TYPE[doc.folder] ?? 'Document');
+    setNev('date', doc.updated
+      ? (() => { try { return new Date(doc.updated.split(' ').reverse().join(' ')).toISOString().slice(0,10); } catch { return new Date().toISOString().slice(0,10); } })()
+      : new Date().toISOString().slice(0, 10));
+  };
+
+  const filteredDocs = docLib.filter(d => {
+    const q = docSearch.toLowerCase();
+    return !q || d.id.toLowerCase().includes(q) || d.title.toLowerCase().includes(q) || (d.folder || '').toLowerCase().includes(q);
+  });
 
   const handleAddEvidence = () => {
     if (!newEv.name.trim() || !newEv.ref.trim()) return;
@@ -134,6 +173,8 @@ const ClauseDrawer = ({ data, clauseId, onClose, onUpdate }) => {
     };
     if (onUpdate) onUpdate(updated);
     setNewEv({ name: '', type: 'SOP', ref: '', date: new Date().toISOString().slice(0, 10), notes: '' });
+    setPickedDoc(null);
+    setDocSearch('');
     setAddEvOpen(false);
   };
 
@@ -384,40 +425,123 @@ const ClauseDrawer = ({ data, clauseId, onClose, onUpdate }) => {
           )}
         </div>
 
-        {/* Add evidence inline form */}
+        {/* Add evidence panel */}
         {addEvOpen && (
-          <div style={{ padding: 14, background: 'var(--surface-2)', borderRadius: 8, marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div className="form-row" style={{ gap: 8 }}>
-              <div className="form-field" style={{ flex: 2 }}>
-                <label className="form-label">Document name</label>
-                <input className="form-input" placeholder="e.g. SOP-EQP-009 Equipment verification" value={newEv.name} onChange={e => setNev('name', e.target.value)} />
-              </div>
-              <div className="form-field" style={{ flex: 1 }}>
-                <label className="form-label">Type</label>
-                <select className="form-input" value={newEv.type} onChange={e => setNev('type', e.target.value)}>
-                  {EV_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                </select>
-              </div>
+          <div style={{ border: '1px solid var(--accent)', borderRadius: 8, marginBottom: 12, overflow: 'hidden' }}>
+            {/* Mode tabs */}
+            <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', background: 'var(--surface-2)' }}>
+              {[['docs','From documents'],['manual','Manual entry']].map(([id, label]) => (
+                <button key={id} onClick={() => { setEvMode(id); setPickedDoc(null); }}
+                  style={{ flex: 1, padding: '8px 0', fontSize: 12, fontWeight: evMode === id ? 600 : 400,
+                    color: evMode === id ? 'var(--accent-ink)' : 'var(--ink-3)',
+                    background: evMode === id ? 'var(--accent-soft)' : 'transparent',
+                    border: 'none', borderBottom: evMode === id ? '2px solid var(--accent)' : '2px solid transparent',
+                    cursor: 'pointer', transition: 'all 0.15s' }}>
+                  {label}
+                </button>
+              ))}
             </div>
-            <div className="form-row" style={{ gap: 8 }}>
-              <div className="form-field" style={{ flex: 1 }}>
-                <label className="form-label">Reference / version</label>
-                <input className="form-input" placeholder="e.g. SOP-EQP-009 v3.1" value={newEv.ref} onChange={e => setNev('ref', e.target.value)} />
+
+            <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+
+              {/* ── From documents mode ── */}
+              {evMode === 'docs' && (<>
+                <input ref={docSearchRef} className="form-input" placeholder="Search by document ID or title…"
+                  value={docSearch} onChange={e => { setDocSearch(e.target.value); setPickedDoc(null); }}
+                  autoFocus />
+
+                {docLibLoading && (
+                  <div style={{ fontSize: 12, color: 'var(--ink-3)', padding: '6px 0' }}>Loading documents…</div>
+                )}
+
+                {!docLibLoading && filteredDocs.length === 0 && (
+                  <div style={{ fontSize: 12, color: 'var(--ink-3)', padding: '4px 0' }}>
+                    {docLib.length === 0 ? 'No documents found in the library.' : 'No documents match your search.'}
+                  </div>
+                )}
+
+                {!docLibLoading && filteredDocs.length > 0 && (
+                  <div style={{ maxHeight: 220, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {filteredDocs.map(doc => {
+                      const isPicked = pickedDoc?.id === doc.id;
+                      return (
+                        <div key={doc.id} onClick={() => handlePickDoc(doc)}
+                          style={{ padding: '8px 10px', borderRadius: 6, cursor: 'pointer',
+                            border: `1.5px solid ${isPicked ? 'var(--accent)' : 'var(--border)'}`,
+                            background: isPicked ? 'var(--accent-soft)' : 'var(--surface)',
+                            transition: 'border-color 0.1s, background 0.1s' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span style={{ fontFamily: 'monospace', fontSize: 11, fontWeight: 600,
+                              color: isPicked ? 'var(--accent-ink)' : 'var(--ink-2)', flexShrink: 0 }}>
+                              {doc.id}
+                            </span>
+                            <span style={{ fontSize: 12, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {doc.title}
+                            </span>
+                            <span style={{ fontSize: 10, color: 'var(--ink-3)', flexShrink: 0 }}>v{doc.version}</span>
+                            {isPicked && <Icon name="check" size={12} style={{ color: 'var(--accent)', flexShrink: 0 }} />}
+                          </div>
+                          <div style={{ fontSize: 10, color: 'var(--ink-3)', marginTop: 2, display: 'flex', gap: 8 }}>
+                            <span style={{ textTransform: 'capitalize' }}>{doc.folder}</span>
+                            <span>·</span>
+                            <span style={{ color: doc.status === 'Issued' ? 'var(--good)' : 'var(--warn)' }}>{doc.status}</span>
+                            {doc.updated && <><span>·</span><span>{doc.updated}</span></>}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {pickedDoc && (
+                  <div style={{ padding: '8px 10px', background: 'var(--surface-2)', borderRadius: 6, fontSize: 12 }}>
+                    <div style={{ fontWeight: 500, marginBottom: 4 }}>Add notes <span style={{ fontWeight: 400, color: 'var(--ink-3)' }}>(optional)</span></div>
+                    <input className="form-input" placeholder="Version notes, expiry, caveats…"
+                      value={newEv.notes} onChange={e => setNev('notes', e.target.value)} />
+                  </div>
+                )}
+              </>)}
+
+              {/* ── Manual entry mode ── */}
+              {evMode === 'manual' && (<>
+                <div className="form-row" style={{ gap: 8 }}>
+                  <div className="form-field" style={{ flex: 2 }}>
+                    <label className="form-label">Document name</label>
+                    <input className="form-input" placeholder="e.g. SOP-EQP-009 Equipment verification"
+                      value={newEv.name} onChange={e => setNev('name', e.target.value)} autoFocus />
+                  </div>
+                  <div className="form-field" style={{ flex: 1 }}>
+                    <label className="form-label">Type</label>
+                    <select className="form-input" value={newEv.type} onChange={e => setNev('type', e.target.value)}>
+                      {EV_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div className="form-row" style={{ gap: 8 }}>
+                  <div className="form-field" style={{ flex: 1 }}>
+                    <label className="form-label">Reference / version</label>
+                    <input className="form-input" placeholder="e.g. SOP-EQP-009 v3.1"
+                      value={newEv.ref} onChange={e => setNev('ref', e.target.value)} />
+                  </div>
+                  <div className="form-field" style={{ flex: 1 }}>
+                    <label className="form-label">Date</label>
+                    <input className="form-input" type="date" value={newEv.date} onChange={e => setNev('date', e.target.value)} />
+                  </div>
+                </div>
+                <div className="form-field">
+                  <label className="form-label">Notes <span style={{ fontWeight: 400, color: 'var(--ink-3)' }}>(optional)</span></label>
+                  <input className="form-input" placeholder="Version notes, expiry, caveats…"
+                    value={newEv.notes} onChange={e => setNev('notes', e.target.value)} />
+                </div>
+              </>)}
+
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleAddEvidence}
+                  disabled={evMode === 'docs' ? !pickedDoc : (!newEv.name.trim() || !newEv.ref.trim())}>
+                  <Icon name="check" size={13} />Link evidence
+                </button>
+                <button className="btn" onClick={() => { setAddEvOpen(false); setPickedDoc(null); setDocSearch(''); }}>Cancel</button>
               </div>
-              <div className="form-field" style={{ flex: 1 }}>
-                <label className="form-label">Date</label>
-                <input className="form-input" type="date" value={newEv.date} onChange={e => setNev('date', e.target.value)} />
-              </div>
-            </div>
-            <div className="form-field">
-              <label className="form-label">Notes <span style={{ fontWeight: 400, color: 'var(--ink-3)' }}>(optional)</span></label>
-              <input className="form-input" placeholder="Version notes, expiry, caveats…" value={newEv.notes} onChange={e => setNev('notes', e.target.value)} />
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleAddEvidence} disabled={!newEv.name.trim() || !newEv.ref.trim()}>
-                <Icon name="check" size={13} />Link evidence
-              </button>
-              <button className="btn" onClick={() => setAddEvOpen(false)}>Cancel</button>
             </div>
           </div>
         )}
