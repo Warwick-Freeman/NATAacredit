@@ -16,4 +16,5 @@ public class NexusDbContext(DbContextOptions<NexusDbContext> options) : DbContex
     public DbSet<AppUser> Users => Set<AppUser>();
     public DbSet<Appointment> Appointments => Set<Appointment>();
     public DbSet<SiteRoom> Rooms => Set<SiteRoom>();
+    public DbSet<SiteConfig> SiteConfig => Set<SiteConfig>();
 }

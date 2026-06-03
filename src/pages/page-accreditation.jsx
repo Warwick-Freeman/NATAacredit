@@ -4,6 +4,8 @@ import { PageHeader, Donut, Tabs, Pill, StatusPill, Drawer } from '../components
 import ClauseDrawer from '../clause-drawer';
 import { useTaskContext } from '../TaskContext';
 import { useAuth } from '../AuthContext';
+import { useNexusData } from '../NexusDataContext';
+import { getStdCfg } from '../standardConfig';
 
 const STATUS_KIND = { compliant: 'good', partial: 'warn', nc: 'bad', na: 'outline' };
 
@@ -246,10 +248,10 @@ tr:last-child td{border-bottom:none}
 
 <!-- Cover -->
 <div class="cover">
-  <div class="brand">Nexus 360 · NATA Accreditation</div>
+  <div class="brand">${stdCfg.reportBrand}</div>
   <h1>Self-Assessment Report</h1>
   <div class="sub">${D.service.name}</div>
-  <div class="standard">ASA Standard for Sleep Disorders Services — March 2019</div>
+  <div class="standard">${stdCfg.standardName} — ${stdCfg.standardVersion}</div>
   <div class="score-row">
     <div class="score-card total"><div class="n">${total}</div><div class="l">Total clauses</div></div>
     <div class="score-card good"><div class="n">${totalCompliant}</div><div class="l">Compliant</div></div>
@@ -305,7 +307,7 @@ ${gapClauses.length > 0 ? `
   <div style="font-size:13px;font-weight:700;margin-bottom:10px">Declaration</div>
   <p style="font-size:12px;color:#374151;line-height:1.6;margin-bottom:20px">
     I declare that this self-assessment report accurately reflects the current compliance status of
-    <strong>${D.service.name}</strong> against the ASA Standard for Sleep Disorders Services (March 2019)
+    <strong>${D.service.name}</strong> against the ${stdCfg.standardName} (${stdCfg.standardVersion})
     at the time of generation. All evidence referenced is current, available for assessor review, and
     has been verified by the nominated clause owners.
   </p>
@@ -346,6 +348,8 @@ ${gapClauses.length > 0 ? `
 const AccreditationPage = ({ data: D }) => {
   const { openCreateTask } = useTaskContext();
   const { user } = useAuth();
+  const { activeStandard } = useNexusData();
+  const stdCfg = getStdCfg(activeStandard);
 
   // Local clause state — seed with realistic linked evidence
   const [clauses,   setClauses]   = useState(() => D.clauses.map(c => ({
@@ -424,7 +428,7 @@ const AccreditationPage = ({ data: D }) => {
   return (
     <div className="page page-wide">
       <PageHeader
-        eyebrow="Compliance · ASA Standard for Sleep Disorders Services (Mar 2019)"
+        eyebrow={`Compliance · ${stdCfg.standardName} (${stdCfg.standardVersion})`}
         title="Accreditation workspace"
         subtitle="Every clause mapped to live evidence. Self-assessment status updates in real time."
         actions={
@@ -530,7 +534,12 @@ const AccreditationPage = ({ data: D }) => {
                   </div>
                   {sclause.map(c => (
                     <div key={c.id} className="clause-row" onClick={() => setDetailId(c.id)}>
-                      <span className="clause-id">{c.id}</span>
+                      <span className="clause-id">
+                        {c.id}
+                        {c.category === 'I' && (
+                          <span title="Category I — immediate cause for denial/revocation" style={{ marginLeft: 5, fontSize: 9, fontWeight: 700, color: 'var(--bad)', background: 'var(--bad-soft)', border: '1px solid var(--bad)', borderRadius: 3, padding: '1px 4px', verticalAlign: 'middle' }}>CAT I</span>
+                        )}
+                      </span>
                       <span className="clause-title">{c.title}</span>
                       <StatusPill status={c.status} />
                       <span className="clause-meta">

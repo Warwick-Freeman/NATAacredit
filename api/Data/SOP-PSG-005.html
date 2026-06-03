@@ -126,8 +126,6 @@
     border-color: #f0a99e;
     border-left-color: #c0392b;
   }
-.callout.nexus { background: #eef6ff; border: 1px solid #93c5fd; border-left: 4px solid #2563eb; padding: 8px 12px; margin: 10px 0; font-size: 10pt; }
-.callout.nexus strong { color: #1d4ed8; }
   .signoff {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
@@ -173,7 +171,7 @@
     <div class="title">Standard Operating Procedure</div>
     <div class="subtitle">Pre-Study Bio-Signal (Biocalibration) Verification - Adult and Paediatric Polysomnography</div>
     <div class="field"><strong>Document ID:</strong> SOP-PSG-005</div>
-    <div class="field"><strong>Revision:</strong> 1.1</div>
+    <div class="field"><strong>Revision:</strong> 1.0</div>
     <div class="field"><strong>Effective date:</strong> _____ / _____ / _______</div>
     <div class="field"><strong>Review date:</strong> _____ / _____ / _______</div>
     <div class="field"><strong>Authorised by:</strong> Medical Director / Tech Lead</div>
@@ -182,11 +180,6 @@
 
   <h2>1. Purpose <span class="clause-tag">ASA 5.3.4.2 / 5.5.5.3(a)</span></h2>
   <p>To verify, prior to each in-lab or ambulatory sleep study, that the polysomnographic recording system, sensors and associated channels are correctly applied and producing physiologically valid signals in accordance with the AASM Manual for the Scoring of Sleep and Associated Events (v2.5+) and the ASA Guidelines for Sleep Studies in Adults / ASTA-ASA Paediatric Addendum. The biocalibration ("biocal") is the patient-performed component of the equipment verification programme (ASA cl. 5.3.4).</p>
-
-  
-
-  <div class="callout nexus"><strong>&#x2139;&#xFE0F; Nexus 360 Integration:</strong> Steps in this procedure that are performed or supported by the Nexus 360 quality management system are identified with [Nexus 360] throughout this document. Staff must access Nexus 360 at <code>http://localhost:5173</code> to complete these steps. The system audit trail satisfies record-keeping requirements for all digitally recorded activities.</div>
-
 
   <h2>2. Scope</h2>
   <p>Applies to all attended Type 1 polysomnography (PSG), CPAP/PAP titration, MSLT/MWT, and unattended Type 2 home studies performed by the service in adult and paediatric patients. Where a patient is unable to cooperate (eg infant, severe cognitive impairment), the alternative qualitative verification described in Section 7 applies.</p>
@@ -389,14 +382,14 @@
   <h2>10. Quality Assurance <span class="clause-tag">ASA 5.5.5.3(f), 5.6.3</span></h2>
   <ul>
     <li>Biocal completion is mandatory and forms a quality indicator (target 100%, threshold &gt;= 98%/month).</li>
-    <li>Biocal failures that delay or abort a study are recorded as nonconformances in Nexus 360 NC &amp; CAPA module <span style="background:#dbeafe;color:#1d4ed8;font-size:8.5pt;padding:1px 5px;border-radius:3px;margin-left:4px;font-weight:600;">[Nexus 360]</span> and trended via the Nexus 360 Quality Indicators dashboard <span style="background:#dbeafe;color:#1d4ed8;font-size:8.5pt;padding:1px 5px;border-radius:3px;margin-left:4px;font-weight:600;">[Nexus 360]</span>.</li>
+    <li>Biocal failures that delay or abort a study are recorded as nonconformances (ASA 4.9) and trended quarterly.</li>
     <li>Senior Scientist/Technologist reviews 10% of biocals each month for completeness and signal quality.</li>
     <li>Trends suggesting equipment drift trigger an out-of-cycle verification per the Equipment Verification SOP.</li>
   </ul>
 
   <h2>11. Records <span class="clause-tag">ASA 4.13, 5.3.4.2</span></h2>
   <ul>
-    <li>Biocal worksheet (paper or electronic) attached to the patient study file; pre-study equipment verification status confirmed in Nexus 360 Equipment module <span style="background:#dbeafe;color:#1d4ed8;font-size:8.5pt;padding:1px 5px;border-radius:3px;margin-left:4px;font-weight:600;">[Nexus 360]</span>; study logged in Nexus 360 Studies &amp; Reports module <span style="background:#dbeafe;color:#1d4ed8;font-size:8.5pt;padding:1px 5px;border-radius:3px;margin-left:4px;font-weight:600;">[Nexus 360]</span>.</li>
+    <li>Biocal worksheet (paper or electronic) attached to the patient study file, including: study ID, three patient identifiers, date, time, technologist ID, impedance values, step-by-step pass/fail or signal-quality grading, deviations, corrective actions.</li>
     <li>Retention: with the polysomnography record per the service Records Retention Policy.</li>
     <li>Corrections per ASA 4.13.2.7 (cross-out, initial, date - no destructive edits).</li>
   </ul>
@@ -426,10 +419,8 @@
     </div>
   </div>
 
-  
-  <div class="callout" style="margin-top:16px;font-size:9.5pt;"><strong>Revision history:</strong> Rev 1.1 (May 2026) — Updated to reflect Nexus 360 quality management system integration. Steps supported by Nexus 360 are identified throughout.</div>
   <div class="footer">
-    Controlled document - uncontrolled when printed. SOP-PSG-005 Rev 1.1 - Page 1 of 1.
+    Controlled document - uncontrolled when printed. SOP-PSG-005 Rev 1.0 - Page 1 of 1.
   </div>
 
 </div>

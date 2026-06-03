@@ -22,8 +22,6 @@ th, td { border: 1px solid #c5cfdb; padding: 6px 8px; text-align: left; vertical
 th { background: #eef3f9; color: #14406b; font-weight: 600; }
 .callout { background: #fff7e0; border: 1px solid #f0d27e; border-left: 4px solid #d49b1c; padding: 8px 12px; margin: 10px 0; font-size: 10pt; }
 .callout.warn { background: #fdecea; border-color: #f0a99e; border-left-color: #c0392b; }
-.callout.nexus { background: #eef6ff; border: 1px solid #93c5fd; border-left: 4px solid #2563eb; padding: 8px 12px; margin: 10px 0; font-size: 10pt; }
-.callout.nexus strong { color: #1d4ed8; }
 .signoff { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 14px; }
 .sign-cell { border: 1px solid #c5cfdb; padding: 8px; min-height: 60px; font-size: 9.5pt; color: #506478; }
 .sign-cell strong { color: #1f2933; }
@@ -46,7 +44,7 @@ th { background: #eef3f9; color: #14406b; font-weight: 600; }
     <div class="title">Document Control</div>
     <div class="subtitle">Creation, approval, issue, review, change and obsolescence of controlled documents</div>
     <div class="field"><strong>Document ID:</strong> SOP-QMS-002</div>
-    <div class="field"><strong>Revision:</strong> 1.1</div>
+    <div class="field"><strong>Revision:</strong> 1.0</div>
     <div class="field"><strong>Effective date:</strong> _____ / _____ / _______</div>
     <div class="field"><strong>Review date:</strong> _____ / _____ / _______</div>
     <div class="field"><strong>Authorised by:</strong> Quality Manager</div>
@@ -55,11 +53,6 @@ th { background: #eef3f9; color: #14406b; font-weight: 600; }
 
   <h2>1. Purpose <span class="clause-tag">ASA 4.3</span></h2>
   <p>To ensure all documents that form the management system are uniquely identified, approved before issue, current at point of use, and removed or marked when obsolete.</p>
-
-  
-
-  <div class="callout nexus"><strong>&#x2139;&#xFE0F; Nexus 360 Integration:</strong> Steps in this procedure that are performed or supported by the Nexus 360 quality management system are identified with [Nexus 360] throughout this document. Staff must access Nexus 360 at <code>http://localhost:5173</code> to complete these steps. The system audit trail satisfies record-keeping requirements for all digitally recorded activities.</div>
-
 
   <h2>2. Scope</h2>
   <p>Applies to internally generated and externally sourced documents including policies, SOPs, forms, equipment manuals, software, templates, calibration records, informational documents and educational guides, in any media (paper or electronic).</p>
@@ -77,22 +70,22 @@ th { background: #eef3f9; color: #14406b; font-weight: 600; }
 
   <h2>5. Procedure</h2>
   <h3>5.1 Drafting</h3>
-  <p>Document Owner drafts using the approved HTML template; initiates a Document Change Request via the Nexus 360 document workflow <span style="background:#dbeafe;color:#1d4ed8;font-size:8.5pt;padding:1px 5px;border-radius:3px;margin-left:4px;font-weight:600;">[Nexus 360]</span> (FRM-027 is used only when Nexus 360 is unavailable).</p>
+  <p>Document Owner drafts using the approved HTML template; raises FRM-027 Document Change Request for any new or revised document.</p>
   <h3>5.2 Review</h3>
-  <p>Reviewer checks content, ASA-clause alignment and consistency with related documents; reviewer actions are tracked in the Nexus 360 document workflow <span style="background:#dbeafe;color:#1d4ed8;font-size:8.5pt;padding:1px 5px;border-radius:3px;margin-left:4px;font-weight:600;">[Nexus 360]</span>; comments returned to Owner.</p>
+  <p>Reviewer checks content, ASA-clause alignment and consistency with related documents; comments returned to Owner.</p>
   <h3>5.3 Approval & Issue</h3>
-  <p>Authoriser signs; Quality Manager assigns the revision number, updates the master register in Nexus 360 <span style="background:#dbeafe;color:#1d4ed8;font-size:8.5pt;padding:1px 5px;border-radius:3px;margin-left:4px;font-weight:600;">[Nexus 360]</span>, distributes the controlled copy and withdraws the prior version.</p>
+  <p>Authoriser signs; Quality Manager assigns the revision number, updates the master register, distributes the controlled copy and withdraws the prior version.</p>
   <h3>5.4 Periodic Review</h3>
-  <p>Default review cycle 24 months. Nexus 360 generates review-due alerts automatically <span style="background:#dbeafe;color:#1d4ed8;font-size:8.5pt;padding:1px 5px;border-radius:3px;margin-left:4px;font-weight:600;">[Nexus 360]</span> to owners 60 days before due date. Even where no change is required, the review is documented.</p>
+  <p>Default review cycle 24 months. The QMS calendar alerts owners 60 days before due date. Even where no change is required, the review is documented.</p>
   <h3>5.5 Hand Amendment</h3>
   <p>Where a document is amended by hand pending re-issue, the change is initialled and dated by the Authoriser; the amended copy is treated as current and a re-issue is scheduled within 30 days.</p>
   <h3>5.6 Obsolescence</h3>
   <p>Withdrawn documents are removed from points of use. Copies retained for legal or knowledge purposes are watermarked "OBSOLETE - REFERENCE ONLY".</p>
   <h3>5.7 Electronic Documents</h3>
-  <p>Nexus 360 is the authoritative QMS repository <span style="background:#dbeafe;color:#1d4ed8;font-size:8.5pt;padding:1px 5px;border-radius:3px;margin-left:4px;font-weight:600;">[Nexus 360]</span>; changes to electronic templates and computerised forms follow the same workflow with version control; access permissions restrict editing to Document Owners. Staff access only current approved versions via Nexus 360.</p>
+  <p>Changes to electronic templates and computerised forms follow the same workflow with version control in the QMS repository; access permissions restrict editing to Document Owners.</p>
 
   <h2>6. Records</h2>
-  <p>Master controlled-document register maintained in Nexus 360 Documents &amp; SOPs module <span style="background:#dbeafe;color:#1d4ed8;font-size:8.5pt;padding:1px 5px;border-radius:3px;margin-left:4px;font-weight:600;">[Nexus 360]</span>; Document Change Request workflow records in Nexus 360; FRM-027 used only when system unavailable; periodic review records; distribution log.</p>
+  <p>Master controlled-document register; FRM-027 Document Change Requests; periodic review records; distribution log.</p>
 
   <h2>7. References</h2>
   <p>ASA Standard cl. 4.3.1 - 4.3.3.2.</p>
@@ -103,9 +96,7 @@ th { background: #eef3f9; color: #14406b; font-weight: 600; }
     <div class="sign-cell"><strong>Reviewed by (Quality Manager)</strong><br>Name:<br>Signature / Date:</div>
     <div class="sign-cell"><strong>Authorised by (Quality Manager)</strong><br>Name:<br>Signature / Date:</div>
   </div>
-  
-  <div class="callout" style="margin-top:16px;font-size:9.5pt;"><strong>Revision history:</strong> Rev 1.1 (May 2026) — Updated to reflect Nexus 360 quality management system integration. Steps supported by Nexus 360 are identified throughout.</div>
-  <div class="footer">Controlled document - uncontrolled when printed. SOP-QMS-002 Rev 1.1 - Page 1 of 1.</div>
+  <div class="footer">Controlled document - uncontrolled when printed. SOP-QMS-002 Rev 1.0 - Page 1 of 1.</div>
 </div>
 </body>
 </html>

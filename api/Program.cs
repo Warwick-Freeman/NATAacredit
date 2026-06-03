@@ -99,15 +99,32 @@ using (var scope = app.Services.CreateScope())
         )
         """);
 
+    db.Database.ExecuteSqlRaw("""
+        CREATE TABLE IF NOT EXISTS SiteConfig (
+            Key   TEXT PRIMARY KEY,
+            Value TEXT NOT NULL DEFAULT ''
+        )
+        """);
+
     // Add columns introduced after initial schema creation (idempotent)
     foreach (var col in new[] {
         "ALTER TABLE Activity ADD COLUMN Ts        TEXT NOT NULL DEFAULT ''",
         "ALTER TABLE Activity ADD COLUMN Module    TEXT NOT NULL DEFAULT ''",
         "ALTER TABLE Activity ADD COLUMN Detail    TEXT NOT NULL DEFAULT ''",
         "ALTER TABLE Appointments ADD COLUMN PatientId TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE Clauses ADD COLUMN Standard TEXT NOT NULL DEFAULT 'asa'",
+        "ALTER TABLE Clauses ADD COLUMN Category TEXT",
+        "ALTER TABLE ComplianceSections ADD COLUMN Standard TEXT NOT NULL DEFAULT 'asa'",
     })
     {
         try { db.Database.ExecuteSqlRaw(col); } catch { /* column already exists */ }
+    }
+
+    // Seed default config if not present
+    if (!db.SiteConfig.Any(c => c.Key == "standard"))
+    {
+        db.SiteConfig.Add(new NexusApi.Models.SiteConfig { Key = "standard", Value = "asa" });
+        db.SaveChanges();
     }
 
     db.Database.ExecuteSqlRaw("""
@@ -250,11 +267,41 @@ app.MapPatch("/api/studies/{id}/status", async (string id, StudyStatusDto dto, N
 
 app.MapGet("/api/equipment",   async (NexusDbContext db) => await db.Equipment.ToListAsync()).RequireAuthorization();
 app.MapGet("/api/indicators",  async (NexusDbContext db) => await db.Indicators.ToListAsync()).RequireAuthorization();
-app.MapGet("/api/clauses",     async (NexusDbContext db) => await db.Clauses.ToListAsync()).RequireAuthorization();
+app.MapGet("/api/config", async (NexusDbContext db) =>
+{
+    var entries = await db.SiteConfig.ToListAsync();
+    return Results.Ok(entries.ToDictionary(e => e.Key, e => e.Value));
+}).RequireAuthorization();
+
+app.MapPost("/api/config/standard", async (StandardSwitchDto dto, NexusDbContext db, IWebHostEnvironment env) =>
+{
+    if (dto.Value != "asa" && dto.Value != "aasm") return Results.BadRequest("Unknown standard");
+
+    var cfg = await db.SiteConfig.FindAsync("standard");
+    if (cfg == null) db.SiteConfig.Add(new NexusApi.Models.SiteConfig { Key = "standard", Value = dto.Value });
+    else cfg.Value = dto.Value;
+
+    var standardsDir = Path.Combine(env.ContentRootPath, "Standards");
+    var jsonPath      = Path.Combine(standardsDir, $"{dto.Value}.json");
+    SeedData.SeedStandardIfNeeded(db, dto.Value, jsonPath);
+
+    await db.SaveChangesAsync();
+    return Results.Ok(new { standard = dto.Value });
+}).RequireAuthorization();
+
+app.MapGet("/api/clauses", async (NexusDbContext db) =>
+{
+    var std = (await db.SiteConfig.FindAsync("standard"))?.Value ?? "asa";
+    return await db.Clauses.Where(c => c.Standard == std).ToListAsync();
+}).RequireAuthorization();
 app.MapGet("/api/clauses/{id}", async (string id, NexusDbContext db) =>
     await db.Clauses.FirstOrDefaultAsync(c => c.ClauseId == id)
         is { } clause ? Results.Ok(clause) : Results.NotFound()).RequireAuthorization();
-app.MapGet("/api/compliance",  async (NexusDbContext db) => await db.ComplianceSections.ToListAsync()).RequireAuthorization();
+app.MapGet("/api/compliance", async (NexusDbContext db) =>
+{
+    var std = (await db.SiteConfig.FindAsync("standard"))?.Value ?? "asa";
+    return await db.ComplianceSections.Where(s => s.Standard == std).ToListAsync();
+}).RequireAuthorization();
 app.MapGet("/api/tasks",       async (NexusDbContext db) => await db.Tasks.ToListAsync()).RequireAuthorization();
 app.MapGet("/api/activity", async (NexusDbContext db) =>
 {
@@ -567,3 +614,5 @@ record AppointmentDto(
     string? RoomId, string? EquipmentId,
     string? Physician, string? Technician,
     string? Notes, string? Status);
+
+record StandardSwitchDto(string Value);

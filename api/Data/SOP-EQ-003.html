@@ -22,8 +22,6 @@ th, td { border: 1px solid #c5cfdb; padding: 6px 8px; text-align: left; vertical
 th { background: #eef3f9; color: #14406b; font-weight: 600; }
 .callout { background: #fff7e0; border: 1px solid #f0d27e; border-left: 4px solid #d49b1c; padding: 8px 12px; margin: 10px 0; font-size: 10pt; }
 .callout.warn { background: #fdecea; border-color: #f0a99e; border-left-color: #c0392b; }
-.callout.nexus { background: #eef6ff; border: 1px solid #93c5fd; border-left: 4px solid #2563eb; padding: 8px 12px; margin: 10px 0; font-size: 10pt; }
-.callout.nexus strong { color: #1d4ed8; }
 .signoff { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 14px; }
 .sign-cell { border: 1px solid #c5cfdb; padding: 8px; min-height: 60px; font-size: 9.5pt; color: #506478; }
 .sign-cell strong { color: #1f2933; }
@@ -46,7 +44,7 @@ th { background: #eef3f9; color: #14406b; font-weight: 600; }
     <div class="title">Equipment Maintenance, Repair & Decontamination</div>
     <div class="subtitle">Preventive maintenance, fault management, repair and decommissioning</div>
     <div class="field"><strong>Document ID:</strong> SOP-EQ-003</div>
-    <div class="field"><strong>Revision:</strong> 1.1</div>
+    <div class="field"><strong>Revision:</strong> 1.0</div>
     <div class="field"><strong>Effective date:</strong> _____ / _____ / _______</div>
     <div class="field"><strong>Review date:</strong> _____ / _____ / _______</div>
     <div class="field"><strong>Authorised by:</strong> Senior Scientist/Technologist</div>
@@ -56,13 +54,8 @@ th { background: #eef3f9; color: #14406b; font-weight: 600; }
   <h2>1. Purpose <span class="clause-tag">ASA 5.3.5</span></h2>
   <p>To maintain equipment in safe working condition, manage defects, ensure repaired equipment is re-verified before use, and decontaminate equipment when removed from service.</p>
 
-  
-
-  <div class="callout nexus"><strong>&#x2139;&#xFE0F; Nexus 360 Integration:</strong> Steps in this procedure that are performed or supported by the Nexus 360 quality management system are identified with [Nexus 360] throughout this document. Staff must access Nexus 360 at <code>http://localhost:5173</code> to complete these steps. The system audit trail satisfies record-keeping requirements for all digitally recorded activities.</div>
-
-
   <h2>2. Preventive Maintenance</h2>
-  <p>A documented preventive maintenance schedule follows manufacturer instructions at minimum. Schedule and maintenance records maintained in Nexus 360 Equipment Register <span style="background:#dbeafe;color:#1d4ed8;font-size:8.5pt;padding:1px 5px;border-radius:3px;margin-left:4px;font-weight:600;">[Nexus 360]</span>; overdue items generate automatic alerts in Nexus 360.</p>
+  <p>A documented preventive maintenance schedule follows manufacturer instructions at minimum. Schedule maintained in equipment register; due/overdue items flagged.</p>
 
   <h2>3. Fault Management</h2>
   <ol>
@@ -73,13 +66,13 @@ th { background: #eef3f9; color: #14406b; font-weight: 600; }
   </ol>
 
   <h2>4. Decontamination</h2>
-  <p>Reasonable measures taken to decontaminate equipment prior to service, repair or decommissioning. Personal protective equipment supplied. Decontamination logged; device return from HST has checklist recorded in Nexus 360 Home Sleep Testing module <span style="background:#dbeafe;color:#1d4ed8;font-size:8.5pt;padding:1px 5px;border-radius:3px;margin-left:4px;font-weight:600;">[Nexus 360]</span>.</p>
+  <p>Reasonable measures taken to decontaminate equipment prior to service, repair or decommissioning. Personal protective equipment supplied. Decontamination logged.</p>
 
   <h2>5. Loaned/External Equipment</h2>
   <p>When equipment is removed from direct control (eg sent to vendor), performance is verified before being returned to use.</p>
 
   <h2>6. Records</h2>
-  <p>Maintenance schedule and logs maintained in Nexus 360 Equipment Register <span style="background:#dbeafe;color:#1d4ed8;font-size:8.5pt;padding:1px 5px;border-radius:3px;margin-left:4px;font-weight:600;">[Nexus 360]</span>; repair records; decontamination logs; NC links in Nexus 360 NC &amp; CAPA module <span style="background:#dbeafe;color:#1d4ed8;font-size:8.5pt;padding:1px 5px;border-radius:3px;margin-left:4px;font-weight:600;">[Nexus 360]</span>.</p>
+  <p>Maintenance schedule and logs; repair records; decontamination logs; NC links.</p>
 
   <h2>7. References</h2>
   <p>ASA Standard cl. 5.3.5.</p>
@@ -90,9 +83,7 @@ th { background: #eef3f9; color: #14406b; font-weight: 600; }
     <div class="sign-cell"><strong>Reviewed by (Quality Manager)</strong><br>Name:<br>Signature / Date:</div>
     <div class="sign-cell"><strong>Authorised by (Senior Scientist/Technologist)</strong><br>Name:<br>Signature / Date:</div>
   </div>
-  
-  <div class="callout" style="margin-top:16px;font-size:9.5pt;"><strong>Revision history:</strong> Rev 1.1 (May 2026) — Updated to reflect Nexus 360 quality management system integration. Steps supported by Nexus 360 are identified throughout.</div>
-  <div class="footer">Controlled document - uncontrolled when printed. SOP-EQ-003 Rev 1.1 - Page 1 of 1.</div>
+  <div class="footer">Controlled document - uncontrolled when printed. SOP-EQ-003 Rev 1.0 - Page 1 of 1.</div>
 </div>
 </body>
 </html>

@@ -558,4 +558,56 @@ public static class SeedData
         db.Appointments.AddRange(appts);
         db.SaveChanges();
     }
+
+    public static void SeedStandardIfNeeded(NexusDbContext db, string standardId, string jsonPath)
+    {
+        if (db.Clauses.Any(c => c.Standard == standardId)) return;
+        if (!File.Exists(jsonPath)) return;
+
+        var json    = File.ReadAllText(jsonPath);
+        var opts    = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+        var config  = JsonSerializer.Deserialize<StandardConfig>(json, opts)!;
+
+        var sectionMap = config.Sections.ToDictionary(s => s.Id, s => s.Title);
+
+        foreach (var c in config.Clauses)
+        {
+            db.Clauses.Add(new NexusApi.Models.Clause
+            {
+                ClauseId     = c.ClauseId,
+                Title        = c.Title,
+                Section      = c.Section,
+                Category     = c.Category,
+                Standard     = standardId,
+                Status       = "review",
+                Evidence     = 0,
+                LastReviewed = "",
+                Owner        = "",
+            });
+        }
+
+        foreach (var s in config.Sections)
+        {
+            var total = config.Clauses.Count(c => c.Section == s.Id);
+            db.ComplianceSections.Add(new NexusApi.Models.ComplianceSection
+            {
+                Section  = s.Id,
+                Title    = s.Title,
+                Standard = standardId,
+                Total    = total,
+                Ok       = 0,
+                Nc       = 0,
+                Na       = 0,
+                Status   = "review",
+            });
+        }
+
+        db.SaveChanges();
+    }
+
+    private record StandardConfig(
+        string Id, string Name, string Version, string Jurisdiction,
+        List<StandardSection> Sections, List<StandardClause> Clauses);
+    private record StandardSection(string Id, string Title);
+    private record StandardClause(string ClauseId, string Title, string Section, string? Category);
 }

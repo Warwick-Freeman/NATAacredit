@@ -77,6 +77,8 @@ function normaliseClause(c) {
     lastReviewed: c.lastReviewed,
     owner: c.owner,
     notes: '',
+    category: c.category ?? null,
+    standard: c.standard ?? 'asa',
   };
 }
 
@@ -195,6 +197,21 @@ export async function updateAppointment(id, data) {
 export async function deleteAppointment(id) {
   const res = await fetch(`${BASE}/api/appointments/${id}`, { method: 'DELETE', headers: authHeaders() });
   if (!res.ok) throw new Error(`API error ${res.status}`);
+}
+
+export async function fetchConfig() {
+  return get('/api/config');
+}
+
+export async function switchStandard(value) {
+  const res = await fetch(`${BASE}/api/config/standard`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ value }),
+  });
+  if (res.status === 401) { clearSessionAndReload(); return; }
+  if (!res.ok) throw new Error(`API error ${res.status}`);
+  return res.json();
 }
 
 export async function fetchAll() {

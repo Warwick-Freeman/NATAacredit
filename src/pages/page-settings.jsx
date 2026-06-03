@@ -4,6 +4,7 @@ import { PageHeader, Pill, Avatar, Tabs, Drawer } from '../components';
 import { useAuth, ROLE_LEVEL, ROLE_PERMISSIONS } from '../AuthContext';
 import UserFormDrawer from '../user-form-drawer';
 import { useNexusData } from '../NexusDataContext';
+import { getStdCfg } from '../standardConfig';
 import { fetchRooms, createRoom, updateRoom, deleteRoom } from '../api';
 
 // ─── Toggle switch ─────────────────────────────────────────────────────────────
@@ -83,7 +84,8 @@ const PERM_LABELS = {
 
 const SettingsPage = () => {
   const { user, users, hasPerm, addUser, updateUser } = useAuth();
-  const { assessmentDate, setAssessmentDate } = useNexusData();
+  const { assessmentDate, setAssessmentDate, activeStandard, changeStandard } = useNexusData();
+  const stdCfg = getStdCfg(activeStandard);
   const [tab, setTab] = useState('service');
 
   // Users
@@ -149,6 +151,10 @@ const SettingsPage = () => {
   const [addIpOpen, setAddIpOpen] = useState(false);
   const [newIp, setNewIp] = useState('');
   const [savedToast, setSavedToast] = useState(false);
+
+  // Standard switcher
+  const [confirmStandard, setConfirmStandard] = useState(null);
+  const [switchingStandard, setSwitchingStandard] = useState(false);
 
   const canInvite = hasPerm('canInviteUsers');
   const canManage = hasPerm('canManageUsers');
@@ -256,6 +262,17 @@ const SettingsPage = () => {
     setTimeout(() => setSavedToast(false), 2500);
   }
 
+  async function handleSwitchStandard(value) {
+    setSwitchingStandard(true);
+    setConfirmStandard(null);
+    try {
+      await changeStandard(value);
+      showSaved();
+    } finally {
+      setSwitchingStandard(false);
+    }
+  }
+
   const pendingIntName = integrations.find(i => i.id === pendingOff)?.name;
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -309,7 +326,7 @@ const SettingsPage = () => {
                 ['ABN',          'abn',   true],
                 ['HPI-O',        'hpio',  true],
                 ['Host institution', 'host', true],
-                ['NATA cert no.', 'nata', false],
+                [stdCfg.certLabel, 'nata', false],
                 ['Accredited since', 'since', false],
               ].map(([label, key, editable]) => (
                 <div key={key} style={{ display: 'flex', alignItems: 'center', padding: '9px 0', borderBottom: '1px solid var(--border)' }}>
@@ -519,11 +536,71 @@ const SettingsPage = () => {
           </div>
         </div>
 
+        {/* Accreditation Standard */}
+        <div className="card" style={{ marginTop: 16 }}>
+          <div className="card-head">
+            <div>
+              <div className="card-title">Accreditation standard</div>
+              <div className="card-sub">Switches the clause set, compliance sections, and evidence framework</div>
+            </div>
+          </div>
+          <div className="card-pad">
+            {confirmStandard && (
+              <div className="banner" style={{ background: 'var(--warn-soft)', border: '1px solid var(--warn)', borderRadius: 8, marginBottom: 16, display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                <Icon name="alert" size={18} style={{ color: 'var(--warn)', flexShrink: 0, marginTop: 1 }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 500, fontSize: 13 }}>
+                    Switch to {confirmStandard === 'aasm' ? 'AASM (US)' : 'ASA (Australian)'} standard?
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--ink-2)', marginTop: 3 }}>
+                    The accreditation workspace will reload with the {confirmStandard === 'aasm' ? '91 AASM standards' : 'ASA clause set'}.
+                    Your existing evidence and status records for each standard are preserved separately.
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                  <button className="btn" onClick={() => setConfirmStandard(null)}>Cancel</button>
+                  <button className="btn btn-primary" onClick={() => handleSwitchStandard(confirmStandard)} disabled={switchingStandard}>
+                    {switchingStandard ? 'Switching…' : 'Switch'}
+                  </button>
+                </div>
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+              {[
+                { id: 'asa',  label: 'ASA Standard',       sub: 'Australian · NATA accreditation', flag: '🇦🇺' },
+                { id: 'aasm', label: 'AASM Standards',      sub: 'United States · 91 standards',     flag: '🇺🇸' },
+              ].map(s => {
+                const active = activeStandard === s.id;
+                return (
+                  <div
+                    key={s.id}
+                    onClick={() => !active && !switchingStandard && setConfirmStandard(s.id)}
+                    style={{
+                      border: `2px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
+                      borderRadius: 10, padding: '14px 18px', minWidth: 200, flex: 1,
+                      background: active ? 'var(--accent-soft)' : 'var(--surface)',
+                      cursor: active || switchingStandard ? 'default' : 'pointer',
+                      transition: 'border-color 0.15s, background 0.15s',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                      <span style={{ fontSize: 20 }}>{s.flag}</span>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: active ? 'var(--accent-ink)' : 'var(--ink-1)' }}>{s.label}</div>
+                      {active && <Pill kind="accent" style={{ marginLeft: 'auto' }}>Active</Pill>}
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{s.sub}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
         {/* NATA Assessment Schedule */}
         <div className="card" style={{ marginTop: 16 }}>
           <div className="card-head">
             <div>
-              <div className="card-title">NATA assessment schedule</div>
+              <div className="card-title">{stdCfg.bodyName} assessment schedule</div>
               <div className="card-sub">Sets the countdown on the home page and accreditation workspace</div>
             </div>
           </div>

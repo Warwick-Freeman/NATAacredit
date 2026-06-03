@@ -49,7 +49,7 @@ const App = () => {
     return () => document.removeEventListener('keydown', handler);
   }, []);
 
-  const { data, loading, error, refreshData } = useNexusData();
+  const { data, loading, error, refreshData, activeStandard } = useNexusData();
 
   const goTo = (r) => { setRoute(r); setSidebarOpen(false); window.scrollTo({ top: 0 }); };
 
@@ -90,7 +90,7 @@ const App = () => {
 
       const days = data.service?.daysToAssessment;
       if (days != null && days >= 0 && days < 90)
-        items.push({ kind: days < 30 ? 'bad' : 'warn', icon: 'shield', title: `NATA assessment in ${days} day${days !== 1 ? 's' : ''}`, sub: `Scheduled: ${data.service.nextAssessment}`, page: 'accreditation' });
+        items.push({ kind: days < 30 ? 'bad' : 'warn', icon: 'shield', title: `${activeStandard === 'aasm' ? 'AASM' : 'NATA'} assessment in ${days} day${days !== 1 ? 's' : ''}`, sub: `Scheduled: ${data.service.nextAssessment}`, page: 'accreditation' });
     }
 
     return items;

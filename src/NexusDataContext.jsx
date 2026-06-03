@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { fetchAll } from './api';
+import { fetchAll, fetchConfig, switchStandard } from './api';
 
 const DEFAULT_DATE = '2026-08-12';
 const STORAGE_KEY  = 'nexus_assessment_date';
@@ -26,6 +26,7 @@ export function NexusDataProvider({ children }) {
   const [data,    setData]    = useState(null);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState(null);
+  const [activeStandard, setActiveStandard] = useState('asa');
   const [assessmentDate, setAssessmentDateState] = useState(
     () => localStorage.getItem(STORAGE_KEY) ?? DEFAULT_DATE
   );
@@ -35,28 +36,29 @@ export function NexusDataProvider({ children }) {
     localStorage.setItem(STORAGE_KEY, iso);
   };
 
-  useEffect(() => {
-    if (!localStorage.getItem('nexus_token')) { setLoading(false); return; }
-    fetchAll()
-      .then(setData)
+  const loadAll = () =>
+    Promise.all([fetchAll(), fetchConfig()])
+      .then(([d, cfg]) => { setData(d); setActiveStandard(cfg?.standard ?? 'asa'); })
       .catch(err => setError(err.message))
       .finally(() => setLoading(false));
+
+  useEffect(() => {
+    if (!localStorage.getItem('nexus_token')) { setLoading(false); return; }
+    loadAll();
   }, []);
 
   useEffect(() => {
-    function handleSignIn() {
-      setLoading(true);
-      fetchAll()
-        .then(setData)
-        .catch(err => setError(err.message))
-        .finally(() => setLoading(false));
-    }
+    function handleSignIn() { setLoading(true); loadAll(); }
     window.addEventListener('nexus:signIn', handleSignIn);
     return () => window.removeEventListener('nexus:signIn', handleSignIn);
   }, []);
 
-  const refreshData = () => {
-    fetchAll().then(setData).catch(() => {});
+  const refreshData = () => { loadAll(); };
+
+  const changeStandard = async (value) => {
+    await switchStandard(value);
+    setLoading(true);
+    loadAll();
   };
 
   const patchedData = data ? {
@@ -69,7 +71,7 @@ export function NexusDataProvider({ children }) {
   } : null;
 
   return (
-    <NexusDataContext.Provider value={{ data: patchedData, loading, error, assessmentDate, setAssessmentDate, refreshData }}>
+    <NexusDataContext.Provider value={{ data: patchedData, loading, error, assessmentDate, setAssessmentDate, refreshData, activeStandard, changeStandard }}>
       {children}
     </NexusDataContext.Provider>
   );

@@ -5,7 +5,7 @@
 param([switch]$Reseed)
 
 $ErrorActionPreference = 'Stop'
-$KeyPath = "C:\Users\wef.CMPHQ\NATAacredit\Hosting\N360Accredit.pem"
+$KeyPath = "$PSScriptRoot\..\Hosting\N360Accredit.pem"
 $server = "ubuntu@18.221.101.26"
 
 Write-Host "==> Building frontend..."

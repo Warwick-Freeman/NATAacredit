@@ -56,6 +56,8 @@ public class Clause
     public int Evidence { get; set; }
     public string LastReviewed { get; set; } = "";
     public string Owner { get; set; } = "";
+    public string Standard { get; set; } = "asa";
+    public string? Category { get; set; }
 }
 
 public class ComplianceSection
@@ -68,6 +70,14 @@ public class ComplianceSection
     public int Nc { get; set; }
     public int Na { get; set; }
     public string Status { get; set; } = "";
+    public string Standard { get; set; } = "asa";
+}
+
+public class SiteConfig
+{
+    [System.ComponentModel.DataAnnotations.Key]
+    public string Key { get; set; } = "";
+    public string Value { get; set; } = "";
 }
 
 public class NexusTask

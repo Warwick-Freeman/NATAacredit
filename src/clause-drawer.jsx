@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import Icon from './icons';
 import { Avatar, StatusPill, Pill } from './components';
 import { useTaskContext } from './TaskContext';
+import { useNexusData } from './NexusDataContext';
+import { getStdCfg } from './standardConfig';
 
 // Full requirement text for all seeded clauses
 const REQUIREMENT = {
@@ -73,6 +75,8 @@ const EvidenceItem = ({ item, onOpen }) => (
 
 const ClauseDrawer = ({ data, clauseId, onClose, onUpdate }) => {
   const { openCreateTask } = useTaskContext();
+  const { activeStandard } = useNexusData();
+  const stdCfg = getStdCfg(activeStandard);
 
   if (!clauseId || !data) return null;
   const clause = data.clauses.find(c => c.id === clauseId) || {
@@ -80,8 +84,7 @@ const ClauseDrawer = ({ data, clauseId, onClose, onUpdate }) => {
     status: 'compliant', evidence: 0, linkedEvidence: [], lastReviewed: '—', owner: '—', notes: '',
   };
 
-  const requirementText = REQUIREMENT[clause.id] ||
-    'Reference clause text from ASA Standard for Sleep Disorders Services (March 2019). Click "Open in standard" to read the full normative text and notes.';
+  const requirementText = REQUIREMENT[clause.id] || stdCfg.defaultReqText;
 
   // Panel mode: null | 'standard' | 'doc' (document viewer)
   const [panel,      setPanel]    = useState(null);
@@ -146,7 +149,7 @@ const ClauseDrawer = ({ data, clauseId, onClose, onUpdate }) => {
         <div className="drawer-head">
           <button className="icon-btn" onClick={() => setPanel(null)} title="Back"><Icon name="chev_left" size={14} /></button>
           <div style={{ flex: 1, marginLeft: 8 }}>
-            <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 2 }}>ASA Standard for Sleep Disorders Services · March 2019</div>
+            <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 2 }}>{stdCfg.standardName} · {stdCfg.standardVersion}</div>
             <div style={{ fontSize: 15, fontWeight: 600 }}>cl. {clause.id} — {clause.title}</div>
           </div>
           <button className="icon-btn" onClick={onClose}><Icon name="x" size={14} /></button>
@@ -155,8 +158,7 @@ const ClauseDrawer = ({ data, clauseId, onClose, onUpdate }) => {
           <div style={{ display: 'flex', gap: 10, marginBottom: 18, padding: 12, background: 'var(--surface-2)', borderRadius: 8, alignItems: 'flex-start' }}>
             <Icon name="book" size={16} style={{ color: 'var(--accent-ink)', flexShrink: 0, marginTop: 2 }} />
             <div style={{ fontSize: 12, color: 'var(--ink-3)', lineHeight: 1.5 }}>
-              Reproduced for internal reference from the <strong>ASA Standard for Sleep Disorders Services</strong> (NATA / RCPA / AASM–ANZ · March 2019 edition).
-              Not for redistribution.
+              {stdCfg.drawerAttrib}
             </div>
           </div>
 
@@ -174,7 +176,7 @@ const ClauseDrawer = ({ data, clauseId, onClose, onUpdate }) => {
             {clause.id === '5.1.4' && 'Annual recertification must be with a NATA-approved provider. For paediatric services, evidence of paediatric-specific BLS training is required for all staff who work in paediatric labs, including reception staff who may be present during studies. Online-only BLS is not accepted.'}
             {clause.id === '4.5.2' && 'The register must include: subcontractor name, ABN, scope of services, evidence of accreditation or competency (current), and date of last review. Written agreements must cover confidentiality, quality requirements, and reporting obligations. Review annually or when a new subcontractor is engaged.'}
             {clause.id === '5.8.1' && 'The 10 business-day window runs from patient contact (study night) to dispatch of the final report to the referring clinician. Preliminary reports do not satisfy this requirement. The service must track SLA compliance as a quality indicator and report it at management review.'}
-            {!['5.3.4','5.1.4','4.5.2','5.8.1'].includes(clause.id) && 'Refer to the current edition of the ASA Standard for detailed implementation guidance, normative references, and informative notes. Assessors will request evidence of documented procedures and records demonstrating compliance.'}
+            {!['5.3.4','5.1.4','4.5.2','5.8.1'].includes(clause.id) && stdCfg.implNote}
           </div>
 
           {crossRefs.length > 0 && (
@@ -189,7 +191,7 @@ const ClauseDrawer = ({ data, clauseId, onClose, onUpdate }) => {
           )}
 
           <div style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 8, padding: 12, background: 'var(--surface-2)', borderRadius: 8 }}>
-            ASA Standard for Sleep Disorders Services (March 2019) · Published by NATA · © National Association of Testing Authorities, Australia · Internal use only
+            {stdCfg.publisher}
           </div>
         </div>
       </div>
@@ -287,7 +289,7 @@ const ClauseDrawer = ({ data, clauseId, onClose, onUpdate }) => {
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <div className="drawer-head">
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 2 }}>ASA Standard · Section {clause.section}</div>
+          <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 2 }}>{stdCfg.standardShort} · Section {clause.section}</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span className="mono" style={{ fontSize: 14, fontWeight: 600 }}>cl. {clause.id}</span>
             <StatusPill status={editStatus} />

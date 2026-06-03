@@ -4,6 +4,8 @@ import { PageHeader, Pill, Avatar, Donut } from '../components';
 import { useTaskContext } from '../TaskContext';
 import { useAuth } from '../AuthContext';
 import { useLocation } from '../LocationContext';
+import { useNexusData } from '../NexusDataContext';
+import { getStdCfg } from '../standardConfig';
 
 function exportEvidencePack(D, site, user) {
   const now = new Date();
@@ -102,7 +104,7 @@ tr:last-child td{border-bottom:none}
 
 <div class="cover">
   <div class="brand">Nexus 360 · Accreditation</div>
-  <h1>NATA Evidence Pack</h1>
+  <h1>${stdCfg.reportTitle}</h1>
   <div class="sub">${site.name}</div>
   <div class="score-box">
     <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#9ca3af;margin-bottom:6px">Overall compliance</div>
@@ -215,6 +217,8 @@ const greeting = () => {
 
 const HomePage = ({ data: D, goTo, openClause }) => {
   const { user } = useAuth();
+  const { activeStandard } = useNexusData();
+  const stdCfg = getStdCfg(activeStandard);
   const { site } = useLocation();
   const { tasks, openCreateTask } = useTaskContext();
   const { hidden, toggle } = useDashboardPrefs(user?.email);
@@ -236,7 +240,7 @@ const HomePage = ({ data: D, goTo, openClause }) => {
       <PageHeader
         eyebrow={`${greeting()}${firstName ? `, ${firstName}` : ''}`}
         title={site.name}
-        subtitle={`NATA assessment in ${D.service.daysToAssessment} days · ${D.service.nextAssessment}`}
+        subtitle={`${stdCfg.assessmentLabel} in ${D.service.daysToAssessment} days · ${D.service.nextAssessment}`}
         actions={
           <>
             <div style={{ position: 'relative' }}>
@@ -333,7 +337,7 @@ const HomePage = ({ data: D, goTo, openClause }) => {
       {show('banner') && <div className="banner warn">
         <Icon name="alert" size={18} />
         <div style={{ flex: 1 }}>
-          <strong>3 items need attention before NATA assessment.</strong> &nbsp;
+          <strong>3 items need attention before {stdCfg.bodyName} assessment.</strong> &nbsp;
           HSAT-NOX-014 verification overdue · 4 staff BLS lapsed · 1 subcontractor evidence missing.
         </div>
         <button className="btn btn-ghost" onClick={() => goTo('tasks')}>Review &nbsp;<Icon name="arrow_right" size={13} /></button>
@@ -349,7 +353,7 @@ const HomePage = ({ data: D, goTo, openClause }) => {
             <div className="card-head">
               <div>
                 <div className="card-title">Section coverage</div>
-                <div className="card-sub">ASA Standard March 2019 · click any section to drill in</div>
+                <div className="card-sub">{stdCfg.standardShort} {stdCfg.standardVersion} · click any section to drill in</div>
               </div>
               <div className="topbar-spacer" />
               <Pill kind="good" dot>{totalCompliant} compliant</Pill>

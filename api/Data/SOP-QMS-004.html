@@ -22,8 +22,6 @@ th, td { border: 1px solid #c5cfdb; padding: 6px 8px; text-align: left; vertical
 th { background: #eef3f9; color: #14406b; font-weight: 600; }
 .callout { background: #fff7e0; border: 1px solid #f0d27e; border-left: 4px solid #d49b1c; padding: 8px 12px; margin: 10px 0; font-size: 10pt; }
 .callout.warn { background: #fdecea; border-color: #f0a99e; border-left-color: #c0392b; }
-.callout.nexus { background: #eef6ff; border: 1px solid #93c5fd; border-left: 4px solid #2563eb; padding: 8px 12px; margin: 10px 0; font-size: 10pt; }
-.callout.nexus strong { color: #1d4ed8; }
 .signoff { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 14px; }
 .sign-cell { border: 1px solid #c5cfdb; padding: 8px; min-height: 60px; font-size: 9.5pt; color: #506478; }
 .sign-cell strong { color: #1f2933; }
@@ -46,7 +44,7 @@ th { background: #eef3f9; color: #14406b; font-weight: 600; }
     <div class="title">Internal Audit Programme</div>
     <div class="subtitle">Planning, conducting and reporting internal audits of the QMS</div>
     <div class="field"><strong>Document ID:</strong> SOP-QMS-004</div>
-    <div class="field"><strong>Revision:</strong> 1.1</div>
+    <div class="field"><strong>Revision:</strong> 1.0</div>
     <div class="field"><strong>Effective date:</strong> _____ / _____ / _______</div>
     <div class="field"><strong>Review date:</strong> _____ / _____ / _______</div>
     <div class="field"><strong>Authorised by:</strong> Quality Manager</div>
@@ -56,11 +54,6 @@ th { background: #eef3f9; color: #14406b; font-weight: 600; }
   <h2>1. Purpose <span class="clause-tag">ASA 4.14</span></h2>
   <p>To verify that pre-study, study and post-study processes conform to the QMS and the ASA Standard, are implemented and effective, and to drive continual improvement.</p>
 
-  
-
-  <div class="callout nexus"><strong>&#x2139;&#xFE0F; Nexus 360 Integration:</strong> Steps in this procedure that are performed or supported by the Nexus 360 quality management system are identified with [Nexus 360] throughout this document. Staff must access Nexus 360 at <code>http://localhost:5173</code> to complete these steps. The system audit trail satisfies record-keeping requirements for all digitally recorded activities.</div>
-
-
   <h2>2. Audit Cycle</h2>
   <p>A rolling 12-month audit programme covers every QMS element at least once per cycle. The annual plan is approved by the Medical Director and reviewed at management review.</p>
 
@@ -69,12 +62,12 @@ th { background: #eef3f9; color: #14406b; font-weight: 600; }
 
   <h2>4. Audit Procedure</h2>
   <ol>
-  <li>Quality Manager publishes annual audit plan with scope, criteria and dates in Nexus 360 Audits &amp; Reviews module <span style="background:#dbeafe;color:#1d4ed8;font-size:8.5pt;padding:1px 5px;border-radius:3px;margin-left:4px;font-weight:600;">[Nexus 360]</span>.</li>
+  <li>Quality Manager publishes annual audit plan with scope, criteria and dates.</li>
   <li>Auditor confirms scope and notifies area owner at least 5 working days before audit.</li>
   <li>Auditor reviews documents, observes activities, interviews staff, and samples records against criteria.</li>
-  <li>Findings recorded in Nexus 360 Audits &amp; Reviews module <span style="background:#dbeafe;color:#1d4ed8;font-size:8.5pt;padding:1px 5px;border-radius:3px;margin-left:4px;font-weight:600;">[Nexus 360]</span> (Conformance / Observation / Minor NC / Major NC) with objective evidence; FRM-009 may supplement where offline recording is needed.</li>
+  <li>Findings recorded on FRM-009 (Conformance / Observation / Minor NC / Major NC) with objective evidence.</li>
   <li>Closing meeting with area owner.</li>
-  <li>Audit report issued within 10 working days; nonconformities raised in Nexus 360 NC &amp; CAPA module <span style="background:#dbeafe;color:#1d4ed8;font-size:8.5pt;padding:1px 5px;border-radius:3px;margin-left:4px;font-weight:600;">[Nexus 360]</span> with automatic links created from the audit record.</li>
+  <li>Audit report issued within 10 working days; nonconformities raised in the NC register.</li>
   <li>Area owner agrees corrective actions and target dates.</li>
   <li>Auditor verifies effectiveness at next cycle.</li>
   </ol>
@@ -83,7 +76,7 @@ th { background: #eef3f9; color: #14406b; font-weight: 600; }
   <p>Audit summary, trend analysis, status of corrective actions and audit-plan completion are tabled at every management review.</p>
 
   <h2>6. Records</h2>
-  <p>Audit plan and findings maintained in Nexus 360 Audits &amp; Reviews module <span style="background:#dbeafe;color:#1d4ed8;font-size:8.5pt;padding:1px 5px;border-radius:3px;margin-left:4px;font-weight:600;">[Nexus 360]</span>; NC/CAPA records in Nexus 360 NC &amp; CAPA module <span style="background:#dbeafe;color:#1d4ed8;font-size:8.5pt;padding:1px 5px;border-radius:3px;margin-left:4px;font-weight:600;">[Nexus 360]</span>; FRM-009 used for offline recording only; verification of corrective action tracked in Nexus 360.</p>
+  <p>Audit plan; FRM-009 reports; NC/CAPA register; verification of corrective action.</p>
 
   <h2>7. References</h2>
   <p>ASA Standard cl. 4.14.1 - 4.14.11.</p>
@@ -94,9 +87,7 @@ th { background: #eef3f9; color: #14406b; font-weight: 600; }
     <div class="sign-cell"><strong>Reviewed by (Quality Manager)</strong><br>Name:<br>Signature / Date:</div>
     <div class="sign-cell"><strong>Authorised by (Quality Manager)</strong><br>Name:<br>Signature / Date:</div>
   </div>
-  
-  <div class="callout" style="margin-top:16px;font-size:9.5pt;"><strong>Revision history:</strong> Rev 1.1 (May 2026) — Updated to reflect Nexus 360 quality management system integration. Steps supported by Nexus 360 are identified throughout.</div>
-  <div class="footer">Controlled document - uncontrolled when printed. SOP-QMS-004 Rev 1.1 - Page 1 of 1.</div>
+  <div class="footer">Controlled document - uncontrolled when printed. SOP-QMS-004 Rev 1.0 - Page 1 of 1.</div>
 </div>
 </body>
 </html>
