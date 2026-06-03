@@ -5,6 +5,7 @@ import DocViewer from '../doc-viewer';
 import DocUploadDrawer from '../doc-upload-drawer';
 import DocDetailDrawer from '../doc-detail-drawer';
 import { useAuth } from '../AuthContext';
+import { useNexusData } from '../NexusDataContext';
 
 // --- Workflow helpers -------------------------------------------------------
 function mkWorkflow(steps) {
@@ -202,6 +203,13 @@ const FOLDER_META = [
   { id: 'obsolete', name: 'Archived',      icon: 'x'         },
 ];
 
+// AASM-specific ID prefixes (network/clinic/lab/hsat/dme sections)
+const AASM_PREFIXES = ['POL-NET', 'POL-CLI', 'POL-LAB', 'POL-HST', 'POL-DME', 'PRO-LAB', 'PRO-HST', 'FRM-AASM'];
+
+function docStandard(id = '') {
+  return AASM_PREFIXES.some(p => id.startsWith(p)) ? 'aasm' : 'asa';
+}
+
 const STATUS_KIND = { Issued: 'good', Draft: 'outline', 'Under review': 'warn', 'Live form': 'info', Obsolete: 'bad' };
 
 const STEP_PERM = [null, 'canPeerReviewDoc', 'canApproveDoc', 'canIssueDoc'];
@@ -209,6 +217,7 @@ const STEP_PERM = [null, 'canPeerReviewDoc', 'canApproveDoc', 'canIssueDoc'];
 // --- Component ---------------------------------------------------------------
 const DocumentsPage = () => {
   const { hasPerm } = useAuth();
+  const { activeStandard } = useNexusData();
   const [docs, setDocs]           = useState(SEED_DOCS);
   const [folder, setFolder]       = useState('all');
   const [search, setSearch]       = useState('');
@@ -219,34 +228,42 @@ const DocumentsPage = () => {
 
   // Load from server on mount; fall back to SEED_DOCS if API is unavailable
   useEffect(() => {
-    fetch(`${BASE_API}/api/documents`)
+    const tok = localStorage.getItem('nexus_token');
+    if (!tok) return;
+    fetch(`${BASE_API}/api/documents`, { headers: { Authorization: `Bearer ${tok}` } })
       .then(r => r.ok ? r.json() : Promise.reject())
-      .then(list => setDocs(list.map(normaliseDocument)))
+      .then(list => { if (list?.length) setDocs(list.map(normaliseDocument)); })
       .catch(() => {});
   }, []);
 
   const detailDoc = docs.find(d => d.id === detailDocId) || null;
 
+  // Only show documents belonging to the active standard
+  const standardDocs = useMemo(
+    () => docs.filter(d => docStandard(d.id) === (activeStandard ?? 'asa')),
+    [docs, activeStandard]
+  );
+
   const folderCounts = useMemo(() => {
     const map = {};
     FOLDER_META.forEach(f => { map[f.id] = 0; });
-    docs.forEach(d => { map[d.folder] = (map[d.folder] || 0) + 1; });
-    map.all = docs.length;
+    standardDocs.forEach(d => { map[d.folder] = (map[d.folder] || 0) + 1; });
+    map.all = standardDocs.length;
     return map;
-  }, [docs]);
+  }, [standardDocs]);
 
   const visibleDocs = useMemo(() => {
     const q = search.toLowerCase();
-    return docs.filter(d => {
+    return standardDocs.filter(d => {
       const matchFolder = folder === 'all' || d.folder === folder;
       const matchSearch = !q || d.id.toLowerCase().includes(q) || d.title.toLowerCase().includes(q) || (d.owner || '').toLowerCase().includes(q);
       return matchFolder && matchSearch;
     });
-  }, [docs, folder, search]);
+  }, [standardDocs, folder, search]);
 
-  const overdueCount   = docs.filter(d => d.reviewDue?.includes('Overdue')).length;
-  const draftCount     = docs.filter(d => d.status === 'Draft' || d.status === 'Under review').length;
-  const awaitingCount  = docs.filter(d => {
+  const overdueCount   = standardDocs.filter(d => d.reviewDue?.includes('Overdue')).length;
+  const draftCount     = standardDocs.filter(d => d.status === 'Draft' || d.status === 'Under review').length;
+  const awaitingCount  = standardDocs.filter(d => {
     const wf = d.workflow || [];
     return wf.some(s => s.active && !s.done);
   }).length;
@@ -254,9 +271,11 @@ const DocumentsPage = () => {
   const handleUpdateDoc = (updated) => {
     setDocs(prev => prev.map(d => d.id === updated.id ? updated : d));
     // Persist workflow and status changes to the server
+    const tok = localStorage.getItem('nexus_token');
+    const ah  = tok ? { Authorization: `Bearer ${tok}` } : {};
     fetch(`${BASE_API}/api/documents/${encodeURIComponent(updated.id)}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...ah },
       body: JSON.stringify({
         title:     updated.title,
         version:   updated.v,
@@ -282,9 +301,10 @@ const DocumentsPage = () => {
       if (saved.rawFile) {
         const fd = new FormData();
         fd.append('file', saved.rawFile);
+        const tok2 = localStorage.getItem('nexus_token');
         const res = await fetch(
           `${BASE_API}/api/documents/${encodeURIComponent(uploadPrefill.id)}/file`,
-          { method: 'POST', body: fd }
+          { method: 'POST', body: fd, headers: tok2 ? { Authorization: `Bearer ${tok2}` } : {} }
         );
         if (res.ok) {
           const updated = normaliseDocument(await res.json());
@@ -306,7 +326,8 @@ const DocumentsPage = () => {
       fd.append('workflow',  JSON.stringify(defaultWorkflow(saved.owner)));
       if (saved.rawFile) fd.append('file', saved.rawFile);
 
-      const res = await fetch(`${BASE_API}/api/documents`, { method: 'POST', body: fd });
+      const tok3 = localStorage.getItem('nexus_token');
+      const res = await fetch(`${BASE_API}/api/documents`, { method: 'POST', body: fd, headers: tok3 ? { Authorization: `Bearer ${tok3}` } : {} });
       if (res.ok) {
         const created = normaliseDocument(await res.json());
         setDocs(prev => [created, ...prev]);
@@ -327,9 +348,12 @@ const DocumentsPage = () => {
   return (
     <div className="page page-wide">
       <PageHeader
-        eyebrow="Compliance · cl. 4.2, 4.3"
+        eyebrow={activeStandard === 'aasm' ? 'Compliance · AASM S-4' : 'Compliance · cl. 4.2, 4.3'}
         title="Documents & SOPs"
-        subtitle="Quality manual → policies → SOPs → forms → records · controlled, versioned, audited"
+        subtitle={activeStandard === 'aasm'
+          ? 'AASM accreditation policies, protocols and forms · controlled, versioned, audited'
+          : 'Quality manual → policies → SOPs → forms → records · controlled, versioned, audited'
+        }
         actions={
           hasPerm('canUploadDoc') ? (
             <>
@@ -348,8 +372,8 @@ const DocumentsPage = () => {
       <div className="stat-grid" style={{ marginBottom: 18 }}>
         <div className="stat">
           <div className="stat-label"><Icon name="file" size={13} />Controlled documents</div>
-          <div className="stat-value">{docs.length}</div>
-          <div className="stat-meta">across {FOLDER_META.length - 2} categories</div>
+          <div className="stat-value">{standardDocs.length}</div>
+          <div className="stat-meta">{activeStandard === 'aasm' ? 'AASM standard' : 'ASA standard'}</div>
         </div>
         <div className="stat">
           <div className="stat-label"><Icon name="clock" size={13} />Awaiting action</div>
@@ -375,7 +399,7 @@ const DocumentsPage = () => {
         <div className="card" style={{ height: 'fit-content' }}>
           <div style={{ padding: '12px 14px' }}>
             <div style={{ fontSize: 11, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600, marginBottom: 10 }}>
-              QMS hierarchy
+              {activeStandard === 'aasm' ? 'AASM document library' : 'QMS hierarchy'}
             </div>
             {FOLDER_META.map(f => (
               <div key={f.id}

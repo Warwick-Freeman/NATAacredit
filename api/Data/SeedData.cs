@@ -61,8 +61,9 @@ public static class SeedData
             if (existingIds.Contains(docId)) continue;
 
             var title = titleRaw.Replace('_', ' ').Trim();
-            var folder = docId.StartsWith("FRM") ? "forms"
-                       : docId.StartsWith("REG") ? "records"
+            var folder = docId.StartsWith("FRM")  ? "forms"
+                       : docId.StartsWith("REG")  ? "records"
+                       : docId.StartsWith("POL-") ? "policies"
                        : "sops";
             var status = folder == "forms" ? "Live form" : "Issued";
             var owner = docId switch
@@ -72,6 +73,11 @@ public static class SeedData
                 _ when docId.StartsWith("SOP-RPT") => "Dr. R. Okafor",
                 _ when docId.StartsWith("SOP-TX")  => "Dr. R. Okafor",
                 _ when docId.StartsWith("SOP-QC")  => "Dr. R. Okafor",
+                _ when docId.StartsWith("PRO-LAB") => "M. Chen",
+                _ when docId.StartsWith("PRO-HST") => "M. Chen",
+                _ when docId.StartsWith("POL-NET") => "Dr. R. Okafor",
+                _ when docId.StartsWith("POL-LAB") => "M. Chen",
+                _ when docId.StartsWith("POL-HST") => "M. Chen",
                 _ => "K. Patel",
             };
 

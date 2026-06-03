@@ -1,15 +1,31 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import Icon from './icons';
 import { Pill } from './components';
 
 const STATUS_KIND = { Issued: 'good', Draft: 'outline', 'Under review': 'warn', 'Live form': 'info', Obsolete: 'bad' };
 
 const DocViewer = ({ doc, onClose, onAttach }) => {
+  const [htmlContent, setHtmlContent] = useState(null);
+  const [htmlLoading, setHtmlLoading] = useState(false);
+
   useEffect(() => {
     const handler = (e) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
   }, [onClose]);
+
+  // Fetch HTML content with auth so it renders in the iframe via srcdoc
+  useEffect(() => {
+    if (!doc?.fileUrl || doc.fileType === 'pdf') return;
+    setHtmlContent(null);
+    setHtmlLoading(true);
+    const tok = localStorage.getItem('nexus_token');
+    fetch(doc.fileUrl, { headers: tok ? { Authorization: `Bearer ${tok}` } : {} })
+      .then(r => r.ok ? r.text() : Promise.reject(r.status))
+      .then(html => setHtmlContent(html))
+      .catch(() => setHtmlContent('<p style="padding:24px;color:#666">Could not load document.</p>'))
+      .finally(() => setHtmlLoading(false));
+  }, [doc?.fileUrl, doc?.fileType]);
 
   if (!doc) return null;
   const hasFile = !!doc.fileUrl;
@@ -87,12 +103,28 @@ const DocViewer = ({ doc, onClose, onAttach }) => {
         {/* Content */}
         <div className="doc-viewer-body">
           {hasFile ? (
-            <iframe
-              src={doc.fileUrl}
-              className="doc-frame"
-              title={doc.title}
-              {...(!isPdf && { sandbox: "allow-scripts allow-forms allow-popups allow-downloads" })}
-            />
+            isPdf ? (
+              <iframe
+                src={doc.fileUrl}
+                className="doc-frame"
+                title={doc.title}
+              />
+            ) : htmlLoading ? (
+              <div style={{ display: 'grid', placeItems: 'center', height: '100%', color: 'var(--ink-3)', fontSize: 13 }}>
+                Loading…
+              </div>
+            ) : htmlContent ? (
+              <iframe
+                srcDoc={htmlContent}
+                className="doc-frame"
+                title={doc.title}
+                sandbox="allow-scripts allow-forms allow-popups allow-downloads"
+              />
+            ) : (
+              <div style={{ display: 'grid', placeItems: 'center', height: '100%', color: 'var(--ink-3)', fontSize: 13 }}>
+                No content
+              </div>
+            )
           ) : (
             <div className="doc-no-file">
               <div style={{ width: 56, height: 56, borderRadius: 14, background: 'var(--surface-2)', display: 'grid', placeItems: 'center' }}>

@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(node /c/Users/wef.CMPHQ/NATAacredit/update_docs.cjs)"
+      "Bash(node /c/Users/wef.CMPHQ/NATAacredit/update_docs.cjs)",
+      "PowerShell(head -20)"
     ]
   }
 }
