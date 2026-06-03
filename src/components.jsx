@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Icon from './icons';
 import { useLocation } from './LocationContext';
+import { useNexusData } from './NexusDataContext';
 
 // === Sparkline ===
 export const Sparkline = ({ data, height = 28, width = 100, color }) => {
@@ -86,6 +87,7 @@ export const Avatar = ({ name, size = 22, idx }) => {
 // === Sidebar ===
 export const Sidebar = ({ current, setCurrent, badges, user, onSignOut, open, onClose }) => {
   const { siteId, setSiteId, site, SITES } = useLocation();
+  const { activeStandard } = useNexusData() ?? {};
   const [siteOpen, setSiteOpen] = useState(false);
 
   const items = [
@@ -104,6 +106,7 @@ export const Sidebar = ({ current, setCurrent, badges, user, onSignOut, open, on
     { id: "indicators", label: "Quality indicators", icon: "chart" },
     { id: "equipment", label: "Equipment register", icon: "cube", badge: badges.equipment },
     { id: "staff", label: "Staff & training", icon: "users" },
+    ...(activeStandard === 'aasm' ? [{ id: "workbooks", label: "Workbooks", icon: "paper" }] : []),
     { section: "Admin" },
     { id: "settings", label: "Settings", icon: "settings" },
     { id: "trail", label: "Audit trail", icon: "clipboard" },

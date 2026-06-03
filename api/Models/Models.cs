@@ -73,6 +73,32 @@ public class ComplianceSection
     public string Standard { get; set; } = "asa";
 }
 
+public class WorkbookCompletion
+{
+    public int Id { get; set; }
+    public string WorkbookId { get; set; } = "";
+    public string Period { get; set; } = "";
+    public string StartedAt { get; set; } = "";
+    public string CompletedAt { get; set; } = "";
+    public string CompletedBy { get; set; } = "";
+    public string FormData { get; set; } = "{}";
+    public string Status { get; set; } = "in-progress";
+}
+
+public class WorkbookSchedule
+{
+    public int Id { get; set; }
+    public string WorkbookId { get; set; } = "";
+    public string Title { get; set; } = "";
+    public string Condition { get; set; } = "";
+    public string FileName { get; set; } = "";
+    public string Frequency { get; set; } = "quarterly";
+    public string LastCompleted { get; set; } = "";
+    public string NextDue { get; set; } = "";
+    public string AssignedTo { get; set; } = "";
+    public string Notes { get; set; } = "";
+}
+
 public class SiteConfig
 {
     [System.ComponentModel.DataAnnotations.Key]

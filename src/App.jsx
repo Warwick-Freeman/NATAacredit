@@ -19,6 +19,7 @@ import AuditTrailPage from './pages/page-audit-trail';
 import TasksPage from './pages/page-tasks';
 import PatientsPage from './pages/page-patients';
 import SchedulerPage from './pages/page-scheduler';
+import WorkbooksPage from './pages/page-workbooks';
 import TaskFormDrawer from './task-form-drawer';
 import ClauseDrawer from './clause-drawer';
 import StudyDrawer from './study-drawer';
@@ -117,6 +118,7 @@ const App = () => {
     indicators: ["Operations", "Quality indicators"],
     equipment: ["Operations", "Equipment register"],
     staff: ["Operations", "Staff & training"],
+    workbooks: ["Operations", "Workbooks"],
     settings: ["Admin", "Settings"],
     trail: ["Admin", "Audit trail"],
   };
@@ -135,6 +137,7 @@ const App = () => {
       case "audits": return <AuditsPage />;
       case "ncr": return <NCRPage />;
       case "staff": return <StaffPage />;
+      case "workbooks": return <WorkbooksPage />;
       case "settings": return <SettingsPage />;
       case "trail": return <AuditTrailPage />;
       default: return <HomePage data={data} goTo={goTo} openClause={setOpenClauseId} />;

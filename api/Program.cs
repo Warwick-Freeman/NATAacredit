@@ -147,6 +147,34 @@ using (var scope = app.Services.CreateScope())
         """);
 
     db.Database.ExecuteSqlRaw("""
+        CREATE TABLE IF NOT EXISTS WorkbookCompletions (
+            Id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            WorkbookId  TEXT NOT NULL DEFAULT '',
+            Period      TEXT NOT NULL DEFAULT '',
+            StartedAt   TEXT NOT NULL DEFAULT '',
+            CompletedAt TEXT NOT NULL DEFAULT '',
+            CompletedBy TEXT NOT NULL DEFAULT '',
+            FormData    TEXT NOT NULL DEFAULT '{{}}',
+            Status      TEXT NOT NULL DEFAULT 'in-progress'
+        )
+        """);
+
+    db.Database.ExecuteSqlRaw("""
+        CREATE TABLE IF NOT EXISTS WorkbookSchedules (
+            Id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            WorkbookId    TEXT NOT NULL DEFAULT '',
+            Title         TEXT NOT NULL DEFAULT '',
+            Condition     TEXT NOT NULL DEFAULT '',
+            FileName      TEXT NOT NULL DEFAULT '',
+            Frequency     TEXT NOT NULL DEFAULT 'quarterly',
+            LastCompleted TEXT NOT NULL DEFAULT '',
+            NextDue       TEXT NOT NULL DEFAULT '',
+            AssignedTo    TEXT NOT NULL DEFAULT '',
+            Notes         TEXT NOT NULL DEFAULT ''
+        )
+        """);
+
+    db.Database.ExecuteSqlRaw("""
         CREATE TABLE IF NOT EXISTS Rooms (
             Id        INTEGER PRIMARY KEY AUTOINCREMENT,
             SiteId    TEXT NOT NULL DEFAULT '',
@@ -165,6 +193,41 @@ using (var scope = app.Services.CreateScope())
 
     var sopDir = Path.Combine(app.Environment.ContentRootPath, "..", "sop");
     SeedData.ImportSopDirectory(db, sopDir, dataDir);
+
+    // Copy AASM workbook PDFs into the data/workbooks directory
+    var workbooksDir = Path.Combine(dataDir, "workbooks");
+    Directory.CreateDirectory(workbooksDir);
+    var sourceWorkbooksDir = Path.GetFullPath(Path.Combine(app.Environment.ContentRootPath, "..", "AASM workbooks"));
+    if (Directory.Exists(sourceWorkbooksDir))
+    {
+        foreach (var pdf in Directory.GetFiles(sourceWorkbooksDir, "*.pdf"))
+            File.Copy(pdf, Path.Combine(workbooksDir, Path.GetFileName(pdf)), overwrite: true);
+    }
+
+    // Seed workbook schedules if not present
+    if (!db.WorkbookSchedules.Any())
+    {
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        var workbooks = new[]
+        {
+            ("adult-osa",      "Adult OSA Measure Reporting",                "Adult OSA",                "Adult-OSA-Measure-Reporting-Workbook.pdf"),
+            ("insomnia",       "Insomnia Measure Reporting",                 "Insomnia",                 "Insomnia-Measure-Reporting-Workbook.pdf"),
+            ("narcolepsy",     "Narcolepsy Measure Reporting",               "Narcolepsy",               "Narcolepsy-Measure-Reporting-Workbook.pdf"),
+            ("pediatric-osa",  "Pediatric OSA Measure Reporting",            "Pediatric OSA",            "Pediatric-OSA-Measure-Reporting-Workbook.pdf"),
+            ("restless-legs",  "Restless Legs Syndrome Measure Reporting",   "Restless Legs Syndrome",   "Restless-Legs-Syndrome-Measure-Reporting-Workbook.pdf"),
+        };
+        foreach (var (id, title, condition, fileName) in workbooks)
+        {
+            var nextDue = today.AddMonths(3).ToString("yyyy-MM-dd");
+            db.WorkbookSchedules.Add(new NexusApi.Models.WorkbookSchedule
+            {
+                WorkbookId = id, Title = title, Condition = condition,
+                FileName = fileName, Frequency = "quarterly",
+                LastCompleted = "", NextDue = nextDue, AssignedTo = "", Notes = "",
+            });
+        }
+        db.SaveChanges();
+    }
 }
 
 app.UseCors();
@@ -477,6 +540,92 @@ app.MapDelete("/api/rooms/{id:int}", async (int id, NexusDbContext db) =>
     return Results.NoContent();
 }).RequireAuthorization();
 
+// ── Workbooks ─────────────────────────────────────────────────────────────────
+
+app.MapGet("/api/workbooks", async (NexusDbContext db) =>
+    await db.WorkbookSchedules.OrderBy(w => w.Id).ToListAsync()
+).RequireAuthorization();
+
+app.MapPut("/api/workbooks/{workbookId}", async (string workbookId, WorkbookUpdateDto dto, NexusDbContext db) =>
+{
+    var w = await db.WorkbookSchedules.FirstOrDefaultAsync(x => x.WorkbookId == workbookId);
+    if (w == null) return Results.NotFound();
+    if (dto.Frequency != null) w.Frequency = dto.Frequency;
+    if (dto.AssignedTo != null) w.AssignedTo = dto.AssignedTo;
+    // Recalculate next due based on new frequency if never completed
+    if (string.IsNullOrEmpty(w.LastCompleted) && dto.Frequency != null)
+    {
+        var months = dto.Frequency switch { "semi-annual" => 6, "annual" => 12, _ => 3 };
+        w.NextDue = DateOnly.FromDateTime(DateTime.Today).AddMonths(months).ToString("yyyy-MM-dd");
+    }
+    await db.SaveChangesAsync();
+    return Results.Ok(w);
+}).RequireAuthorization();
+
+app.MapPost("/api/workbooks/{workbookId}/complete", async (string workbookId, WorkbookCompleteDto dto, NexusDbContext db) =>
+{
+    var w = await db.WorkbookSchedules.FirstOrDefaultAsync(x => x.WorkbookId == workbookId);
+    if (w == null) return Results.NotFound();
+    var completed = dto.CompletedDate ?? DateOnly.FromDateTime(DateTime.Today).ToString("yyyy-MM-dd");
+    w.LastCompleted = completed;
+    if (dto.Notes != null) w.Notes = dto.Notes;
+    var months = w.Frequency switch { "semi-annual" => 6, "annual" => 12, _ => 3 };
+    w.NextDue = DateOnly.Parse(completed).AddMonths(months).ToString("yyyy-MM-dd");
+    await db.SaveChangesAsync();
+    return Results.Ok(w);
+}).RequireAuthorization();
+
+app.MapGet("/api/workbooks/{workbookId}/completions", async (string workbookId, NexusDbContext db) =>
+    await db.WorkbookCompletions
+        .Where(c => c.WorkbookId == workbookId)
+        .OrderByDescending(c => c.StartedAt)
+        .ToListAsync()
+).RequireAuthorization();
+
+app.MapPost("/api/workbooks/{workbookId}/completions", async (string workbookId, WorkbookCompletionDto dto, NexusDbContext db, ClaimsPrincipal principal) =>
+{
+    var name = principal.FindFirstValue("name") ?? "Unknown";
+    var now  = DateTime.Now.ToString("yyyy-MM-ddTHH:mm");
+    var c    = new NexusApi.Models.WorkbookCompletion
+    {
+        WorkbookId  = workbookId,
+        Period      = dto.Period,
+        StartedAt   = now,
+        CompletedAt = "",
+        CompletedBy = name,
+        FormData    = dto.FormData ?? "{}",
+        Status      = "in-progress",
+    };
+    db.WorkbookCompletions.Add(c);
+    await db.SaveChangesAsync();
+    return Results.Ok(c);
+}).RequireAuthorization();
+
+app.MapPut("/api/workbooks/{workbookId}/completions/{id:int}", async (string workbookId, int id, WorkbookCompletionDto dto, NexusDbContext db) =>
+{
+    var c = await db.WorkbookCompletions.FindAsync(id);
+    if (c == null || c.WorkbookId != workbookId) return Results.NotFound();
+    if (dto.FormData != null) c.FormData = dto.FormData;
+    if (dto.Status != null)
+    {
+        c.Status = dto.Status;
+        if (dto.Status == "complete") c.CompletedAt = DateTime.Now.ToString("yyyy-MM-ddTHH:mm");
+    }
+    await db.SaveChangesAsync();
+    return Results.Ok(c);
+}).RequireAuthorization();
+
+app.MapGet("/api/workbooks/{workbookId}/file", async (string workbookId, NexusDbContext db, IWebHostEnvironment env) =>
+{
+    var w = await db.WorkbookSchedules.FirstOrDefaultAsync(x => x.WorkbookId == workbookId);
+    if (w == null) return Results.NotFound();
+    var dataDir = Path.GetFullPath(Path.Combine(env.ContentRootPath, "data"));
+    var path = Path.Combine(dataDir, "workbooks", w.FileName);
+    if (!File.Exists(path)) return Results.NotFound();
+    var bytes = await File.ReadAllBytesAsync(path);
+    return Results.File(bytes, "application/pdf", w.FileName);
+}).RequireAuthorization();
+
 // ── Appointments ──────────────────────────────────────────────────────────────
 
 app.MapGet("/api/appointments", async (string? siteId, string? from, string? to, NexusDbContext db) =>
@@ -616,3 +765,6 @@ record AppointmentDto(
     string? Notes, string? Status);
 
 record StandardSwitchDto(string Value);
+record WorkbookUpdateDto(string? Frequency, string? AssignedTo);
+record WorkbookCompleteDto(string? CompletedDate, string? Notes);
+record WorkbookCompletionDto(string Period, string? FormData, string? Status);
