@@ -73,6 +73,27 @@ public class ComplianceSection
     public string Standard { get; set; } = "asa";
 }
 
+public class IsrAssessment
+{
+    public int Id { get; set; }
+    public string AssessmentRef { get; set; } = "";   // e.g. ISR-2026-Q2-001
+    public string Quarter { get; set; } = "";         // e.g. Q2 2026
+    public string Scorer { get; set; } = "";
+    public string Reviewer { get; set; } = "";
+    public string ReviewerRole { get; set; } = "";    // "Network Director" | "Medical Staff"
+    public string AttestationBy { get; set; } = "";   // ND name when reviewer is medical staff
+    public string AttestationDate { get; set; } = "";
+    public string StudyIds { get; set; } = "[]";      // JSON: array of 3 PSG study IDs
+    public string Results { get; set; } = "{{}}";     // JSON: concordance per parameter
+    public string Thresholds { get; set; } = "{{}}";  // JSON: lab-defined minimum per parameter
+    public string ProdigiSessionData { get; set; } = "{{}}"; // JSON: Prodigi API response data
+    public string Status { get; set; } = "pending";   // pending | in-progress | complete | signed
+    public string SignedBy { get; set; } = "";
+    public string SignedAt { get; set; } = "";
+    public string Notes { get; set; } = "";
+    public string CreatedAt { get; set; } = "";
+}
+
 public class FormRecord
 {
     public int Id { get; set; }

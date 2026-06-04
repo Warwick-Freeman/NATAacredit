@@ -99,6 +99,7 @@ export const Sidebar = ({ current, setCurrent, badges, user, onSignOut, open, on
     { id: "documents", label: "Documents & SOPs", icon: "file" },
     { id: "audits", label: "Audits & reviews", icon: "audit" },
     { id: "ncr", label: "NC & CAPA", icon: "alert", badge: badges.ncr },
+    ...(activeStandard === 'aasm' ? [{ id: "isr", label: "Inter-Scorer Reliability", icon: "chart" }] : []),
     { section: "Operations" },
     { id: "scheduler", label: "Scheduler", icon: "calendar" },
     { id: "patients", label: "Patients", icon: "heart" },

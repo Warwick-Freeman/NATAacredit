@@ -152,6 +152,28 @@ using (var scope = app.Services.CreateScope())
         """);
 
     db.Database.ExecuteSqlRaw("""
+        CREATE TABLE IF NOT EXISTS IsrAssessments (
+            Id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+            AssessmentRef      TEXT NOT NULL DEFAULT '',
+            Quarter            TEXT NOT NULL DEFAULT '',
+            Scorer             TEXT NOT NULL DEFAULT '',
+            Reviewer           TEXT NOT NULL DEFAULT '',
+            ReviewerRole       TEXT NOT NULL DEFAULT '',
+            AttestationBy      TEXT NOT NULL DEFAULT '',
+            AttestationDate    TEXT NOT NULL DEFAULT '',
+            StudyIds           TEXT NOT NULL DEFAULT '[]',
+            Results            TEXT NOT NULL DEFAULT '{{}}',
+            Thresholds         TEXT NOT NULL DEFAULT '{{}}',
+            ProdigiSessionData TEXT NOT NULL DEFAULT '{{}}',
+            Status             TEXT NOT NULL DEFAULT 'pending',
+            SignedBy           TEXT NOT NULL DEFAULT '',
+            SignedAt           TEXT NOT NULL DEFAULT '',
+            Notes              TEXT NOT NULL DEFAULT '',
+            CreatedAt          TEXT NOT NULL DEFAULT ''
+        )
+        """);
+
+    db.Database.ExecuteSqlRaw("""
         CREATE TABLE IF NOT EXISTS FormRecords (
             Id           INTEGER PRIMARY KEY AUTOINCREMENT,
             FormId       TEXT NOT NULL DEFAULT '',
@@ -601,6 +623,143 @@ app.MapDelete("/api/rooms/{id:int}", async (int id, NexusDbContext db) =>
     return Results.NoContent();
 }).RequireAuthorization();
 
+// ── Inter-Scorer Reliability (ISR) ────────────────────────────────────────────
+
+app.MapGet("/api/isr", async (string? quarter, NexusDbContext db) =>
+{
+    var q = db.IsrAssessments.AsQueryable();
+    if (!string.IsNullOrEmpty(quarter)) q = q.Where(a => a.Quarter == quarter);
+    return await q.OrderByDescending(a => a.CreatedAt).ToListAsync();
+}).RequireAuthorization();
+
+app.MapGet("/api/isr/{id:int}", async (int id, NexusDbContext db) =>
+    await db.IsrAssessments.FindAsync(id) is { } a ? Results.Ok(a) : Results.NotFound()
+).RequireAuthorization();
+
+app.MapPost("/api/isr", async (IsrDto dto, NexusDbContext db, ClaimsPrincipal principal) =>
+{
+    var now = DateTime.Now;
+    var seq = await db.IsrAssessments.CountAsync(a => a.Quarter == dto.Quarter) + 1;
+    var a = new NexusApi.Models.IsrAssessment
+    {
+        AssessmentRef      = $"ISR-{dto.Quarter.Replace(" ", "-")}-{seq:D3}",
+        Quarter            = dto.Quarter,
+        Scorer             = dto.Scorer ?? "",
+        Reviewer           = dto.Reviewer ?? "",
+        ReviewerRole       = dto.ReviewerRole ?? "Network Director",
+        StudyIds           = dto.StudyIds ?? "[]",
+        Results            = dto.Results ?? "{{}}",
+        Thresholds         = dto.Thresholds ?? "{{}}",
+        Status             = "pending",
+        CreatedAt          = now.ToString("yyyy-MM-ddTHH:mm"),
+    };
+    db.IsrAssessments.Add(a);
+    await db.SaveChangesAsync();
+    return Results.Ok(a);
+}).RequireAuthorization();
+
+app.MapPut("/api/isr/{id:int}", async (int id, IsrDto dto, NexusDbContext db, ClaimsPrincipal principal) =>
+{
+    var a = await db.IsrAssessments.FindAsync(id);
+    if (a == null) return Results.NotFound();
+    if (dto.Scorer      != null) a.Scorer      = dto.Scorer;
+    if (dto.Reviewer    != null) a.Reviewer    = dto.Reviewer;
+    if (dto.ReviewerRole!= null) a.ReviewerRole= dto.ReviewerRole;
+    if (dto.StudyIds    != null) a.StudyIds    = dto.StudyIds;
+    if (dto.Results     != null) a.Results     = dto.Results;
+    if (dto.Thresholds  != null) a.Thresholds  = dto.Thresholds;
+    if (dto.Notes       != null) a.Notes       = dto.Notes;
+    if (dto.Status      != null) a.Status      = dto.Status;
+    if (dto.AttestationBy   != null) a.AttestationBy   = dto.AttestationBy;
+    if (dto.AttestationDate != null) a.AttestationDate = dto.AttestationDate;
+    await db.SaveChangesAsync();
+    return Results.Ok(a);
+}).RequireAuthorization();
+
+app.MapPost("/api/isr/{id:int}/sign", async (int id, IsrSignDto dto, NexusDbContext db, ClaimsPrincipal principal) =>
+{
+    var a = await db.IsrAssessments.FindAsync(id);
+    if (a == null) return Results.NotFound();
+    var name = principal.FindFirstValue("name") ?? "Unknown";
+    a.SignedBy = name;
+    a.SignedAt = DateTime.Now.ToString("yyyy-MM-ddTHH:mm");
+    a.Status   = "signed";
+    if (!string.IsNullOrEmpty(dto.AttestationBy))   a.AttestationBy   = dto.AttestationBy;
+    if (!string.IsNullOrEmpty(dto.AttestationDate)) a.AttestationDate = dto.AttestationDate;
+    a.Notes = dto.Notes ?? a.Notes;
+    await db.SaveChangesAsync();
+    return Results.Ok(a);
+}).RequireAuthorization();
+
+// ── Prodigi PSG integration (placeholder) ─────────────────────────────────────
+// TODO: Replace placeholder responses with actual Prodigi API calls.
+// Prodigi ISR integration would:
+//   1. POST a study + scorer/reviewer credentials to launch an ISR scoring session
+//   2. Prodigi returns a launch URL (iframe or redirect) and session token
+//   3. After scoring, GET results using the session token
+
+app.MapGet("/api/isr/prodigi/studies", async (string? q, IConfiguration config) =>
+{
+    // TODO: Call Prodigi API to list available PSG studies
+    // var prodigiBase = config["Prodigi:BaseUrl"] ?? "https://prodigi.example.com";
+    // var response = await httpClient.GetAsync($"{prodigiBase}/api/studies?search={q}");
+    var sampleStudies = new[]
+    {
+        new { studyId = "PSG-2026-0440", patientInitials = "T.N.", date = "2026-05-01", type = "Adult PSG",    site = "RML", durationHours = 7.5 },
+        new { studyId = "PSG-2026-0439", patientInitials = "L.W.", date = "2026-04-28", type = "Paed PSG",     site = "EPL", durationHours = 8.2 },
+        new { studyId = "PSG-2026-0438", patientInitials = "D.M.", date = "2026-04-22", type = "Split-night",  site = "RML", durationHours = 7.0 },
+        new { studyId = "PSG-2026-0437", patientInitials = "A.P.", date = "2026-04-15", type = "Adult PSG",    site = "EPL", durationHours = 7.8 },
+        new { studyId = "PSG-2026-0436", patientInitials = "R.K.", date = "2026-04-10", type = "Adult PSG",    site = "RML", durationHours = 6.9 },
+        new { studyId = "PSG-2026-0435", patientInitials = "P.B.", date = "2026-04-05", type = "Adult PSG",    site = "RML", durationHours = 7.3 },
+    };
+    var filtered = string.IsNullOrEmpty(q)
+        ? sampleStudies
+        : sampleStudies.Where(s => s.studyId.Contains(q, StringComparison.OrdinalIgnoreCase)
+                                || s.patientInitials.Contains(q, StringComparison.OrdinalIgnoreCase));
+    return Results.Ok(new { source = "placeholder", studies = filtered });
+});
+
+app.MapPost("/api/isr/prodigi/launch", async (ProdigiLaunchDto dto, IConfiguration config) =>
+{
+    // TODO: POST to Prodigi to launch ISR scoring session
+    // var payload = new { studyId = dto.StudyId, scorerId = dto.ScorerId, reviewerId = dto.ReviewerId, mode = "isr" };
+    // var response = await httpClient.PostAsJsonAsync($"{prodigiBase}/api/isr/launch", payload);
+    return Results.Ok(new {
+        source      = "placeholder",
+        studyId     = dto.StudyId,
+        launchUrl   = $"https://prodigi.compumedics.com/isr?study={dto.StudyId}&scorer={dto.ScorerId}&token=PLACEHOLDER_TOKEN",
+        sessionToken= $"placeholder_token_{dto.StudyId}_{DateTime.Now.Ticks}",
+        message     = "Replace with actual Prodigi ISR launch endpoint. Scorer will score 200 consecutive epochs in Prodigi; results will be available via /prodigi/results.",
+        epochCount  = 200,
+        epochLengthSec = 30,
+    });
+});
+
+app.MapGet("/api/isr/prodigi/results/{studyId}", async (string studyId, string? scorerId, IConfiguration config) =>
+{
+    // TODO: GET results from Prodigi after scoring is complete
+    // var response = await httpClient.GetAsync($"{prodigiBase}/api/isr/results?study={studyId}&scorer={scorerId}");
+    var rng = new Random(studyId.GetHashCode() + (scorerId ?? "").GetHashCode());
+    double Pct(double min, double max) => Math.Round(min + rng.NextDouble() * (max - min), 1);
+    return Results.Ok(new {
+        source        = "placeholder",
+        studyId,
+        scorerId,
+        status        = "complete",
+        totalEpochs   = 200,
+        message       = "Replace with actual Prodigi results endpoint. These are simulated values.",
+        concordance   = new {
+            staging          = new { value = Pct(86, 98), label = "Sleep staging"          },
+            obstructiveApnea = new { value = Pct(80, 97), label = "Obstructive apnea"      },
+            centralApnea     = new { value = Pct(78, 96), label = "Central apnea"          },
+            hypopnea         = new { value = Pct(75, 95), label = "Hypopnea"               },
+            legMovements     = new { value = Pct(82, 97), label = "Leg movements"          },
+            arousals         = new { value = Pct(80, 96), label = "Arousals"               },
+            rera             = new { value = Pct(72, 92), label = "RERA"                   },
+        },
+    });
+});
+
 // ── Form records ──────────────────────────────────────────────────────────────
 
 app.MapGet("/api/form-records", async (string? formId, NexusDbContext db) =>
@@ -900,6 +1059,11 @@ record AppointmentDto(
 
 record StandardSwitchDto(string Value);
 record FormRecordDto(string FormId, string? FormTitle, string? Period, string? Notes, string? FormData, string? SnapshotHtml);
+record IsrDto(string Quarter, string? Scorer, string? Reviewer, string? ReviewerRole,
+    string? StudyIds, string? Results, string? Thresholds, string? Notes, string? Status,
+    string? AttestationBy, string? AttestationDate);
+record IsrSignDto(string? AttestationBy, string? AttestationDate, string? Notes);
+record ProdigiLaunchDto(string StudyId, string ScorerId, string? ReviewerId);
 record WorkbookUpdateDto(string? Frequency, string? AssignedTo);
 record WorkbookCompleteDto(string? CompletedDate, string? Notes);
 record WorkbookCompletionDto(string Period, string? FormData, string? Status);
