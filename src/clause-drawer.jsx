@@ -231,8 +231,15 @@ const ClauseDrawer = ({ data, clauseId, onClose, onUpdate }) => {
             </>
           )}
 
-          <div style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 8, padding: 12, background: 'var(--surface-2)', borderRadius: 8 }}>
-            {stdCfg.publisher}
+          <div style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 8, padding: 12, background: 'var(--surface-2)', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ flex: 1 }}>{stdCfg.publisher}</span>
+            <a
+              href={`${import.meta.env.VITE_API_URL ?? ''}/api/standards/${activeStandard ?? 'asa'}`}
+              target="_blank" rel="noreferrer"
+              style={{ fontSize: 11, color: 'var(--accent-ink)', textDecoration: 'none', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4 }}
+            >
+              <Icon name="arrow_up_right" size={11} />Open standard
+            </a>
           </div>
         </div>
       </div>

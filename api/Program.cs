@@ -147,6 +147,21 @@ using (var scope = app.Services.CreateScope())
         """);
 
     db.Database.ExecuteSqlRaw("""
+        CREATE TABLE IF NOT EXISTS FormRecords (
+            Id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            FormId       TEXT NOT NULL DEFAULT '',
+            RecordRef    TEXT NOT NULL DEFAULT '',
+            FormTitle    TEXT NOT NULL DEFAULT '',
+            CompletedBy  TEXT NOT NULL DEFAULT '',
+            CompletedAt  TEXT NOT NULL DEFAULT '',
+            Period       TEXT NOT NULL DEFAULT '',
+            Notes        TEXT NOT NULL DEFAULT '',
+            FormData     TEXT NOT NULL DEFAULT '{{}}',
+            SnapshotHtml TEXT NOT NULL DEFAULT ''
+        )
+        """);
+
+    db.Database.ExecuteSqlRaw("""
         CREATE TABLE IF NOT EXISTS WorkbookCompletions (
             Id          INTEGER PRIMARY KEY AUTOINCREMENT,
             WorkbookId  TEXT NOT NULL DEFAULT '',
@@ -193,6 +208,16 @@ using (var scope = app.Services.CreateScope())
 
     var sopDir = Path.Combine(app.Environment.ContentRootPath, "..", "sop");
     SeedData.ImportSopDirectory(db, sopDir, dataDir);
+
+    // Copy standard reference PDFs into data/standards/
+    var standardsDataDir = Path.Combine(dataDir, "standards");
+    Directory.CreateDirectory(standardsDataDir);
+    var repoRoot = Path.GetFullPath(Path.Combine(app.Environment.ContentRootPath, ".."));
+    foreach (var pdf in Directory.GetFiles(repoRoot, "*.pdf"))
+    {
+        var dest = Path.Combine(standardsDataDir, Path.GetFileName(pdf));
+        if (!File.Exists(dest)) File.Copy(pdf, dest, overwrite: false);
+    }
 
     // Copy AASM workbook PDFs into the data/workbooks directory
     var workbooksDir = Path.Combine(dataDir, "workbooks");
@@ -494,14 +519,15 @@ app.MapPost("/api/documents/{id}/file", async (string id, HttpRequest req, Nexus
     return Results.Ok(ToDto(doc));
 }).RequireAuthorization();
 
-app.MapGet("/api/documents/{id}/file", async (string id, NexusDbContext db) =>
+app.MapGet("/api/documents/{id}/file", async (string id, NexusDbContext db, HttpContext ctx) =>
 {
     var doc = await db.Documents.FirstOrDefaultAsync(d => d.DocId == id);
     if (doc?.StoredFileName == null) return Results.NotFound();
     var path = Path.Combine(dataDir, doc.StoredFileName);
     if (!File.Exists(path)) return Results.NotFound();
-    var contentType = doc.FileType == "pdf" ? "application/pdf" : "text/html; charset=utf-8";
-    return Results.File(path, contentType);
+    var isPdf = doc.FileType == "pdf";
+    if (isPdf) ctx.Response.Headers["Content-Disposition"] = $"inline; filename=\"{doc.StoredFileName}\"";
+    return Results.File(path, isPdf ? "application/pdf" : "text/html; charset=utf-8");
 }).RequireAuthorization();
 
 // ── Rooms ─────────────────────────────────────────────────────────────────────
@@ -538,6 +564,51 @@ app.MapDelete("/api/rooms/{id:int}", async (int id, NexusDbContext db) =>
     db.Rooms.Remove(room);
     await db.SaveChangesAsync();
     return Results.NoContent();
+}).RequireAuthorization();
+
+// ── Form records ──────────────────────────────────────────────────────────────
+
+app.MapGet("/api/form-records", async (string? formId, NexusDbContext db) =>
+{
+    var q = db.FormRecords.AsQueryable();
+    if (!string.IsNullOrEmpty(formId)) q = q.Where(r => r.FormId == formId);
+    return await q.OrderByDescending(r => r.CompletedAt).Select(r => new {
+        r.Id, r.FormId, r.RecordRef, r.FormTitle,
+        r.CompletedBy, r.CompletedAt, r.Period, r.Notes,
+    }).ToListAsync();
+}).RequireAuthorization();
+
+app.MapGet("/api/form-records/{id:int}", async (int id, NexusDbContext db) =>
+    await db.FormRecords.FindAsync(id) is { } r ? Results.Ok(r) : Results.NotFound()
+).RequireAuthorization();
+
+app.MapPost("/api/form-records", async (FormRecordDto dto, NexusDbContext db, ClaimsPrincipal principal) =>
+{
+    var name = principal.FindFirstValue("name") ?? "Unknown";
+    var now  = DateTime.Now;
+    var seq  = (await db.FormRecords.CountAsync(r => r.FormId == dto.FormId)) + 1;
+    var rec  = new NexusApi.Models.FormRecord
+    {
+        FormId      = dto.FormId,
+        RecordRef   = $"REC-{dto.FormId}-{now.Year}-{seq:D3}",
+        FormTitle   = dto.FormTitle ?? "",
+        CompletedBy = name,
+        CompletedAt = now.ToString("yyyy-MM-ddTHH:mm"),
+        Period      = dto.Period ?? now.ToString("MMM yyyy"),
+        Notes       = dto.Notes ?? "",
+        FormData    = dto.FormData ?? "{}",
+        SnapshotHtml = dto.SnapshotHtml ?? "",
+    };
+    db.FormRecords.Add(rec);
+    await db.SaveChangesAsync();
+    return Results.Ok(new { rec.Id, rec.RecordRef, rec.CompletedAt });
+}).RequireAuthorization();
+
+app.MapGet("/api/form-records/{id:int}/html", async (int id, NexusDbContext db) =>
+{
+    var r = await db.FormRecords.FindAsync(id);
+    if (r == null) return Results.NotFound();
+    return Results.Content(r.SnapshotHtml, "text/html; charset=utf-8");
 }).RequireAuthorization();
 
 // ── Workbooks ─────────────────────────────────────────────────────────────────
@@ -615,16 +686,33 @@ app.MapPut("/api/workbooks/{workbookId}/completions/{id:int}", async (string wor
     return Results.Ok(c);
 }).RequireAuthorization();
 
-app.MapGet("/api/workbooks/{workbookId}/file", async (string workbookId, NexusDbContext db, IWebHostEnvironment env) =>
+app.MapGet("/api/workbooks/{workbookId}/file", async (string workbookId, NexusDbContext db, IWebHostEnvironment env, HttpContext ctx) =>
 {
     var w = await db.WorkbookSchedules.FirstOrDefaultAsync(x => x.WorkbookId == workbookId);
     if (w == null) return Results.NotFound();
     var dataDir = Path.GetFullPath(Path.Combine(env.ContentRootPath, "data"));
     var path = Path.Combine(dataDir, "workbooks", w.FileName);
     if (!File.Exists(path)) return Results.NotFound();
+    ctx.Response.Headers["Content-Disposition"] = $"inline; filename=\"{w.FileName}\"";
     var bytes = await File.ReadAllBytesAsync(path);
-    return Results.File(bytes, "application/pdf", w.FileName);
-}).RequireAuthorization();
+    return Results.File(bytes, "application/pdf");
+}); // public — AASM published documents
+
+// Standards reference PDFs (public — published accreditation standards)
+app.MapGet("/api/standards/{standardId}", async (string standardId, IWebHostEnvironment env, HttpContext ctx) =>
+{
+    var dir = Path.Combine(env.ContentRootPath, "data", "standards");
+    var candidates = Directory.Exists(dir) ? Directory.GetFiles(dir, "*.pdf") : Array.Empty<string>();
+    var match = standardId.ToLower() switch {
+        "aasm" => candidates.FirstOrDefault(f => Path.GetFileName(f).StartsWith("Standards-for-Accreditation", StringComparison.OrdinalIgnoreCase)),
+        "asa"  => candidates.FirstOrDefault(f => Path.GetFileName(f).Contains("ASA", StringComparison.OrdinalIgnoreCase) || Path.GetFileName(f).Contains("Sleep-Disorders", StringComparison.OrdinalIgnoreCase)),
+        _ => null
+    };
+    if (match == null) return Results.NotFound();
+    ctx.Response.Headers["Content-Disposition"] = $"inline; filename=\"{Path.GetFileName(match)}\"";
+    var bytes = await File.ReadAllBytesAsync(match);
+    return Results.File(bytes, "application/pdf");
+});
 
 // ── Appointments ──────────────────────────────────────────────────────────────
 
@@ -765,6 +853,7 @@ record AppointmentDto(
     string? Notes, string? Status);
 
 record StandardSwitchDto(string Value);
+record FormRecordDto(string FormId, string? FormTitle, string? Period, string? Notes, string? FormData, string? SnapshotHtml);
 record WorkbookUpdateDto(string? Frequency, string? AssignedTo);
 record WorkbookCompleteDto(string? CompletedDate, string? Notes);
 record WorkbookCompletionDto(string Period, string? FormData, string? Status);

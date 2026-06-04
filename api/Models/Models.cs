@@ -73,6 +73,20 @@ public class ComplianceSection
     public string Standard { get; set; } = "asa";
 }
 
+public class FormRecord
+{
+    public int Id { get; set; }
+    public string FormId { get; set; } = "";
+    public string RecordRef { get; set; } = "";
+    public string FormTitle { get; set; } = "";
+    public string CompletedBy { get; set; } = "";
+    public string CompletedAt { get; set; } = "";
+    public string Period { get; set; } = "";
+    public string Notes { get; set; } = "";
+    public string FormData { get; set; } = "{{}}";
+    public string SnapshotHtml { get; set; } = "";
+}
+
 public class WorkbookCompletion
 {
     public int Id { get; set; }

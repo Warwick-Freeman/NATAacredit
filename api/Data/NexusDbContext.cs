@@ -17,6 +17,7 @@ public class NexusDbContext(DbContextOptions<NexusDbContext> options) : DbContex
     public DbSet<Appointment> Appointments => Set<Appointment>();
     public DbSet<SiteRoom> Rooms => Set<SiteRoom>();
     public DbSet<SiteConfig> SiteConfig => Set<SiteConfig>();
+    public DbSet<FormRecord> FormRecords => Set<FormRecord>();
     public DbSet<WorkbookSchedule> WorkbookSchedules => Set<WorkbookSchedule>();
     public DbSet<WorkbookCompletion> WorkbookCompletions => Set<WorkbookCompletion>();
 }

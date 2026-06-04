@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import Icon from '../icons';
 import { PageHeader, Donut, Tabs, Pill, StatusPill, Drawer } from '../components';
 import ClauseDrawer from '../clause-drawer';
@@ -6,6 +6,8 @@ import { useTaskContext } from '../TaskContext';
 import { useAuth } from '../AuthContext';
 import { useNexusData } from '../NexusDataContext';
 import { getStdCfg } from '../standardConfig';
+
+const BASE = import.meta.env.VITE_API_URL ?? '';
 
 const STATUS_KIND = { compliant: 'good', partial: 'warn', nc: 'bad', na: 'outline' };
 
@@ -351,6 +353,11 @@ const AccreditationPage = ({ data: D }) => {
   const { activeStandard } = useNexusData();
   const stdCfg = getStdCfg(activeStandard);
 
+  const openStandard = useCallback(() => {
+    // Standards endpoint is public — open directly
+    window.open(`${BASE}/api/standards/${activeStandard ?? 'asa'}`, '_blank');
+  }, [activeStandard]);
+
   // Local clause state — seed with realistic linked evidence
   const [clauses,   setClauses]   = useState(() => D.clauses.map(c => ({
     ...c,
@@ -433,6 +440,7 @@ const AccreditationPage = ({ data: D }) => {
         subtitle="Every clause mapped to live evidence. Self-assessment status updates in real time."
         actions={
           <>
+            <button className="btn" onClick={openStandard}><Icon name="book" size={14} />View standard</button>
             <button className="btn"><Icon name="eye" size={14} />Preview assessor view</button>
             <button className="btn" onClick={() => exportSelfAssessment(clauses, D, user)}><Icon name="download" size={14} />Self-assessment report</button>
             <button className="btn btn-primary"><Icon name="link" size={14} />Issue assessor access</button>

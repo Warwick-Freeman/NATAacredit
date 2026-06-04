@@ -1,18 +1,64 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import Icon from './icons';
 import { Pill } from './components';
+import FormFiller, { RecordViewer } from './form-filler';
 
 const STATUS_KIND = { Issued: 'good', Draft: 'outline', 'Under review': 'warn', 'Live form': 'info', Obsolete: 'bad' };
 
+const BASE = import.meta.env.VITE_API_URL ?? '';
+
 const DocViewer = ({ doc, onClose, onAttach }) => {
-  const [htmlContent, setHtmlContent] = useState(null);
-  const [htmlLoading, setHtmlLoading] = useState(false);
+  const [htmlContent, setHtmlContent]   = useState(null);
+  const [htmlLoading, setHtmlLoading]   = useState(false);
+  const [pdfBlobUrl,  setPdfBlobUrl]    = useState(null);
+  const [pdfLoading,  setPdfLoading]    = useState(false);
+  const [fillMode,    setFillMode]      = useState(false);
+  const [records,     setRecords]       = useState(null);
+  const [showRecords, setShowRecords]   = useState(false);
+  const [viewingRecord, setViewingRecord] = useState(null);
+
+  const isForm = doc?.folder === 'forms' && doc?.fileType === 'html';
 
   useEffect(() => {
     const handler = (e) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
   }, [onClose]);
+
+  // Reset state when document changes
+  useEffect(() => {
+    setFillMode(false);
+    setRecords(null);
+    setShowRecords(false);
+    setViewingRecord(null);
+    setPdfBlobUrl(prev => { if (prev) URL.revokeObjectURL(prev); return null; });
+  }, [doc?.id]);
+
+  // Fetch PDF as blob so the iframe can display it without auth headers
+  useEffect(() => {
+    if (!doc?.fileUrl || doc.fileType !== 'pdf') return;
+    setPdfBlobUrl(null);
+    setPdfLoading(true);
+    const tok = localStorage.getItem('nexus_token');
+    let blobUrl = null;
+    fetch(doc.fileUrl, { headers: tok ? { Authorization: `Bearer ${tok}` } : {} })
+      .then(r => r.ok ? r.blob() : Promise.reject(r.status))
+      .then(blob => { blobUrl = URL.createObjectURL(blob); setPdfBlobUrl(blobUrl); })
+      .catch(() => {})
+      .finally(() => setPdfLoading(false));
+    return () => { if (blobUrl) URL.revokeObjectURL(blobUrl); };
+  }, [doc?.fileUrl, doc?.fileType]);
+
+  const loadRecords = useCallback(() => {
+    if (!doc?.id) return;
+    const tok = localStorage.getItem('nexus_token');
+    fetch(`${BASE}/api/form-records?formId=${encodeURIComponent(doc.id)}`, {
+      headers: tok ? { Authorization: `Bearer ${tok}` } : {},
+    })
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(list => setRecords(list))
+      .catch(() => setRecords([]));
+  }, [doc?.id]);
 
   // Fetch HTML content with auth so it renders in the iframe via srcdoc
   useEffect(() => {
@@ -30,6 +76,33 @@ const DocViewer = ({ doc, onClose, onAttach }) => {
   if (!doc) return null;
   const hasFile = !!doc.fileUrl;
   const isPdf   = doc.fileType === 'pdf';
+
+  // Render: record viewer mode
+  if (viewingRecord) {
+    return (
+      <div className="doc-viewer-overlay" onClick={onClose}>
+        <div className="doc-viewer" onClick={e => e.stopPropagation()}>
+          <RecordViewer record={viewingRecord} onClose={() => setViewingRecord(null)} />
+        </div>
+      </div>
+    );
+  }
+
+  // Render: fill mode
+  if (fillMode && htmlContent) {
+    return (
+      <div className="doc-viewer-overlay" onClick={onClose}>
+        <div className="doc-viewer" onClick={e => e.stopPropagation()}>
+          <FormFiller
+            doc={doc}
+            htmlContent={htmlContent}
+            onCancel={() => setFillMode(false)}
+            onSaved={() => { setFillMode(false); loadRecords(); setShowRecords(true); }}
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="doc-viewer-overlay" onClick={onClose}>
@@ -53,6 +126,21 @@ const DocViewer = ({ doc, onClose, onAttach }) => {
           </div>
 
           <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+            {isForm && htmlContent && (
+              <button className="btn btn-primary" onClick={() => setFillMode(true)}>
+                <Icon name="edit" size={14} />Fill form
+              </button>
+            )}
+            {isForm && (
+              <button className="btn" onClick={() => { if (!records) loadRecords(); setShowRecords(v => !v); }}>
+                <Icon name="paper" size={14} />Records
+                {records?.length > 0 && (
+                  <span style={{ marginLeft: 4, background: 'var(--accent)', color: '#fff', borderRadius: 8, padding: '0 5px', fontSize: 10, fontWeight: 700 }}>
+                    {records.length}
+                  </span>
+                )}
+              </button>
+            )}
             {hasFile && isPdf && (
               <a href={doc.fileUrl} download={doc.fileName || `${doc.id}.pdf`}
                 className="btn" style={{ textDecoration: 'none' }}>
@@ -104,11 +192,21 @@ const DocViewer = ({ doc, onClose, onAttach }) => {
         <div className="doc-viewer-body">
           {hasFile ? (
             isPdf ? (
-              <iframe
-                src={doc.fileUrl}
-                className="doc-frame"
-                title={doc.title}
-              />
+              pdfLoading ? (
+                <div style={{ display: 'grid', placeItems: 'center', height: '100%', color: 'var(--ink-3)', fontSize: 13 }}>
+                  Loading PDF…
+                </div>
+              ) : pdfBlobUrl ? (
+                <iframe
+                  src={pdfBlobUrl}
+                  className="doc-frame"
+                  title={doc.title}
+                />
+              ) : (
+                <div style={{ display: 'grid', placeItems: 'center', height: '100%', color: 'var(--ink-3)', fontSize: 13 }}>
+                  Could not load PDF
+                </div>
+              )
             ) : htmlLoading ? (
               <div style={{ display: 'grid', placeItems: 'center', height: '100%', color: 'var(--ink-3)', fontSize: 13 }}>
                 Loading…
@@ -140,6 +238,34 @@ const DocViewer = ({ doc, onClose, onAttach }) => {
             </div>
           )}
         </div>
+
+        {/* Records panel — shown when Records button is toggled */}
+        {showRecords && isForm && (
+          <div style={{ borderTop: '1px solid var(--border)', background: 'var(--surface-2)', maxHeight: 280, overflowY: 'auto', flexShrink: 0 }}>
+            <div style={{ padding: '10px 18px', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, flex: 1 }}>Completed records</div>
+              {records === null && <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>Loading…</span>}
+              {records?.length === 0 && <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>No records yet — click Fill form to create one.</span>}
+            </div>
+            {records?.map(r => (
+              <div
+                key={r.id}
+                onClick={() => setViewingRecord(r)}
+                style={{ padding: '8px 18px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}
+                className="row-clickable"
+              >
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600 }}>{r.recordRef}</div>
+                  <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+                    {r.period} · {r.completedBy} · {r.completedAt?.slice(0, 10)}
+                    {r.notes && <span> · {r.notes}</span>}
+                  </div>
+                </div>
+                <Icon name="chev_right" size={13} style={{ color: 'var(--ink-3)' }} />
+              </div>
+            ))}
+          </div>
+        )}
 
       </div>
     </div>
