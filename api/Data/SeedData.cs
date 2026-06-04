@@ -1,11 +1,21 @@
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using NexusApi.Models;
 
 namespace NexusApi.Data;
 
 public static class SeedData
 {
+    public static string StripHtml(string html)
+    {
+        if (string.IsNullOrEmpty(html)) return "";
+        html = Regex.Replace(html, @"<(script|style)[^>]*>[\s\S]*?</\1>", " ", RegexOptions.IgnoreCase);
+        html = Regex.Replace(html, @"<[^>]+>", " ");
+        html = System.Net.WebUtility.HtmlDecode(html);
+        return Regex.Replace(html, @"\s+", " ").Trim();
+    }
+
     private static string Wf(params object[] steps) =>
         JsonSerializer.Serialize(steps, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
 
@@ -85,6 +95,9 @@ public static class SeedData
             var destPath = Path.Combine(dataDir, storedName);
             File.Copy(filePath, destPath, overwrite: true);
 
+            var rawHtml = File.ReadAllText(filePath);
+            var contentText = StripHtml(rawHtml);
+
             db.Documents.Add(new Document
             {
                 DocId          = docId,
@@ -99,6 +112,7 @@ public static class SeedData
                 FileType       = "html",
                 FileName       = Path.GetFileName(filePath),
                 StoredFileName = storedName,
+                ContentText    = contentText,
                 Workflow       = "[]",
             });
 

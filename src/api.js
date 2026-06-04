@@ -199,6 +199,11 @@ export async function deleteAppointment(id) {
   if (!res.ok) throw new Error(`API error ${res.status}`);
 }
 
+export async function searchDocumentContent(q) {
+  if (!q || q.length < 2) return [];
+  return get(`/api/documents/search?q=${encodeURIComponent(q)}`);
+}
+
 export async function fetchDocuments() {
   const list = await get('/api/documents');
   return (list ?? []).map(d => ({

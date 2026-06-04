@@ -6,6 +6,7 @@ import DocUploadDrawer from '../doc-upload-drawer';
 import DocDetailDrawer from '../doc-detail-drawer';
 import { useAuth } from '../AuthContext';
 import { useNexusData } from '../NexusDataContext';
+import { searchDocumentContent } from '../api';
 
 // --- Workflow helpers -------------------------------------------------------
 function mkWorkflow(steps) {
@@ -218,6 +219,8 @@ const STEP_PERM = [null, 'canPeerReviewDoc', 'canApproveDoc', 'canIssueDoc'];
 const DocumentsPage = () => {
   const { hasPerm } = useAuth();
   const { activeStandard } = useNexusData();
+  const [contentResults, setContentResults] = React.useState(null); // null=idle, []=no results, [...]
+  const [contentSearching, setContentSearching] = React.useState(false);
   const [docs, setDocs]           = useState(SEED_DOCS);
   const [folder, setFolder]       = useState('all');
   const [search, setSearch]       = useState('');
@@ -235,6 +238,19 @@ const DocumentsPage = () => {
       .then(list => { if (list?.length) setDocs(list.map(normaliseDocument)); })
       .catch(() => {});
   }, []);
+
+  // Debounced content search — fires 500ms after the user stops typing (3+ chars)
+  React.useEffect(() => {
+    if (search.length < 3) { setContentResults(null); return; }
+    setContentSearching(true);
+    const timer = setTimeout(() => {
+      searchDocumentContent(search)
+        .then(results => setContentResults(results ?? []))
+        .catch(() => setContentResults([]))
+        .finally(() => setContentSearching(false));
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   const detailDoc = docs.find(d => d.id === detailDocId) || null;
 
@@ -429,18 +445,52 @@ const DocumentsPage = () => {
               <Icon name="search" size={12} />
               <input
                 style={{ border: 'none', outline: 'none', background: 'transparent', font: 'inherit', fontSize: 12, color: 'var(--ink)', width: '100%' }}
-                placeholder="Filter documents…"
+                placeholder="Search title or content…"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
               />
+              {contentSearching && <span style={{ fontSize: 10, color: 'var(--ink-3)' }}>searching…</span>}
               {search && (
                 <button style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--ink-3)', padding: 0 }}
-                  onClick={e => { e.stopPropagation(); setSearch(''); }}>
+                  onClick={e => { e.stopPropagation(); setSearch(''); setContentResults(null); }}>
                   <Icon name="x" size={11} />
                 </button>
               )}
             </div>
           </div>
+
+          {/* Content search results */}
+          {contentResults !== null && (
+            <div style={{ borderBottom: '2px solid var(--accent)', background: 'var(--accent-soft)', padding: '10px 14px' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent-ink)', marginBottom: contentResults.length ? 10 : 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Icon name="search" size={12} />
+                {contentResults.length === 0
+                  ? `No documents contain "${search}" in their content`
+                  : `${contentResults.length} document${contentResults.length > 1 ? 's' : ''} contain "${search}" in content`
+                }
+              </div>
+              {contentResults.map(r => (
+                <div key={r.docId}
+                  onClick={() => { setDetailDocId(r.docId); }}
+                  style={{ padding: '8px 10px', marginBottom: 6, background: 'var(--surface)', borderRadius: 6, cursor: 'pointer', border: '1px solid var(--border)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                    <span className="mono" style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent-ink)' }}>{r.docId}</span>
+                    <span style={{ fontSize: 12, fontWeight: 500 }}>{r.title}</span>
+                    <Pill kind={STATUS_KIND[r.status] || 'outline'}>{r.status}</Pill>
+                    <span style={{ fontSize: 10, color: 'var(--ink-3)', marginLeft: 'auto', textTransform: 'capitalize' }}>{r.folder}</span>
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--ink-3)', lineHeight: 1.6 }}>
+                    {/* Highlight matching term in snippet */}
+                    {r.snippet?.split(new RegExp(`(${search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'i')).map((part, i) =>
+                      part.toLowerCase() === search.toLowerCase()
+                        ? <mark key={i} style={{ background: '#fef08a', color: '#1f2933', borderRadius: 2, padding: '0 1px' }}>{part}</mark>
+                        : part
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
 
           {visibleDocs.length === 0 ? (
             <div className="empty">No documents match your filter.</div>

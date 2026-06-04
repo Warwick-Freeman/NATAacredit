@@ -201,4 +201,5 @@ public class Document
     public string? FileName { get; set; }
     public string? StoredFileName { get; set; }
     public string Workflow { get; set; } = "[]";
+    public string ContentText { get; set; } = "";
 }

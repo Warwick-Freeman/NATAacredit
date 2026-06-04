@@ -1,4 +1,5 @@
 using System.IdentityModel.Tokens.Jwt;
+using Microsoft.Data.Sqlite;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text.RegularExpressions;
@@ -115,10 +116,14 @@ using (var scope = app.Services.CreateScope())
         "ALTER TABLE Clauses ADD COLUMN Standard TEXT NOT NULL DEFAULT 'asa'",
         "ALTER TABLE Clauses ADD COLUMN Category TEXT",
         "ALTER TABLE ComplianceSections ADD COLUMN Standard TEXT NOT NULL DEFAULT 'asa'",
+        "ALTER TABLE Documents ADD COLUMN ContentText TEXT NOT NULL DEFAULT ''",
     })
     {
         try { db.Database.ExecuteSqlRaw(col); } catch { /* column already exists */ }
     }
+
+    // Flush all cached SQLite connections so subsequent queries see the updated schema
+    SqliteConnection.ClearAllPools();
 
     // Seed default config if not present
     if (!db.SiteConfig.Any(c => c.Key == "standard"))
@@ -208,6 +213,21 @@ using (var scope = app.Services.CreateScope())
 
     var sopDir = Path.Combine(app.Environment.ContentRootPath, "..", "sop");
     SeedData.ImportSopDirectory(db, sopDir, dataDir);
+
+    // Backfill ContentText for any HTML documents that haven't been indexed yet
+    var unindexed = await db.Documents
+        .Where(d => d.ContentText == "" && d.StoredFileName != null && d.FileType == "html")
+        .ToListAsync();
+    if (unindexed.Count > 0)
+    {
+        foreach (var doc in unindexed)
+        {
+            var htmlPath = Path.Combine(dataDir, doc.StoredFileName!);
+            if (File.Exists(htmlPath))
+                doc.ContentText = ExtractTextFromHtml(await File.ReadAllTextAsync(htmlPath));
+        }
+        await db.SaveChangesAsync();
+    }
 
     // Copy standard reference PDFs into data/standards/
     var standardsDataDir = Path.Combine(dataDir, "standards");
@@ -417,6 +437,21 @@ DocumentDto ToDto(Document d) => new(
     d.DocId, d.Title, d.Version, d.Status, d.Folder,
     d.Owner, d.Clauses, d.ReviewDue, d.Updated,
     d.FileType, d.FileName, d.StoredFileName != null, d.Workflow);
+
+app.MapGet("/api/documents/search", async (string q, NexusDbContext db) =>
+{
+    if (string.IsNullOrWhiteSpace(q) || q.Length < 2) return Results.Ok(Array.Empty<object>());
+    var lower = q.ToLower();
+    var matches = await db.Documents
+        .Where(d => d.ContentText != "" && d.ContentText.ToLower().Contains(lower))
+        .Select(d => new { d.DocId, d.Title, d.Status, d.Folder, d.Owner, d.Version, d.ContentText })
+        .ToListAsync();
+    var results = matches.Select(d => new {
+        d.DocId, d.Title, d.Status, d.Folder, d.Owner, d.Version,
+        Snippet = GetSnippet(d.ContentText, q),
+    });
+    return Results.Ok(results);
+}).RequireAuthorization();
 
 app.MapGet("/api/documents", async (NexusDbContext db) =>
     (await db.Documents.ToListAsync()).Select(ToDto)).RequireAuthorization();
@@ -799,6 +834,17 @@ bool VerifyPassword(string password, string stored)
         return CryptographicOperations.FixedTimeEquals(actualHash, expectedHash);
     }
     catch { return false; }
+}
+
+string ExtractTextFromHtml(string html) => SeedData.StripHtml(html);
+
+string GetSnippet(string text, string query, int snippetLen = 220)
+{
+    var idx = text.IndexOf(query, StringComparison.OrdinalIgnoreCase);
+    if (idx < 0) return text.Length > snippetLen ? text[..snippetLen] + "…" : text;
+    var start = Math.Max(0, idx - 60);
+    var end   = Math.Min(text.Length, idx + query.Length + 160);
+    return (start > 0 ? "…" : "") + text[start..end] + (end < text.Length ? "…" : "");
 }
 
 string Initials(string name)

@@ -4,7 +4,7 @@ import { Avatar, StatusPill, Pill } from './components';
 import { useTaskContext } from './TaskContext';
 import { useNexusData } from './NexusDataContext';
 import { getStdCfg } from './standardConfig';
-import { fetchDocuments } from './api';
+import { fetchDocuments, searchDocumentContent } from './api';
 
 // Full requirement text for all seeded clauses
 const REQUIREMENT = {
@@ -98,10 +98,12 @@ const ClauseDrawer = ({ data, clauseId, onClose, onUpdate }) => {
   const setNev = (k, v) => setNewEv(n => ({ ...n, [k]: v }));
 
   // Document picker state
-  const [docLib,       setDocLib]       = useState([]);
-  const [docLibLoading, setDocLibLoading] = useState(false);
-  const [docSearch,    setDocSearch]    = useState('');
-  const [pickedDoc,    setPickedDoc]    = useState(null);
+  const [docLib,          setDocLib]          = useState([]);
+  const [docLibLoading,   setDocLibLoading]   = useState(false);
+  const [docSearch,       setDocSearch]       = useState('');
+  const [pickedDoc,       setPickedDoc]       = useState(null);
+  const [contentResults,  setContentResults]  = useState(null); // null=idle
+  const [contentSearching,setContentSearching]= useState(false);
   const docSearchRef = useRef(null);
 
   // Status / notes editing
@@ -119,7 +121,22 @@ const ClauseDrawer = ({ data, clauseId, onClose, onUpdate }) => {
     setPickedDoc(null);
     setDocSearch('');
     setEvMode('docs');
+    setContentResults(null);
   }, [clause.id]);
+
+  // Debounced content search — fires 450ms after typing stops (3+ chars)
+  useEffect(() => {
+    if (!addEvOpen || evMode !== 'docs') return;
+    if (docSearch.length < 3) { setContentResults(null); return; }
+    setContentSearching(true);
+    const timer = setTimeout(() => {
+      searchDocumentContent(docSearch)
+        .then(r => setContentResults(r ?? []))
+        .catch(() => setContentResults([]))
+        .finally(() => setContentSearching(false));
+    }, 450);
+    return () => clearTimeout(timer);
+  }, [docSearch, addEvOpen, evMode]);
 
   // Load document library when the add-evidence panel opens
   useEffect(() => {
@@ -453,9 +470,18 @@ const ClauseDrawer = ({ data, clauseId, onClose, onUpdate }) => {
 
               {/* ── From documents mode ── */}
               {evMode === 'docs' && (<>
-                <input ref={docSearchRef} className="form-input" placeholder="Search by document ID or title…"
-                  value={docSearch} onChange={e => { setDocSearch(e.target.value); setPickedDoc(null); }}
-                  autoFocus />
+                <div style={{ position: 'relative' }}>
+                  <input ref={docSearchRef} className="form-input" style={{ width: '100%', boxSizing: 'border-box', paddingRight: contentSearching ? 80 : 8 }}
+                    placeholder="Search by ID, title or content…"
+                    value={docSearch}
+                    onChange={e => { setDocSearch(e.target.value); setPickedDoc(null); if (!e.target.value) setContentResults(null); }}
+                    autoFocus />
+                  {contentSearching && (
+                    <span style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', fontSize: 10, color: 'var(--ink-3)', pointerEvents: 'none' }}>
+                      searching…
+                    </span>
+                  )}
+                </div>
 
                 {docLibLoading && (
                   <div style={{ fontSize: 12, color: 'var(--ink-3)', padding: '6px 0' }}>Loading documents…</div>
@@ -499,6 +525,59 @@ const ClauseDrawer = ({ data, clauseId, onClose, onUpdate }) => {
                     })}
                   </div>
                 )}
+
+                {/* Content search results — docs whose full text matches */}
+                {contentResults !== null && (() => {
+                  // Deduplicate: hide content matches already shown above
+                  const titleMatchIds = new Set(filteredDocs.map(d => d.id));
+                  const unique = contentResults.filter(r => !titleMatchIds.has(r.docId));
+                  if (unique.length === 0 && !contentSearching) return null;
+                  return (
+                    <div style={{ borderTop: '1px dashed var(--border)', paddingTop: 8 }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <Icon name="search" size={10} />
+                        {unique.length === 0 ? 'No content matches' : `${unique.length} match${unique.length > 1 ? 'es' : ''} in document content`}
+                      </div>
+                      <div style={{ maxHeight: 180, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        {unique.map(r => {
+                          const isPicked = pickedDoc?.id === r.docId;
+                          // Try to get full doc from library for the picker
+                          const fullDoc = docLib.find(d => d.id === r.docId) || {
+                            id: r.docId, title: r.title, version: r.version,
+                            status: r.status, folder: r.folder, updated: '',
+                          };
+                          // Highlight matching term in snippet
+                          const highlighted = r.snippet?.split(
+                            new RegExp(`(${docSearch.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'i')
+                          ).map((part, i) =>
+                            part.toLowerCase() === docSearch.toLowerCase()
+                              ? <mark key={i} style={{ background: '#fef08a', color: '#1f2933', borderRadius: 2, padding: '0 1px' }}>{part}</mark>
+                              : part
+                          );
+                          return (
+                            <div key={r.docId} onClick={() => handlePickDoc(fullDoc)}
+                              style={{ padding: '8px 10px', borderRadius: 6, cursor: 'pointer',
+                                border: `1.5px solid ${isPicked ? 'var(--accent)' : 'var(--border)'}`,
+                                background: isPicked ? 'var(--accent-soft)' : 'var(--surface)',
+                                transition: 'border-color 0.1s, background 0.1s' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                                <span style={{ fontFamily: 'monospace', fontSize: 11, fontWeight: 600,
+                                  color: isPicked ? 'var(--accent-ink)' : 'var(--ink-2)', flexShrink: 0 }}>
+                                  {r.docId}
+                                </span>
+                                <span style={{ fontSize: 12, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {r.title}
+                                </span>
+                                {isPicked && <Icon name="check" size={12} style={{ color: 'var(--accent)', flexShrink: 0 }} />}
+                              </div>
+                              <div style={{ fontSize: 10, color: 'var(--ink-3)', lineHeight: 1.5 }}>{highlighted}</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {pickedDoc && (
                   <div style={{ padding: '8px 10px', background: 'var(--surface-2)', borderRadius: 6, fontSize: 12 }}>
