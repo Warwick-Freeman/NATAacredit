@@ -636,7 +636,7 @@ app.MapGet("/api/documents/{id}/file", async (string id, NexusDbContext db, Http
         return Results.File(path, "application/pdf");
     }
     var html = await File.ReadAllTextAsync(path);
-    var script = BuildSignoffScript(doc.Workflow);
+    var script = BuildDocScript(doc);
     if (!string.IsNullOrEmpty(script))
         html = html.Contains("</body>", StringComparison.OrdinalIgnoreCase)
             ? html.Replace("</body>", script + "\n</body>", StringComparison.OrdinalIgnoreCase)
@@ -1059,40 +1059,65 @@ bool VerifyPassword(string password, string stored)
     catch { return false; }
 }
 
-string BuildSignoffScript(string? workflowJson)
+string BuildDocScript(Document doc)
 {
-    if (string.IsNullOrEmpty(workflowJson) || workflowJson == "[]") return "";
-    try
+    JsonElement[]? steps = null;
+    try { steps = JsonSerializer.Deserialize<JsonElement[]>(doc.Workflow ?? "[]"); } catch { }
+
+    string Str(int i, string key) =>
+        steps != null && i < steps.Length && steps[i].TryGetProperty(key, out var v) ? (v.GetString() ?? "—") : "—";
+    bool Done(int i) =>
+        steps != null && i < steps.Length && steps[i].TryGetProperty("done", out var v) && v.GetBoolean();
+
+    var effectiveDate = Done(3) ? Str(3, "date") : Done(2) ? Str(2, "date") : doc.Updated ?? "—";
+    var authorisedBy  = Done(2) ? Str(2, "who") : "—";
+    var isForm = doc.DocId?.StartsWith("FRM") == true;
+
+    var meta = new {
+        idLabel      = isForm ? "Form ID" : "Document ID",
+        docId        = doc.DocId        ?? "—",
+        version      = doc.Version      ?? "—",
+        effectiveDate,
+        reviewDue    = doc.ReviewDue    ?? "—",
+        authorisedBy,
+        clauses      = doc.Clauses      ?? ""
+    };
+
+    var sfCells = steps?.Length > 0 ? new[]
     {
-        var steps = JsonSerializer.Deserialize<JsonElement[]>(workflowJson);
-        if (steps == null || steps.Length == 0) return "";
+        new { label = "Prepared by",   who = Done(0) ? Str(0, "who") : "—", date = Done(0) ? Str(0, "date") : "—", comment = Done(0) ? Str(0, "comment") : "" },
+        new { label = "Reviewed by",   who = Done(1) ? Str(1, "who") : "—", date = Done(1) ? Str(1, "date") : "—", comment = Done(1) ? Str(1, "comment") : "" },
+        new { label = "Authorised by", who = Done(2) ? Str(2, "who") : "—", date = Done(2) ? Str(2, "date") : "—", comment = Done(2) ? Str(2, "comment") : "" },
+    } : null;
 
-        string Str(int i, string key) =>
-            i < steps.Length && steps[i].TryGetProperty(key, out var v) ? (v.GetString() ?? "—") : "—";
-        bool Done(int i) =>
-            i < steps.Length && steps[i].TryGetProperty("done", out var v) && v.GetBoolean();
+    var metaJson = JsonSerializer.Serialize(meta);
+    var sfJson   = sfCells != null ? JsonSerializer.Serialize(sfCells) : "null";
 
-        var cells = new[]
-        {
-            new { label = "Prepared by",   who = Done(0) ? Str(0, "who") : "—", date = Done(0) ? Str(0, "date") : "—", comment = Done(0) ? Str(0, "comment") : "" },
-            new { label = "Reviewed by",   who = Done(1) ? Str(1, "who") : "—", date = Done(1) ? Str(1, "date") : "—", comment = Done(1) ? Str(1, "comment") : "" },
-            new { label = "Authorised by", who = Done(2) ? Str(2, "who") : "—", date = Done(2) ? Str(2, "date") : "—", comment = Done(2) ? Str(2, "comment") : "" },
-        };
-        var json = JsonSerializer.Serialize(cells);
-        var sb = new System.Text.StringBuilder();
-        sb.Append("<script>\n");
-        sb.Append("(function(){var c=").Append(json).Append(";");
-        sb.Append("document.addEventListener('DOMContentLoaded',function(){");
-        sb.Append("var sf=document.querySelector('.signoff');if(!sf)return;");
-        sb.Append("sf.innerHTML=c.map(function(s){");
-        sb.Append("var h='<div class=\"sign-cell\"><strong>'+s.label+'</strong><br>Name: '+s.who+'<br>Date: '+s.date;");
-        sb.Append("if(s.comment&&s.comment.length>0)h+='<br><em style=\"font-size:9pt;color:var(--ink-3)\">\"'+s.comment+'\"</em>';");
-        sb.Append("return h+'</div>';");
-        sb.Append("}).join('');");
-        sb.Append("});})();\n</script>");
-        return sb.ToString();
-    }
-    catch { return ""; }
+    var sb = new System.Text.StringBuilder();
+    sb.Append("<script>\n(function(){");
+    sb.Append("var m=").Append(metaJson).Append(';');
+    sb.Append("var sf=").Append(sfJson).Append(';');
+    sb.Append("document.addEventListener('DOMContentLoaded',function(){");
+
+    // Header metadata
+    sb.Append("var hdr=document.querySelector('.doc-header');");
+    sb.Append("if(hdr){");
+    sb.Append("hdr.querySelectorAll('.field').forEach(function(f){f.remove();});");
+    sb.Append("var fi=[{l:m.idLabel,v:m.docId},{l:'Revision',v:m.version},{l:'Effective date',v:m.effectiveDate},{l:'Review date',v:m.reviewDue},{l:'Authorised by',v:m.authorisedBy}];");
+    sb.Append("if(m.clauses&&m.clauses.length>0)fi.push({l:'Linked clauses',v:m.clauses});");
+    sb.Append("fi.forEach(function(f){var d=document.createElement('div');d.className='field';d.innerHTML='<strong>'+f.l+':</strong> '+f.v;hdr.appendChild(d);});");
+    sb.Append("}");
+
+    // Signoff
+    sb.Append("if(sf){var so=document.querySelector('.signoff');if(so){");
+    sb.Append("so.innerHTML=sf.map(function(s){");
+    sb.Append("var h='<div class=\"sign-cell\"><strong>'+s.label+'</strong><br>Name: '+s.who+'<br>Date: '+s.date;");
+    sb.Append("if(s.comment&&s.comment.length>0)h+='<br><em style=\"font-size:9pt;color:var(--ink-3)\">\"'+s.comment+'\"</em>';");
+    sb.Append("return h+'</div>';");
+    sb.Append("}).join('');}}");
+
+    sb.Append("});})();\n</script>");
+    return sb.ToString();
 }
 
 string ExtractTextFromHtml(string html) => SeedData.StripHtml(html);

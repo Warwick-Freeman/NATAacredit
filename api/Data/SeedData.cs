@@ -99,13 +99,13 @@ public static class SeedData
             var contentText = StripHtml(rawHtml);
             var isForm   = folder == "forms";
             var importDate  = DateTime.Now.ToString("dd MMM yyyy");
-            var reviewDate  = DateTime.Now.AddMonths(24).ToString("dd MMM yyyy");
-            var wfJson = isForm ? "[]" : Wf(
+            var reviewDate  = DateTime.Now.AddMonths(isForm ? 12 : 24).ToString("dd MMM yyyy");
+            var wfJson = Wf(
                 Step("Draft",           owner,  importDate, done: true),
                 Step("Peer review",     owner,  importDate, done: true),
                 Step("Approval",        owner,  importDate, done: true),
                 Step("Issue",           owner,  importDate, done: true),
-                Step("Periodic review", "+24 mo", reviewDate)
+                Step("Periodic review", isForm ? "+12 mo" : "+24 mo", reviewDate)
             );
 
             db.Documents.Add(new Document
@@ -117,7 +117,7 @@ public static class SeedData
                 Folder         = folder,
                 Owner          = owner,
                 Clauses        = "",
-                ReviewDue      = isForm ? "Annual" : reviewDate,
+                ReviewDue      = reviewDate,
                 Updated        = importDate,
                 FileType       = "html",
                 FileName       = Path.GetFileName(filePath),
