@@ -1,29 +1,63 @@
 import React, { createContext, useContext, useState, useRef, useEffect } from 'react';
 
 export const ROLE_LEVEL = {
-  'Medical Director':           5,
-  'Quality Manager':            4,
-  'Paediatric Sleep Physician': 3,
-  'Reporting Physician':        3,
-  'Senior Technologist':        2,
-  'Scoring Technologist':       1,
-  'Recording Tech':             1,
-  'Reception / Bookings':       0,
-  'External Auditor':           0,
-  'External Assessor':          0,
+  // ASA / NATA roles
+  'Medical Director':                         5,
+  'Quality Manager':                          4,
+  'Paediatric Sleep Physician':               3,
+  'Reporting Physician':                      3,
+  'Senior Technologist':                      2,
+  'Scoring Technologist':                     1,
+  'Recording Tech':                           1,
+  'Reception / Bookings':                     0,
+  'External Auditor':                         0,
+  'External Assessor':                        0,
+  // AASM roles
+  'Network Director':                         5,
+  'Site Director':                            4,
+  'Lead Technologist (RPSGT)':                2,
+  'Registered Polysomnographic Technologist': 1,
+  'Sleep Technician':                         1,
+  'Scheduling / Receptionist':                0,
+  'External Reviewer':                        0,
+  'AASM Accreditation Reviewer':              0,
 };
 
+// Role lists per standard — used to filter dropdowns in user management
+export const ASA_ROLES = [
+  'Medical Director', 'Quality Manager', 'Paediatric Sleep Physician',
+  'Reporting Physician', 'Senior Technologist', 'Scoring Technologist',
+  'Recording Tech', 'Reception / Bookings', 'External Auditor', 'External Assessor',
+];
+
+export const AASM_ROLES = [
+  'Network Director', 'Site Director', 'Quality Manager',
+  'Lead Technologist (RPSGT)', 'Registered Polysomnographic Technologist',
+  'Sleep Technician', 'Scheduling / Receptionist',
+  'External Reviewer', 'AASM Accreditation Reviewer',
+];
+
 export const ROLE_PERMISSIONS = {
-  'Medical Director':           { canCreateDoc: true,  canUploadDoc: true,  canPeerReviewDoc: true,  canApproveDoc: true,  canIssueDoc: true,  canSignStudy: true,  canManageUsers: true,  canInviteUsers: true  },
-  'Quality Manager':            { canCreateDoc: true,  canUploadDoc: true,  canPeerReviewDoc: true,  canApproveDoc: true,  canIssueDoc: true,  canSignStudy: false, canManageUsers: true,  canInviteUsers: true  },
-  'Paediatric Sleep Physician': { canCreateDoc: true,  canUploadDoc: true,  canPeerReviewDoc: true,  canApproveDoc: true,  canIssueDoc: false, canSignStudy: true,  canManageUsers: false, canInviteUsers: false },
-  'Reporting Physician':        { canCreateDoc: true,  canUploadDoc: true,  canPeerReviewDoc: true,  canApproveDoc: true,  canIssueDoc: false, canSignStudy: true,  canManageUsers: false, canInviteUsers: false },
-  'Senior Technologist':        { canCreateDoc: true,  canUploadDoc: true,  canPeerReviewDoc: true,  canApproveDoc: false, canIssueDoc: false, canSignStudy: false, canManageUsers: false, canInviteUsers: false },
-  'Scoring Technologist':       { canCreateDoc: false, canUploadDoc: false, canPeerReviewDoc: false, canApproveDoc: false, canIssueDoc: false, canSignStudy: false, canManageUsers: false, canInviteUsers: false },
-  'Recording Tech':             { canCreateDoc: false, canUploadDoc: false, canPeerReviewDoc: false, canApproveDoc: false, canIssueDoc: false, canSignStudy: false, canManageUsers: false, canInviteUsers: false },
-  'Reception / Bookings':       { canCreateDoc: false, canUploadDoc: false, canPeerReviewDoc: false, canApproveDoc: false, canIssueDoc: false, canSignStudy: false, canManageUsers: false, canInviteUsers: false },
-  'External Auditor':           { canCreateDoc: false, canUploadDoc: false, canPeerReviewDoc: false, canApproveDoc: false, canIssueDoc: false, canSignStudy: false, canManageUsers: false, canInviteUsers: false },
-  'External Assessor':          { canCreateDoc: false, canUploadDoc: false, canPeerReviewDoc: false, canApproveDoc: false, canIssueDoc: false, canSignStudy: false, canManageUsers: false, canInviteUsers: false },
+  // ASA / NATA roles
+  'Medical Director':                         { canCreateDoc: true,  canUploadDoc: true,  canPeerReviewDoc: true,  canApproveDoc: true,  canIssueDoc: true,  canSignStudy: true,  canManageUsers: true,  canInviteUsers: true  },
+  'Quality Manager':                          { canCreateDoc: true,  canUploadDoc: true,  canPeerReviewDoc: true,  canApproveDoc: true,  canIssueDoc: true,  canSignStudy: false, canManageUsers: true,  canInviteUsers: true  },
+  'Paediatric Sleep Physician':               { canCreateDoc: true,  canUploadDoc: true,  canPeerReviewDoc: true,  canApproveDoc: true,  canIssueDoc: false, canSignStudy: true,  canManageUsers: false, canInviteUsers: false },
+  'Reporting Physician':                      { canCreateDoc: true,  canUploadDoc: true,  canPeerReviewDoc: true,  canApproveDoc: true,  canIssueDoc: false, canSignStudy: true,  canManageUsers: false, canInviteUsers: false },
+  'Senior Technologist':                      { canCreateDoc: true,  canUploadDoc: true,  canPeerReviewDoc: true,  canApproveDoc: false, canIssueDoc: false, canSignStudy: false, canManageUsers: false, canInviteUsers: false },
+  'Scoring Technologist':                     { canCreateDoc: false, canUploadDoc: false, canPeerReviewDoc: false, canApproveDoc: false, canIssueDoc: false, canSignStudy: false, canManageUsers: false, canInviteUsers: false },
+  'Recording Tech':                           { canCreateDoc: false, canUploadDoc: false, canPeerReviewDoc: false, canApproveDoc: false, canIssueDoc: false, canSignStudy: false, canManageUsers: false, canInviteUsers: false },
+  'Reception / Bookings':                     { canCreateDoc: false, canUploadDoc: false, canPeerReviewDoc: false, canApproveDoc: false, canIssueDoc: false, canSignStudy: false, canManageUsers: false, canInviteUsers: false },
+  'External Auditor':                         { canCreateDoc: false, canUploadDoc: false, canPeerReviewDoc: false, canApproveDoc: false, canIssueDoc: false, canSignStudy: false, canManageUsers: false, canInviteUsers: false },
+  'External Assessor':                        { canCreateDoc: false, canUploadDoc: false, canPeerReviewDoc: false, canApproveDoc: false, canIssueDoc: false, canSignStudy: false, canManageUsers: false, canInviteUsers: false },
+  // AASM roles
+  'Network Director':                         { canCreateDoc: true,  canUploadDoc: true,  canPeerReviewDoc: true,  canApproveDoc: true,  canIssueDoc: true,  canSignStudy: true,  canManageUsers: true,  canInviteUsers: true  },
+  'Site Director':                            { canCreateDoc: true,  canUploadDoc: true,  canPeerReviewDoc: true,  canApproveDoc: true,  canIssueDoc: true,  canSignStudy: true,  canManageUsers: true,  canInviteUsers: true  },
+  'Lead Technologist (RPSGT)':                { canCreateDoc: true,  canUploadDoc: true,  canPeerReviewDoc: true,  canApproveDoc: false, canIssueDoc: false, canSignStudy: false, canManageUsers: false, canInviteUsers: false },
+  'Registered Polysomnographic Technologist': { canCreateDoc: false, canUploadDoc: false, canPeerReviewDoc: false, canApproveDoc: false, canIssueDoc: false, canSignStudy: false, canManageUsers: false, canInviteUsers: false },
+  'Sleep Technician':                         { canCreateDoc: false, canUploadDoc: false, canPeerReviewDoc: false, canApproveDoc: false, canIssueDoc: false, canSignStudy: false, canManageUsers: false, canInviteUsers: false },
+  'Scheduling / Receptionist':                { canCreateDoc: false, canUploadDoc: false, canPeerReviewDoc: false, canApproveDoc: false, canIssueDoc: false, canSignStudy: false, canManageUsers: false, canInviteUsers: false },
+  'External Reviewer':                        { canCreateDoc: false, canUploadDoc: false, canPeerReviewDoc: false, canApproveDoc: false, canIssueDoc: false, canSignStudy: false, canManageUsers: false, canInviteUsers: false },
+  'AASM Accreditation Reviewer':              { canCreateDoc: false, canUploadDoc: false, canPeerReviewDoc: false, canApproveDoc: false, canIssueDoc: false, canSignStudy: false, canManageUsers: false, canInviteUsers: false },
 };
 
 export function can(role, permission) {

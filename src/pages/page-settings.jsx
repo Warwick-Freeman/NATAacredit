@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Icon from '../icons';
 import { PageHeader, Pill, Avatar, Tabs, Drawer } from '../components';
-import { useAuth, ROLE_LEVEL, ROLE_PERMISSIONS } from '../AuthContext';
+import { useAuth, ROLE_LEVEL, ROLE_PERMISSIONS, ASA_ROLES, AASM_ROLES } from '../AuthContext';
 import UserFormDrawer from '../user-form-drawer';
 import { useNexusData } from '../NexusDataContext';
 import { getStdCfg } from '../standardConfig';
@@ -705,7 +705,9 @@ const SettingsPage = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {Object.entries(ROLE_PERMISSIONS).map(([role, perms]) => (
+                    {(activeStandard === 'aasm' ? AASM_ROLES : ASA_ROLES).map(role => {
+                      const perms = ROLE_PERMISSIONS[role] ?? {};
+                      return (
                       <tr key={role}>
                         <td style={{ fontSize: 12, fontWeight: 500, whiteSpace: 'nowrap' }}>{role}</td>
                         {Object.keys(PERM_LABELS).map(key => (
@@ -717,7 +719,8 @@ const SettingsPage = () => {
                           </td>
                         ))}
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

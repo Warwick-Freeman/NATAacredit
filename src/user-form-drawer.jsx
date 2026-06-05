@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import Icon from './icons';
-import { ROLE_LEVEL } from './AuthContext';
+import { ROLE_LEVEL, ASA_ROLES, AASM_ROLES } from './AuthContext';
+import { useNexusData } from './NexusDataContext';
 
 const AUTH_METHODS = ['Okta', 'Local', 'Magic link', 'SAML'];
 
@@ -23,14 +24,15 @@ const UserFormDrawer = ({ userData, currentUserRole, onSave, onClose }) => {
   const isEdit = !!(userData?.id);
   const [form, setForm] = useState(() => initForm(userData));
   const [errors, setErrors] = useState({});
+  const { activeStandard } = useNexusData();
 
   const currentLevel = ROLE_LEVEL[currentUserRole] ?? 0;
+  const standardRoles = activeStandard === 'aasm' ? AASM_ROLES : ASA_ROLES;
 
-  // Roles the current user can assign: only roles strictly below their own level
-  const allowedRoles = Object.entries(ROLE_LEVEL)
-    .filter(([, level]) => level < currentLevel)
-    .sort((a, b) => b[1] - a[1])
-    .map(([role]) => role);
+  // Roles the current user can assign: only standard-appropriate roles strictly below their own level
+  const allowedRoles = standardRoles
+    .filter(role => (ROLE_LEVEL[role] ?? 0) < currentLevel)
+    .sort((a, b) => (ROLE_LEVEL[b] ?? 0) - (ROLE_LEVEL[a] ?? 0));
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -97,7 +99,11 @@ const UserFormDrawer = ({ userData, currentUserRole, onSave, onClose }) => {
           </select>
           {form.role && (
             <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 4 }}>
-              Level {ROLE_LEVEL[form.role] ?? 0} · {['No QMS access', 'Recording/Scoring', 'Senior tech', 'Physician', 'Physician', 'Quality Manager', 'Medical Director'][ROLE_LEVEL[form.role] ?? 0]}
+              Level {ROLE_LEVEL[form.role] ?? 0} · {
+                activeStandard === 'aasm'
+                  ? ['No QMS access', 'Technician/RPSGT', 'Lead Technologist', 'Site Director', 'Site Director', 'Network Director', 'Network Director'][ROLE_LEVEL[form.role] ?? 0]
+                  : ['No QMS access', 'Recording/Scoring', 'Senior tech', 'Physician', 'Physician', 'Quality Manager', 'Medical Director'][ROLE_LEVEL[form.role] ?? 0]
+              }
             </div>
           )}
         </div>

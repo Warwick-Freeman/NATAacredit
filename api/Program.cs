@@ -1,4 +1,5 @@
-using System.IdentityModel.Tokens.Jwt;
+﻿using System.IdentityModel.Tokens.Jwt;
+using System.Text.Json;
 using Microsoft.Data.Sqlite;
 using System.Security.Claims;
 using System.Security.Cryptography;
@@ -427,10 +428,57 @@ app.MapGet("/api/clauses", async (NexusDbContext db) =>
 app.MapGet("/api/clauses/{id}", async (string id, NexusDbContext db) =>
     await db.Clauses.FirstOrDefaultAsync(c => c.ClauseId == id)
         is { } clause ? Results.Ok(clause) : Results.NotFound()).RequireAuthorization();
+
+app.MapPut("/api/clauses/{id}", async (string id, ClauseUpdateDto dto, NexusDbContext db, ClaimsPrincipal principal) =>
+{
+    var clause = await db.Clauses.FirstOrDefaultAsync(c => c.ClauseId == id);
+    if (clause == null) return Results.NotFound();
+    var prevStatus = clause.Status;
+    if (dto.Status != null)
+    {
+        clause.Status = dto.Status switch {
+            "nc"      => "nonconformant",
+            "partial" => "review",
+            _         => dto.Status,
+        };
+    }
+    if (dto.Evidence.HasValue) clause.Evidence     = dto.Evidence.Value;
+    if (dto.Owner != null)     clause.Owner        = dto.Owner;
+    if (dto.LastReviewed != null) clause.LastReviewed = dto.LastReviewed;
+    var displayStatus = clause.Status switch {
+        "nonconformant" => "non-conformant",
+        "review"        => "under review",
+        _               => clause.Status,
+    };
+    db.Activity.Add(MakeActivity(
+        ActorName(principal),
+        "updated self-assessment",
+        $"cl. {id} → '{displayStatus}'",
+        "edit",
+        "accreditation",
+        prevStatus != clause.Status
+            ? $"Previous status: {prevStatus}. Clause: {clause.Title}."
+            : $"Evidence updated. Clause: {clause.Title}."
+    ));
+    await db.SaveChangesAsync();
+    return Results.Ok(clause);
+}).RequireAuthorization();
+
 app.MapGet("/api/compliance", async (NexusDbContext db) =>
 {
-    var std = (await db.SiteConfig.FindAsync("standard"))?.Value ?? "asa";
-    return await db.ComplianceSections.Where(s => s.Standard == std).ToListAsync();
+    var std      = (await db.SiteConfig.FindAsync("standard"))?.Value ?? "asa";
+    var sections = await db.ComplianceSections.Where(s => s.Standard == std).OrderBy(s => s.Section).ToListAsync();
+    var clauses  = await db.Clauses.Where(c => c.Standard == std).ToListAsync();
+    return sections.Select(s => {
+        var sc      = clauses.Where(c => c.Section == s.Section).ToList();
+        var total   = sc.Count > 0 ? sc.Count : s.Total;
+        var ok      = sc.Count(c => c.Status == "compliant");
+        var nc      = sc.Count(c => c.Status == "nonconformant" || c.Status == "nc");
+        var na      = sc.Count(c => c.Status == "na");
+        var partial = Math.Max(0, total - ok - nc - na);
+        var status  = nc > 0 ? "nc" : partial > 0 ? "partial" : "ok";
+        return new { section = s.Section, title = s.Title, total, ok, nc, na, status };
+    });
 }).RequireAuthorization();
 app.MapGet("/api/tasks",       async (NexusDbContext db) => await db.Tasks.ToListAsync()).RequireAuthorization();
 app.MapGet("/api/activity", async (NexusDbContext db) =>
@@ -582,9 +630,18 @@ app.MapGet("/api/documents/{id}/file", async (string id, NexusDbContext db, Http
     if (doc?.StoredFileName == null) return Results.NotFound();
     var path = Path.Combine(dataDir, doc.StoredFileName);
     if (!File.Exists(path)) return Results.NotFound();
-    var isPdf = doc.FileType == "pdf";
-    if (isPdf) ctx.Response.Headers["Content-Disposition"] = $"inline; filename=\"{doc.StoredFileName}\"";
-    return Results.File(path, isPdf ? "application/pdf" : "text/html; charset=utf-8");
+    if (doc.FileType == "pdf")
+    {
+        ctx.Response.Headers["Content-Disposition"] = $"inline; filename=\"{doc.StoredFileName}\"";
+        return Results.File(path, "application/pdf");
+    }
+    var html = await File.ReadAllTextAsync(path);
+    var script = BuildSignoffScript(doc.Workflow);
+    if (!string.IsNullOrEmpty(script))
+        html = html.Contains("</body>", StringComparison.OrdinalIgnoreCase)
+            ? html.Replace("</body>", script + "\n</body>", StringComparison.OrdinalIgnoreCase)
+            : html + script;
+    return Results.Content(html, "text/html; charset=utf-8");
 }).RequireAuthorization();
 
 // ── Rooms ─────────────────────────────────────────────────────────────────────
@@ -687,6 +744,13 @@ app.MapPost("/api/isr/{id:int}/sign", async (int id, IsrSignDto dto, NexusDbCont
     if (!string.IsNullOrEmpty(dto.AttestationBy))   a.AttestationBy   = dto.AttestationBy;
     if (!string.IsNullOrEmpty(dto.AttestationDate)) a.AttestationDate = dto.AttestationDate;
     a.Notes = dto.Notes ?? a.Notes;
+    db.Activity.Add(MakeActivity(
+        name,
+        "signed ISR assessment",
+        $"{a.AssessmentRef} — {a.Quarter}",
+        "sign",
+        "isr"
+    ));
     await db.SaveChangesAsync();
     return Results.Ok(a);
 }).RequireAuthorization();
@@ -995,6 +1059,42 @@ bool VerifyPassword(string password, string stored)
     catch { return false; }
 }
 
+string BuildSignoffScript(string? workflowJson)
+{
+    if (string.IsNullOrEmpty(workflowJson) || workflowJson == "[]") return "";
+    try
+    {
+        var steps = JsonSerializer.Deserialize<JsonElement[]>(workflowJson);
+        if (steps == null || steps.Length == 0) return "";
+
+        string Str(int i, string key) =>
+            i < steps.Length && steps[i].TryGetProperty(key, out var v) ? (v.GetString() ?? "—") : "—";
+        bool Done(int i) =>
+            i < steps.Length && steps[i].TryGetProperty("done", out var v) && v.GetBoolean();
+
+        var cells = new[]
+        {
+            new { label = "Prepared by",   who = Done(0) ? Str(0, "who") : "—", date = Done(0) ? Str(0, "date") : "—", comment = Done(0) ? Str(0, "comment") : "" },
+            new { label = "Reviewed by",   who = Done(1) ? Str(1, "who") : "—", date = Done(1) ? Str(1, "date") : "—", comment = Done(1) ? Str(1, "comment") : "" },
+            new { label = "Authorised by", who = Done(2) ? Str(2, "who") : "—", date = Done(2) ? Str(2, "date") : "—", comment = Done(2) ? Str(2, "comment") : "" },
+        };
+        var json = JsonSerializer.Serialize(cells);
+        var sb = new System.Text.StringBuilder();
+        sb.Append("<script>\n");
+        sb.Append("(function(){var c=").Append(json).Append(";");
+        sb.Append("document.addEventListener('DOMContentLoaded',function(){");
+        sb.Append("var sf=document.querySelector('.signoff');if(!sf)return;");
+        sb.Append("sf.innerHTML=c.map(function(s){");
+        sb.Append("var h='<div class=\"sign-cell\"><strong>'+s.label+'</strong><br>Name: '+s.who+'<br>Date: '+s.date;");
+        sb.Append("if(s.comment&&s.comment.length>0)h+='<br><em style=\"font-size:9pt;color:var(--ink-3)\">\"'+s.comment+'\"</em>';");
+        sb.Append("return h+'</div>';");
+        sb.Append("}).join('');");
+        sb.Append("});})();\n</script>");
+        return sb.ToString();
+    }
+    catch { return ""; }
+}
+
 string ExtractTextFromHtml(string html) => SeedData.StripHtml(html);
 
 string GetSnippet(string text, string query, int snippetLen = 220)
@@ -1037,6 +1137,7 @@ ActivityEntry MakeActivity(string who, string action, string target, string kind
 
 record LoginDto(string Email, string Password);
 record StudyStatusDto(string Status, int? SignedDays);
+record ClauseUpdateDto(string? Status, int? Evidence, string? Owner, string? LastReviewed);
 
 record DocumentDto(
     string DocId, string Title, string Version, string Status, string Folder,

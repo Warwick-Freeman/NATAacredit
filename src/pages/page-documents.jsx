@@ -17,13 +17,15 @@ function mkWorkflow(steps) {
   }));
 }
 
-function defaultWorkflow(owner) {
+function defaultWorkflow(owner, activeStandard) {
+  const approver = activeStandard === 'aasm' ? 'Site Director' : 'Dr. R. Okafor';
+  const issuer   = activeStandard === 'aasm' ? 'Quality Manager' : 'K. Patel';
   return mkWorkflow([
     { step: 'Draft',           who: owner || 'Author', date: 'today', done: true,  active: false },
     { step: 'Peer review',     who: '—',                               done: false, active: true  },
-    { step: 'Approval',        who: 'Dr. R. Okafor',                   done: false, active: false },
-    { step: 'Issue',           who: 'K. Patel',                        done: false, active: false },
-    { step: 'Periodic review', who: '+24 mo',                          done: false, active: false },
+    { step: 'Approval',        who: approver,                          done: false, active: false },
+    { step: 'Issue',           who: issuer,                            done: false, active: false },
+    { step: 'Periodic review', who: '+24 mo',                         done: false, active: false },
   ]);
 }
 
@@ -339,7 +341,7 @@ const DocumentsPage = () => {
       fd.append('owner',     saved.owner || '');
       fd.append('clauses',   (saved.clauses || []).join(','));
       fd.append('reviewDue', saved.reviewDue || '—');
-      fd.append('workflow',  JSON.stringify(defaultWorkflow(saved.owner)));
+      fd.append('workflow',  JSON.stringify(defaultWorkflow(saved.owner, activeStandard)));
       if (saved.rawFile) fd.append('file', saved.rawFile);
 
       const tok3 = localStorage.getItem('nexus_token');

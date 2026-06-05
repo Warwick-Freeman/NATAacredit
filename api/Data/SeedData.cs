@@ -97,6 +97,16 @@ public static class SeedData
 
             var rawHtml = File.ReadAllText(filePath);
             var contentText = StripHtml(rawHtml);
+            var isForm   = folder == "forms";
+            var importDate  = DateTime.Now.ToString("dd MMM yyyy");
+            var reviewDate  = DateTime.Now.AddMonths(24).ToString("dd MMM yyyy");
+            var wfJson = isForm ? "[]" : Wf(
+                Step("Draft",           owner,  importDate, done: true),
+                Step("Peer review",     owner,  importDate, done: true),
+                Step("Approval",        owner,  importDate, done: true),
+                Step("Issue",           owner,  importDate, done: true),
+                Step("Periodic review", "+24 mo", reviewDate)
+            );
 
             db.Documents.Add(new Document
             {
@@ -107,13 +117,13 @@ public static class SeedData
                 Folder         = folder,
                 Owner          = owner,
                 Clauses        = "",
-                ReviewDue      = "—",
-                Updated        = File.GetLastWriteTime(filePath).ToString("dd MMM yyyy"),
+                ReviewDue      = isForm ? "Annual" : reviewDate,
+                Updated        = importDate,
                 FileType       = "html",
                 FileName       = Path.GetFileName(filePath),
                 StoredFileName = storedName,
                 ContentText    = contentText,
-                Workflow       = "[]",
+                Workflow       = wfJson,
             });
 
             existingIds.Add(docId);

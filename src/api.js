@@ -126,6 +126,17 @@ function normaliseActivity(a) {
   };
 }
 
+export async function patchClause(id, data) {
+  const res = await fetch(`${BASE}/api/clauses/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(data),
+  });
+  if (res.status === 401) { clearSessionAndReload(); return; }
+  if (!res.ok) throw new Error(`API error ${res.status}`);
+  return res.json();
+}
+
 export async function patchStudyStatus(id, status, signedDays) {
   const res = await fetch(`${BASE}/api/studies/${id}/status`, {
     method: 'PATCH',

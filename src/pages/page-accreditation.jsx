@@ -6,6 +6,7 @@ import { useTaskContext } from '../TaskContext';
 import { useAuth } from '../AuthContext';
 import { useNexusData } from '../NexusDataContext';
 import { getStdCfg } from '../standardConfig';
+import { patchClause } from '../api';
 
 const BASE = import.meta.env.VITE_API_URL ?? '';
 
@@ -350,7 +351,7 @@ ${gapClauses.length > 0 ? `
 const AccreditationPage = ({ data: D }) => {
   const { openCreateTask } = useTaskContext();
   const { user } = useAuth();
-  const { activeStandard } = useNexusData();
+  const { activeStandard, refreshData } = useNexusData();
   const stdCfg = getStdCfg(activeStandard);
 
   const openStandard = useCallback(() => {
@@ -400,8 +401,19 @@ const AccreditationPage = ({ data: D }) => {
     return m;
   }, [D.complianceBySection]);
 
-  const handleUpdateClause = (updated) => {
+  const handleUpdateClause = async (updated) => {
     setClauses(prev => prev.map(c => c.id === updated.id ? updated : c));
+    try {
+      await patchClause(updated.id, {
+        status: updated.status,
+        evidence: typeof updated.evidence === 'number' ? updated.evidence : undefined,
+        owner: updated.owner ?? undefined,
+        lastReviewed: updated.lastReviewed ?? undefined,
+      });
+      refreshData();
+    } catch {
+      // optimistic update already applied; API failure is non-blocking
+    }
   };
 
   // Derive a data object that uses the local clause state for the drawer

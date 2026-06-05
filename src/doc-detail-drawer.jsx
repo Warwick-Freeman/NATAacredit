@@ -7,11 +7,8 @@ import { useNexusData } from './NexusDataContext';
 const STATUS_KIND = { Issued: 'good', Draft: 'outline', 'Under review': 'warn', 'Live form': 'info', Obsolete: 'bad' };
 
 const STEP_PERM = [null, 'canPeerReviewDoc', 'canApproveDoc', 'canIssueDoc'];
-const PERM_ROLE = {
-  canPeerReviewDoc: 'Senior Technologist or above',
-  canApproveDoc:    'Reporting Physician or above',
-  canIssueDoc:      'Quality Manager or above',
-};
+const PERM_ROLE_ASA  = { canPeerReviewDoc: 'Senior Technologist or above', canApproveDoc: 'Reporting Physician or above', canIssueDoc: 'Quality Manager or above' };
+const PERM_ROLE_AASM = { canPeerReviewDoc: 'Lead Technologist (RPSGT) or above', canApproveDoc: 'Site Director or above', canIssueDoc: 'Site Director or above' };
 const ADVANCE_LABEL = ['Submit for peer review', 'Approve peer review', 'Approve document', 'Issue document'];
 const STEP_STATUS   = ['Under review', 'Under review', 'Issued', 'Issued'];
 
@@ -55,7 +52,8 @@ const StepCircle = ({ index, step, isLast }) => {
 
 const DocDetailDrawer = ({ doc, onUpdate, onClose, onView, onEdit }) => {
   const { hasPerm, user, users } = useAuth();
-  const { refreshData } = useNexusData();
+  const { refreshData, activeStandard } = useNexusData();
+  const PERM_ROLE = activeStandard === 'aasm' ? PERM_ROLE_AASM : PERM_ROLE_ASA;
 
   const wf = doc.workflow || [];
   const activeIdx = wf.findIndex(s => s.active && !s.done);
@@ -117,7 +115,9 @@ const DocDetailDrawer = ({ doc, onUpdate, onClose, onView, onEdit }) => {
       {/* Header */}
       <div className="drawer-head">
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 2 }}>Documents &amp; SOPs · cl. 4.3</div>
+          <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 2 }}>
+            Documents &amp; SOPs · {activeStandard === 'aasm' ? 'AASM S-4' : 'cl. 4.3'}
+          </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <span className="mono" style={{ fontSize: 13, fontWeight: 700 }}>{doc.id}</span>
             <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>v{doc.v}</span>

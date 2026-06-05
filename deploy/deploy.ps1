@@ -32,6 +32,29 @@ Remove-Item api-publish.tar.gz
 ssh -i $KeyPath $server "tar -xzf /tmp/nexus-api.tar.gz -C /opt/nexus-api && rm /tmp/nexus-api.tar.gz"
 ssh -i $KeyPath $server "sudo chown -R www-data:www-data /opt/nexus-api"
 
+Write-Host "==> Uploading SOPs and forms (sop/)..."
+ssh -i $KeyPath $server "sudo mkdir -p /opt/sop && sudo chown ubuntu:ubuntu /opt/sop"
+tar -czf sop.tar.gz -C sop .
+scp -i $KeyPath sop.tar.gz "${server}:/tmp/nexus-sop.tar.gz"
+Remove-Item sop.tar.gz
+ssh -i $KeyPath $server "tar -xzf /tmp/nexus-sop.tar.gz -C /opt/sop && rm /tmp/nexus-sop.tar.gz"
+
+Write-Host "==> Uploading AASM workbook PDFs..."
+ssh -i $KeyPath $server 'sudo mkdir -p "/opt/AASM workbooks" && sudo chown ubuntu:ubuntu "/opt/AASM workbooks"'
+tar -czf workbooks.tar.gz -C "AASM workbooks" .
+scp -i $KeyPath workbooks.tar.gz "${server}:/tmp/nexus-workbooks.tar.gz"
+Remove-Item workbooks.tar.gz
+ssh -i $KeyPath $server 'tar -xzf /tmp/nexus-workbooks.tar.gz -C "/opt/AASM workbooks" && rm /tmp/nexus-workbooks.tar.gz'
+
+Write-Host "==> Uploading standards PDFs..."
+$pdfs = Get-ChildItem -Path . -Filter "*.pdf" -File
+if ($pdfs) {
+    tar -czf standards.tar.gz $pdfs.Name
+    scp -i $KeyPath standards.tar.gz "${server}:/tmp/nexus-standards.tar.gz"
+    Remove-Item standards.tar.gz
+    ssh -i $KeyPath $server "tar -xzf /tmp/nexus-standards.tar.gz -C /opt && rm /tmp/nexus-standards.tar.gz"
+}
+
 Write-Host "==> Installing systemd service..."
 scp -i $KeyPath deploy/nexus-api.service "${server}:/tmp/nexus-api.service"
 ssh -i $KeyPath $server "sudo mv /tmp/nexus-api.service /etc/systemd/system/nexus-api.service"
@@ -39,8 +62,8 @@ ssh -i $KeyPath $server "sudo systemctl daemon-reload"
 ssh -i $KeyPath $server "sudo systemctl enable nexus-api"
 
 if ($Reseed) {
-    Write-Host "==> Clearing database (reseed on next startup)..."
-    ssh -i $KeyPath $server "sudo rm -f /opt/nexus-api/nexus.db /opt/nexus-api/data/*"
+    Write-Host "==> Clearing database and data files (reseed on next startup)..."
+    ssh -i $KeyPath $server "sudo rm -f /opt/nexus-api/nexus.db && sudo rm -rf /opt/nexus-api/data"
 }
 
 ssh -i $KeyPath $server "sudo systemctl restart nexus-api"
