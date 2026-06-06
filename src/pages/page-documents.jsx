@@ -231,15 +231,20 @@ const DocumentsPage = () => {
   const [uploadPrefill, setUploadPrefill] = useState(null);
   const [uploadOpen,    setUploadOpen]    = useState(false);
 
-  // Load from server on mount; fall back to SEED_DOCS if API is unavailable
-  useEffect(() => {
+  // Load from server; fall back to SEED_DOCS if API is unavailable
+  const loadDocs = useCallback(() => {
     const tok = localStorage.getItem('nexus_token');
-    if (!tok) return;
-    fetch(`${BASE_API}/api/documents`, { headers: { Authorization: `Bearer ${tok}` } })
+    if (!tok) return Promise.resolve();
+    return fetch(`${BASE_API}/api/documents`, { headers: { Authorization: `Bearer ${tok}` } })
       .then(r => r.ok ? r.json() : Promise.reject())
       .then(list => { if (list?.length) setDocs(list.map(normaliseDocument)); })
       .catch(() => {});
   }, []);
+  useEffect(() => { loadDocs(); }, [loadDocs]);
+
+  const handleFormSaved = useCallback(() => {
+    loadDocs().then(() => setFolder('records'));
+  }, [loadDocs]);
 
   // Debounced content search — fires 500ms after the user stops typing (3+ chars)
   React.useEffect(() => {
@@ -256,9 +261,9 @@ const DocumentsPage = () => {
 
   const detailDoc = docs.find(d => d.id === detailDocId) || null;
 
-  // Only show documents belonging to the active standard
+  // Only show documents belonging to the active standard; records are cross-cutting
   const standardDocs = useMemo(
-    () => docs.filter(d => docStandard(d.id) === (activeStandard ?? 'asa')),
+    () => docs.filter(d => d.folder === 'records' || docStandard(d.id) === (activeStandard ?? 'asa')),
     [docs, activeStandard]
   );
 
@@ -577,6 +582,7 @@ const DocumentsPage = () => {
           doc={viewingDoc}
           onClose={() => setViewingDoc(null)}
           onAttach={(doc) => { setViewingDoc(null); openUpload(doc); }}
+          onFormSaved={handleFormSaved}
         />
       )}
 

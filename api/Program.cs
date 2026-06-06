@@ -858,8 +858,59 @@ app.MapPost("/api/form-records", async (FormRecordDto dto, NexusDbContext db, Cl
         SnapshotHtml = dto.SnapshotHtml ?? "",
     };
     db.FormRecords.Add(rec);
+
+    // Save snapshot as a viewable Document in the records folder
+    bool docCreated = false;
+    if (!string.IsNullOrWhiteSpace(rec.SnapshotHtml))
+    {
+        try
+        {
+            var recordFileName = rec.RecordRef + ".html";
+            var recordFilePath = Path.Combine(dataDir, recordFileName);
+
+            // Read-only style + value-restore script appended to snapshot
+            var restore =
+                "<style>input.fi,select.fi,textarea.fi{pointer-events:none!important;opacity:.9!important;" +
+                "background:#f5f5f5!important;border-color:#ccc!important;cursor:default!important}</style>" +
+                "<script>document.addEventListener('DOMContentLoaded',function(){" +
+                "document.querySelectorAll('[data-snap-value]').forEach(function(el){el.value=el.getAttribute('data-snap-value');});" +
+                "document.querySelectorAll('[data-snap-checked]').forEach(function(el){el.checked=el.getAttribute('data-snap-checked')==='1';});" +
+                "});</script>";
+            var fileHtml = rec.SnapshotHtml.Contains("</body>", StringComparison.OrdinalIgnoreCase)
+                ? rec.SnapshotHtml.Replace("</body>", restore + "</body>", StringComparison.OrdinalIgnoreCase)
+                : rec.SnapshotHtml + restore;
+            await File.WriteAllTextAsync(recordFilePath, fileHtml);
+
+            var sourceForm = await db.Documents.FirstOrDefaultAsync(d => d.DocId == dto.FormId);
+            var contentText = "";
+            try { contentText = ExtractTextFromHtml(fileHtml); } catch { }
+            db.Documents.Add(new Document
+            {
+                DocId          = rec.RecordRef,
+                Title          = $"{rec.FormTitle} — {rec.Period}",
+                Version        = "1.0",
+                Status         = "Issued",
+                Folder         = "records",
+                Owner          = name,
+                Clauses        = sourceForm?.Clauses ?? "",
+                ReviewDue      = "—",
+                Updated        = now.ToString("dd MMM yyyy"),
+                FileType       = "html",
+                FileName       = recordFileName,
+                StoredFileName = recordFileName,
+                ContentText    = contentText,
+                Workflow       = "[]",
+            });
+            docCreated = true;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[form-records] Failed to create record document: {ex.Message}");
+        }
+    }
+
     await db.SaveChangesAsync();
-    return Results.Ok(new { rec.Id, rec.RecordRef, rec.CompletedAt });
+    return Results.Ok(new { rec.Id, rec.RecordRef, rec.CompletedAt, DocCreated = docCreated });
 }).RequireAuthorization();
 
 app.MapGet("/api/form-records/{id:int}/html", async (int id, NexusDbContext db) =>
@@ -1093,13 +1144,19 @@ string BuildDocScript(Document doc)
     var metaJson = JsonSerializer.Serialize(meta);
     var sfJson   = sfCells != null ? JsonSerializer.Serialize(sfCells) : "null";
 
+    // Script runs immediately (not at DOMContentLoaded) because it is injected at end of </body>
+    // so the DOM is already fully built when this script executes.
     var sb = new System.Text.StringBuilder();
     sb.Append("<script>\n(function(){");
     sb.Append("var m=").Append(metaJson).Append(';');
     sb.Append("var sf=").Append(sfJson).Append(';');
-    sb.Append("document.addEventListener('DOMContentLoaded',function(){");
 
-    // Header metadata
+    // Lock header against user editing before FILL_SCRIPT runs
+    sb.Append("var _s=document.createElement('style');");
+    sb.Append("_s.textContent='.doc-header{pointer-events:none!important;user-select:none!important}';");
+    sb.Append("if(document.head)document.head.appendChild(_s);");
+
+    // Header metadata — runs immediately
     sb.Append("var hdr=document.querySelector('.doc-header');");
     sb.Append("if(hdr){");
     sb.Append("hdr.querySelectorAll('.field').forEach(function(f){f.remove();});");
@@ -1108,7 +1165,7 @@ string BuildDocScript(Document doc)
     sb.Append("fi.forEach(function(f){var d=document.createElement('div');d.className='field';d.innerHTML='<strong>'+f.l+':</strong> '+f.v;hdr.appendChild(d);});");
     sb.Append("}");
 
-    // Signoff
+    // Signoff — runs immediately
     sb.Append("if(sf){var so=document.querySelector('.signoff');if(so){");
     sb.Append("so.innerHTML=sf.map(function(s){");
     sb.Append("var h='<div class=\"sign-cell\"><strong>'+s.label+'</strong><br>Name: '+s.who+'<br>Date: '+s.date;");
@@ -1116,7 +1173,7 @@ string BuildDocScript(Document doc)
     sb.Append("return h+'</div>';");
     sb.Append("}).join('');}}");
 
-    sb.Append("});})();\n</script>");
+    sb.Append("})();\n</script>");
     return sb.ToString();
 }
 

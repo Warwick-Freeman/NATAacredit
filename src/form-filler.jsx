@@ -37,8 +37,18 @@ const FILL_SCRIPT = `
     return el;
   }
 
+  // Sections populated by the server's BuildDocScript — must not be made editable
+  var LOCKED = ['.doc-header', '.signoff'];
+  function isLocked(el) {
+    return LOCKED.some(function(sel) {
+      var p = document.querySelector(sel);
+      return p && p.contains(el);
+    });
+  }
+
   // Replace .fill spans
   Array.from(document.querySelectorAll('.fill')).forEach(function(el) {
+    if (isLocked(el)) return;
     var sz = el.classList.contains('lg') ? 'lg' : el.classList.contains('sm') ? 'sm' : 'md';
     var inp = makeInput(sz);
     el.parentNode.replaceChild(inp, el);
@@ -46,12 +56,14 @@ const FILL_SCRIPT = `
 
   // Replace .fill-sm spans (AASM form style)
   Array.from(document.querySelectorAll('.fill-sm')).forEach(function(el) {
+    if (isLocked(el)) return;
     var inp = makeInput('sm');
     el.parentNode.replaceChild(inp, el);
   });
 
   // Replace .box spans with checkboxes
   Array.from(document.querySelectorAll('.box')).forEach(function(el) {
+    if (isLocked(el)) return;
     var cb = document.createElement('input');
     cb.type = 'checkbox';
     cb.className = 'fi';
@@ -78,23 +90,27 @@ const FILL_SCRIPT = `
   }
   var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
   var textNodes = [];
-  while (walker.nextNode()) textNodes.push(walker.currentNode);
+  var _n;
+  while ((_n = walker.nextNode())) { if (!isLocked(_n)) textNodes.push(_n); }
   textNodes.forEach(processTextNode);
 
   // Activate existing <select> elements
   Array.from(document.querySelectorAll('select')).forEach(function(el) {
+    if (isLocked(el)) return;
     el.classList.add('fi');
     el.dataset.fi = idx++;
   });
 
   // Activate existing date inputs
   Array.from(document.querySelectorAll('input[type=date]')).forEach(function(el) {
+    if (isLocked(el)) return;
     el.classList.add('fi');
     el.dataset.fi = idx++;
   });
 
-  // Make sign-cell divs editable
+  // Make sign-cell divs outside locked sections editable
   Array.from(document.querySelectorAll('.sign-cell')).forEach(function(el) {
+    if (isLocked(el)) return;
     var ta = document.createElement('textarea');
     ta.className = 'fi';
     ta.placeholder = el.textContent.trim() || 'Signature / name…';

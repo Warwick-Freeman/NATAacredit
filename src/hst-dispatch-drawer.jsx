@@ -28,11 +28,13 @@ const fmtDate = iso => iso
 
 // ── Dispatch Drawer ───────────────────────────────────────────────────────────
 
-export const HstDispatchDrawer = ({ eq, onUpdate, onClose }) => {
+export const HstDispatchDrawer = ({ eq, onUpdate, onClose, patients = [] }) => {
   const { user } = useAuth();
   const [step,      setStep]      = useState('form'); // 'form' | 'label'
   const [patient,   setPatient]   = useState({ name: '', dob: '', phone: '', studyRef: '' });
   const [address,   setAddress]   = useState({ line1: '', line2: '', suburb: '', state: 'VIC', postcode: '' });
+  const [patSearch, setPatSearch] = useState('');
+  const [patDropOpen, setPatDropOpen] = useState(false);
   const [courierId, setCourierId] = useState('auspost');
   const [service,   setService]   = useState(COURIERS[0].services[0]);
   const [returnBy,  setReturnBy]  = useState(addDays(7));
@@ -43,6 +45,31 @@ export const HstDispatchDrawer = ({ eq, onUpdate, onClose }) => {
 
   const courier    = COURIERS.find(c => c.id === courierId) ?? COURIERS[0];
   const setPat     = (k, v) => setPatient(p => ({ ...p, [k]: v }));
+
+  const patResults = patSearch.trim()
+    ? patients.filter(p => p.name.toLowerCase().includes(patSearch.toLowerCase()) || p.mrn.toLowerCase().includes(patSearch.toLowerCase()))
+    : patients;
+
+  function selectPatient(p) {
+    const latestHsat = (p.studies ?? []).slice().reverse().find(s => s.startsWith('HSAT'));
+    setPatient({
+      name: p.name,
+      dob: p.dob ?? '',
+      phone: p.contact?.phone ?? '',
+      studyRef: latestHsat ?? '',
+    });
+    if (p.contact?.address) {
+      setAddress({
+        line1: p.contact.address.line1 ?? '',
+        line2: p.contact.address.line2 ?? '',
+        suburb: p.contact.address.suburb ?? '',
+        state: p.contact.address.state || 'VIC',
+        postcode: p.contact.address.postcode ?? '',
+      });
+    }
+    setPatSearch(p.name);
+    setPatDropOpen(false);
+  }
   const setAddr    = (k, v) => setAddress(a => ({ ...a, [k]: v }));
   const missing = [
     !patient.name.trim()    && 'Patient name',
@@ -138,6 +165,42 @@ export const HstDispatchDrawer = ({ eq, onUpdate, onClose }) => {
 
         {/* ── STEP 1: form ── */}
         {step === 'form' && (<>
+
+          {patients.length > 0 && (
+            <div style={{ marginBottom: 16, position: 'relative' }}>
+              <label className="form-label" style={{ marginBottom: 4 }}>Search patient record</label>
+              <input
+                className="form-input"
+                placeholder="Name or MRN…"
+                value={patSearch}
+                onChange={e => { setPatSearch(e.target.value); setPatDropOpen(true); }}
+                onFocus={() => setPatDropOpen(true)}
+                onBlur={() => setTimeout(() => setPatDropOpen(false), 150)}
+                style={{ paddingLeft: 30 }}
+              />
+              <Icon name="search" size={13} style={{ position: 'absolute', left: 9, top: 28, color: 'var(--ink-3)', pointerEvents: 'none' }} />
+              {patDropOpen && (
+                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, zIndex: 50, boxShadow: '0 4px 16px rgba(0,0,0,0.12)', maxHeight: 200, overflowY: 'auto' }}>
+                  {patResults.length === 0 && (
+                    <div style={{ padding: '10px 12px', fontSize: 12, color: 'var(--ink-3)' }}>No patients found</div>
+                  )}
+                  {patResults.map(p => (
+                    <div key={p.id} onMouseDown={() => selectPatient(p)}
+                      style={{ padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid var(--border)', display: 'flex', gap: 10, alignItems: 'center' }}
+                      className="row-clickable">
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 13, fontWeight: 500 }}>{p.name}</div>
+                        <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{p.mrn} · {p.site}</div>
+                      </div>
+                      {p.contact?.address?.suburb && (
+                        <span style={{ fontSize: 11, color: 'var(--ink-4)' }}>{p.contact.address.suburb} {p.contact.address.postcode}</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 10, color: 'var(--ink-2)', display: 'flex', alignItems: 'center', gap: 6 }}>
             <Icon name="user_plus" size={13} />Patient details

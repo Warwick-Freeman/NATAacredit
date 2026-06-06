@@ -7,7 +7,7 @@ const STATUS_KIND = { Issued: 'good', Draft: 'outline', 'Under review': 'warn', 
 
 const BASE = import.meta.env.VITE_API_URL ?? '';
 
-const DocViewer = ({ doc, onClose, onAttach }) => {
+const DocViewer = ({ doc, onClose, onAttach, onFormSaved }) => {
   const [htmlContent, setHtmlContent]   = useState(null);
   const [htmlLoading, setHtmlLoading]   = useState(false);
   const [pdfBlobUrl,  setPdfBlobUrl]    = useState(null);
@@ -97,7 +97,7 @@ const DocViewer = ({ doc, onClose, onAttach }) => {
             doc={doc}
             htmlContent={htmlContent}
             onCancel={() => setFillMode(false)}
-            onSaved={() => { setFillMode(false); loadRecords(); setShowRecords(true); }}
+            onSaved={() => { setFillMode(false); loadRecords(); setShowRecords(true); onFormSaved?.(); }}
           />
         </div>
       </div>
@@ -148,7 +148,14 @@ const DocViewer = ({ doc, onClose, onAttach }) => {
               </a>
             )}
             {hasFile && (
-              <button className="btn" onClick={() => window.open(doc.fileUrl)}>
+              <button className="btn" onClick={() => {
+                if (isPdf && pdfBlobUrl) {
+                  window.open(pdfBlobUrl);
+                } else if (!isPdf && htmlContent) {
+                  const blob = new Blob([htmlContent], { type: 'text/html; charset=utf-8' });
+                  window.open(URL.createObjectURL(blob));
+                }
+              }} disabled={isPdf ? !pdfBlobUrl : !htmlContent}>
                 <Icon name="arrow_up_right" size={14} />Open in tab
               </button>
             )}

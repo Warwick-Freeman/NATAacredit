@@ -4,6 +4,7 @@ import { PageHeader, Pill, Tabs, Drawer } from '../components';
 import EquipmentFormDrawer from '../equipment-form-drawer';
 import EquipmentDetailDrawer from '../equipment-detail-drawer';
 import { HstDispatchDrawer, HstReturnDrawer } from '../hst-dispatch-drawer';
+import { SEED_PATIENTS } from './page-patients';
 import { COURIERS } from '../courier-api';
 import { ConsumableFormDrawer, StockReceiveDrawer, StockUseDrawer, PlaceOrderDrawer } from '../consumables-drawers';
 
@@ -1304,6 +1305,7 @@ const EquipmentPage = () => {
             eq={hstDispatchEq}
             onUpdate={eq => { handleUpdateEquipment(eq); setHstDispatchEq(null); }}
             onClose={() => setHstDispatchEq(null)}
+            patients={SEED_PATIENTS}
           />
         )}
       </Drawer>

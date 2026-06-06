@@ -25,6 +25,8 @@ export const studyStatusKind = (status) =>
 
 // ─── seed data ────────────────────────────────────────────────────────────────
 
+const BLANK_CONTACT = { phone: '', email: '', address: { line1: '', line2: '', suburb: '', state: 'VIC', postcode: '' }, emergencyContact: { name: '', relationship: '', phone: '' } };
+
 export const SEED_PATIENTS = [
   // Matches study PSG-2026-0441 (Awaiting sign-off, Dr. R. Okafor)
   {
@@ -42,6 +44,7 @@ export const SEED_PATIENTS = [
     studies: ['PSG-2024-018', 'PSG-2026-0441'],
     alerts: ['Compliance 61% — below 70% Medicare threshold'],
     compliance: { rate: 61, meanUsage: 4.1, meanAhi: 3.2, p90Pressure: 10.4, meanLeak: 12, lastSync: '2026-05-15' },
+    contact: { phone: '0412 345 678', email: 'r.kingston@email.com.au', address: { line1: '42 Riverside Drive', line2: '', suburb: 'Richmond', state: 'VIC', postcode: '3121' }, emergencyContact: { name: 'Jane Kingston', relationship: 'Spouse', phone: '0409 876 543' } },
   },
   // Matches study PSG-2026-0440 (Awaiting sign-off, SLA critical, Dr. R. Okafor)
   {
@@ -59,6 +62,7 @@ export const SEED_PATIENTS = [
     studies: ['PSG-2025-003', 'PSG-2026-0440'],
     alerts: [],
     compliance: { rate: 89, meanUsage: 6.8, meanAhi: 1.4, p90Pressure: 8.8, meanLeak: 6, lastSync: '2026-05-15' },
+    contact: { phone: '0421 987 654', email: 't.nguyen@gmail.com', address: { line1: '8 St Kilda Road', line2: 'Apt 14', suburb: 'St Kilda', state: 'VIC', postcode: '3182' }, emergencyContact: { name: 'Linh Nguyen', relationship: 'Spouse', phone: '0418 234 567' } },
   },
   // Matches study PSG-2026-0438 (Preliminary, Split-night PSG/CPAP, Dr. R. Okafor)
   {
@@ -76,6 +80,7 @@ export const SEED_PATIENTS = [
     studies: ['PSG-2023-041', 'PSG-2023-055', 'PSG-2026-0438'],
     alerts: ['Review date approaching — 33 days'],
     compliance: { rate: 94, meanUsage: 7.2, meanAhi: 2.8, p90Pressure: null, meanLeak: 9, lastSync: '2026-05-14' },
+    contact: { phone: '0435 111 222', email: 'd.mitchell@outlook.com', address: { line1: '17 Hawthorn Street', line2: '', suburb: 'Hawthorn', state: 'VIC', postcode: '3122' }, emergencyContact: { name: 'Carol Mitchell', relationship: 'Spouse', phone: '0407 333 444' } },
   },
   // Matches study PSG-2026-0439 (Scoring, Paediatric PSG, Dr. L. Hartono)
   {
@@ -89,6 +94,7 @@ export const SEED_PATIENTS = [
     studies: ['PSG-2026-0439'],
     alerts: [],
     compliance: null,
+    contact: { phone: '0398 654 321', email: 'walsh.family@iinet.net.au', address: { line1: '5 Doncaster Road', line2: '', suburb: 'Doncaster', state: 'VIC', postcode: '3108' }, emergencyContact: { name: 'Mark Walsh', relationship: 'Parent', phone: '0412 654 321' } },
   },
   // Matches study MSLT-2026-0031 (Awaiting sign-off, MSLT, Dr. R. Okafor)
   {
@@ -105,6 +111,7 @@ export const SEED_PATIENTS = [
     studies: ['PSG-2025-008', 'MSLT-2026-0031'],
     alerts: [],
     compliance: null,
+    contact: { phone: '0447 222 333', email: 's.carter@student.unimelb.edu.au', address: { line1: '33 Johnston Street', line2: 'Unit 7', suburb: 'Fitzroy', state: 'VIC', postcode: '3065' }, emergencyContact: { name: 'Helen Carter', relationship: 'Mother', phone: '0388 445 566' } },
   },
   // Matches study HSAT-2026-0218 (Scoring, Type 3 HSAT, Dr. F. Liu, Home Service)
   {
@@ -118,6 +125,7 @@ export const SEED_PATIENTS = [
     studies: ['HSAT-2026-0218'],
     alerts: ['HSAT-2026-0218 in scoring — report pending'],
     compliance: null,
+    contact: { phone: '0393 887 766', email: 'patricia.brown@bigpond.com', address: { line1: '102 Brunswick Road', line2: '', suburb: 'Brunswick', state: 'VIC', postcode: '3056' }, emergencyContact: { name: 'Gary Brown', relationship: 'Spouse', phone: '0414 556 677' } },
   },
   // Matches study PSG-2026-0437 (Final, signed Dr. F. Liu, 7 days)
   {
@@ -135,6 +143,7 @@ export const SEED_PATIENTS = [
     studies: ['PSG-2026-0437'],
     alerts: [],
     compliance: { rate: 72, meanUsage: 5.1, meanAhi: 4.8, p90Pressure: 11.2, meanLeak: 18, lastSync: '2026-05-13' },
+    contact: { phone: '0398 123 456', email: 'a.park@kew.net.au', address: { line1: '29 Cotham Road', line2: '', suburb: 'Kew', state: 'VIC', postcode: '3101' }, emergencyContact: { name: 'Susan Park', relationship: 'Spouse', phone: '0402 789 012' } },
   },
   // Matches study HSAT-2026-0217 (Final, Type 2 HSAT, signed Dr. F. Liu, Home Service)
   {
@@ -148,6 +157,7 @@ export const SEED_PATIENTS = [
     studies: ['HSAT-2026-0217'],
     alerts: ['CPAP prescription pending — report signed 09 May 2026'],
     compliance: null,
+    contact: { phone: '0411 765 432', email: 'maria.torres@hotmail.com', address: { line1: '14 Murray Road', line2: 'Unit 3', suburb: 'Preston', state: 'VIC', postcode: '3072' }, emergencyContact: { name: 'Carlos Torres', relationship: 'Spouse', phone: '0423 876 543' } },
   },
 ];
 
@@ -717,10 +727,25 @@ function CompliancePill({ rate }) {
 
 // ─── patient detail drawer ─────────────────────────────────────────────────────
 
-function PatientDrawer({ patient, onClose, onCreateTask, onOrderDme, studies = [], openStudy }) {
+function PatientDrawer({ patient, onClose, onCreateTask, onOrderDme, onUpdate, studies = [], openStudy }) {
   const [dtab, setDtab] = useState('overview');
+  const [contactEdit, setContactEdit] = useState(false);
+  const [contactDraft, setContactDraft] = useState(null);
   const complianceDays = patient.compliance ? makeDailyData(patient.id, patient.compliance.rate, patient.compliance.meanUsage) : [];
   const provider = patient.treatment?.provider ? CPAP_PROVIDERS[patient.treatment.provider] : null;
+  const contact = patient.contact ?? { phone: '', email: '', address: { line1: '', line2: '', suburb: '', state: '', postcode: '' }, emergencyContact: { name: '', relationship: '', phone: '' } };
+
+  function startContactEdit() {
+    setContactDraft(JSON.parse(JSON.stringify(contact)));
+    setContactEdit(true);
+  }
+  function saveContact() {
+    onUpdate?.({ ...patient, contact: contactDraft });
+    setContactEdit(false);
+  }
+  function setC(field, val) { setContactDraft(p => ({ ...p, [field]: val })); }
+  function setA(field, val) { setContactDraft(p => ({ ...p, address: { ...p.address, [field]: val } })); }
+  function setE(field, val) { setContactDraft(p => ({ ...p, emergencyContact: { ...p.emergencyContact, [field]: val } })); }
 
   return (
     <>
@@ -752,6 +777,7 @@ function PatientDrawer({ patient, onClose, onCreateTask, onOrderDme, studies = [
           ...(patient.compliance ? [{ id: 'compliance', label: 'CPAP compliance' }] : []),
           { id: 'studies', label: 'Studies' },
           { id: 'prescription', label: 'Prescription' },
+          { id: 'contact', label: 'Contact' },
         ]} />
       </div>
 
@@ -891,6 +917,96 @@ function PatientDrawer({ patient, onClose, onCreateTask, onOrderDme, studies = [
           </div>
         )}
 
+        {/* ── Contact ── */}
+        {dtab === 'contact' && (
+          <div>
+            {contactEdit ? (
+              <>
+                <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--ink-3)', marginBottom: 10 }}>Contact details</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 18 }}>
+                  {[['Phone', 'phone', contactDraft.phone], ['Email', 'email', contactDraft.email]].map(([label, field, val]) => (
+                    <div key={field} style={{ display: 'grid', gridTemplateColumns: '100px 1fr', alignItems: 'center', gap: 10 }}>
+                      <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>{label}</span>
+                      <input className="input" style={{ fontSize: 13 }} value={val} onChange={e => setC(field, e.target.value)} />
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--ink-3)', marginBottom: 10 }}>Address</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 18 }}>
+                  {[['Street', 'line1', contactDraft.address.line1], ['Line 2', 'line2', contactDraft.address.line2], ['Suburb', 'suburb', contactDraft.address.suburb]].map(([label, field, val]) => (
+                    <div key={field} style={{ display: 'grid', gridTemplateColumns: '100px 1fr', alignItems: 'center', gap: 10 }}>
+                      <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>{label}</span>
+                      <input className="input" style={{ fontSize: 13 }} value={val} onChange={e => setA(field, e.target.value)} />
+                    </div>
+                  ))}
+                  <div style={{ display: 'grid', gridTemplateColumns: '100px 1fr 1fr', alignItems: 'center', gap: 10 }}>
+                    <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>State / PC</span>
+                    <input className="input" style={{ fontSize: 13 }} value={contactDraft.address.state} onChange={e => setA('state', e.target.value)} placeholder="State" />
+                    <input className="input" style={{ fontSize: 13 }} value={contactDraft.address.postcode} onChange={e => setA('postcode', e.target.value)} placeholder="Postcode" />
+                  </div>
+                </div>
+
+                <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--ink-3)', marginBottom: 10 }}>Emergency contact</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 18 }}>
+                  {[['Name', 'name', contactDraft.emergencyContact.name], ['Relationship', 'relationship', contactDraft.emergencyContact.relationship], ['Phone', 'phone', contactDraft.emergencyContact.phone]].map(([label, field, val]) => (
+                    <div key={field} style={{ display: 'grid', gridTemplateColumns: '100px 1fr', alignItems: 'center', gap: 10 }}>
+                      <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>{label}</span>
+                      <input className="input" style={{ fontSize: 13 }} value={val} onChange={e => setE(field, e.target.value)} />
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button className="btn" onClick={() => setContactEdit(false)}>Cancel</button>
+                  <button className="btn btn-primary" onClick={saveContact}><Icon name="check" size={13} />Save</button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 18 }}>
+                  {[
+                    ['Phone', contact.phone || '—'],
+                    ['Email', contact.email || '—'],
+                  ].map(([label, val]) => (
+                    <div key={label} style={{ display: 'flex', gap: 12, padding: '8px 0', borderBottom: '1px solid var(--border)', fontSize: 13 }}>
+                      <span style={{ color: 'var(--ink-3)', minWidth: 100, flexShrink: 0 }}>{label}</span>
+                      <span style={{ fontWeight: 500 }}>{val}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--ink-3)', marginBottom: 8 }}>Address</div>
+                <div style={{ padding: '10px 12px', background: 'var(--surface-2)', borderRadius: 8, fontSize: 13, lineHeight: 1.7, marginBottom: 18 }}>
+                  {contact.address?.line1 ? (
+                    <>
+                      <div>{contact.address.line1}</div>
+                      {contact.address.line2 && <div>{contact.address.line2}</div>}
+                      <div>{[contact.address.suburb, contact.address.state, contact.address.postcode].filter(Boolean).join(' ')}</div>
+                    </>
+                  ) : <span style={{ color: 'var(--ink-3)' }}>No address on file</span>}
+                </div>
+
+                <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--ink-3)', marginBottom: 8 }}>Emergency contact</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 18 }}>
+                  {[
+                    ['Name', contact.emergencyContact?.name || '—'],
+                    ['Relationship', contact.emergencyContact?.relationship || '—'],
+                    ['Phone', contact.emergencyContact?.phone || '—'],
+                  ].map(([label, val]) => (
+                    <div key={label} style={{ display: 'flex', gap: 12, padding: '8px 0', borderBottom: '1px solid var(--border)', fontSize: 13 }}>
+                      <span style={{ color: 'var(--ink-3)', minWidth: 100, flexShrink: 0 }}>{label}</span>
+                      <span style={{ fontWeight: 500 }}>{val}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <button className="btn" onClick={startContactEdit}><Icon name="edit" size={13} />Edit contact details</button>
+              </>
+            )}
+          </div>
+        )}
+
         {/* ── Prescription ── */}
         {dtab === 'prescription' && (
           <div>
@@ -948,7 +1064,7 @@ const PatientsPage = ({ openStudy }) => {
   const { user } = useAuth();
   const { data } = useNexusData();
 
-  const [patients] = useState(SEED_PATIENTS);
+  const [patients, setPatients] = useState(SEED_PATIENTS);
   const [selectedId, setSelectedId] = useState(null);
   const [dmePatient, setDmePatient] = useState(null);
   const [filter, setFilter] = useState('all');
@@ -1270,6 +1386,7 @@ const PatientsPage = ({ openStudy }) => {
             onClose={() => setSelectedId(null)}
             onCreateTask={openCreateTask}
             onOrderDme={() => { setDmePatient(selectedPatient); setSelectedId(null); }}
+            onUpdate={pat => setPatients(prev => prev.map(p => p.id === pat.id ? pat : p))}
             studies={data?.studies ?? []}
             openStudy={(sid) => { setSelectedId(null); openStudy?.(sid); }}
           />
