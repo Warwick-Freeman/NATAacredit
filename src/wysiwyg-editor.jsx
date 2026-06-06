@@ -192,15 +192,98 @@ const TB = [
 
 // ── WysiwygEditor component ───────────────────────────────────────────────────
 
-const WysiwygEditor = ({ title, folder, docId, onSave, onCancel }) => {
+const WysiwygEditor = ({ title, folder, docId, initialHtml, onSave, onCancel }) => {
   const iframeRef = useRef(null);
   const [saving, setSaving] = useState(false);
 
+  // For new docs use the full template; for edits pass the raw HTML directly so
+  // the browser parses it natively, then we patch the live DOM in onLoad.
   const template = useMemo(
-    () => buildTemplate({ title, folder, docId }),
+    () => initialHtml ?? buildTemplate({ title, folder, docId }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [], // intentionally compute once on mount — metadata is locked in at open time
+    [],
   );
+
+  // After the iframe loads, inject editor chrome into the live document.
+  // Only runs in edit mode (initialHtml provided); new-doc template is self-contained.
+  const handleIframeLoad = useCallback(() => {
+    if (!initialHtml) return;
+    const iframe  = iframeRef.current;
+    const iDoc    = iframe?.contentDocument;
+    const iWin    = iframe?.contentWindow;
+    if (!iDoc || !iWin) return;
+
+    // Inject editor CSS so locked sections render correctly
+    const style = iDoc.createElement('style');
+    style.textContent = DOC_CSS;
+    (iDoc.head || iDoc.body).appendChild(style);
+
+    // Lock header
+    const header = iDoc.querySelector('.doc-header');
+    if (header) {
+      header.classList.add('editor-locked');
+      header.setAttribute('contenteditable', 'false');
+      if (!header.querySelector('.editor-lock-badge')) {
+        const badge = iDoc.createElement('div');
+        badge.className = 'editor-lock-badge';
+        badge.style.cssText = 'grid-column:1/-1';
+        badge.textContent = '\u{1F512} Header is auto-populated from the document workflow when viewed';
+        header.appendChild(badge);
+      }
+    }
+
+    // Lock signoff
+    const signoff = iDoc.querySelector('.signoff');
+    if (signoff) {
+      signoff.classList.add('editor-locked');
+      signoff.setAttribute('contenteditable', 'false');
+      if (!signoff.querySelector('.editor-lock-badge')) {
+        const badge = iDoc.createElement('div');
+        badge.className = 'editor-lock-badge';
+        badge.style.cssText = 'grid-column:1/-1';
+        badge.textContent = '\u{1F512} Signoff is auto-populated from the approval workflow when viewed';
+        signoff.appendChild(badge);
+      }
+    }
+
+    // Make content area editable
+    const content = iDoc.querySelector('.doc-content');
+    if (content) {
+      content.setAttribute('contenteditable', 'true');
+      content.focus();
+      try {
+        const r = iDoc.createRange(); const s = iWin.getSelection();
+        r.selectNodeContents(content); r.collapse(false);
+        s?.removeAllRanges(); s?.addRange(r);
+      } catch (_) {}
+    } else {
+      // Fallback for non-template HTML: make body editable, keep header/signoff locked
+      iDoc.body.setAttribute('contenteditable', 'true');
+      header?.setAttribute('contenteditable', 'false');
+      signoff?.setAttribute('contenteditable', 'false');
+    }
+
+    // Inject exec/getHtml message handler only if the saved HTML doesn't already have one
+    const hasHandler = [...iDoc.querySelectorAll('script')].some(s => s.textContent.includes('getHtml'));
+    if (!hasHandler) {
+      const script = iDoc.createElement('script');
+      script.textContent = `(function(){
+  window.addEventListener('message',function(e){
+    if(!e.data)return;
+    var c=document.querySelector('.doc-content')||document.body;
+    if(e.data.type==='exec'){try{document.execCommand(e.data.cmd,false,e.data.val!=null?e.data.val:null);}catch(ex){}if(c)c.focus();return;}
+    if(e.data.type==='getHtml'){
+      var clone=document.documentElement.cloneNode(true);
+      clone.querySelectorAll('.editor-locked').forEach(function(el){el.classList.remove('editor-locked');});
+      clone.querySelectorAll('.editor-lock-badge').forEach(function(el){el.remove();});
+      clone.querySelectorAll('[contenteditable]').forEach(function(el){el.removeAttribute('contenteditable');});
+      parent.postMessage({type:'editorHtml',html:'<!DOCTYPE html>\\n'+clone.outerHTML},'*');
+    }
+  });
+})();`;
+      iDoc.body.appendChild(script);
+    }
+  }, [initialHtml]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const exec = useCallback((cmd, val) => {
     iframeRef.current?.contentWindow?.postMessage({ type: 'exec', cmd, val }, '*');
@@ -248,13 +331,13 @@ const WysiwygEditor = ({ title, folder, docId, onSave, onCancel }) => {
             {title || 'New document'}
           </div>
           <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>
-            WYSIWYG editor · locked header &amp; footer are auto-populated from the approval workflow
+            {initialHtml ? 'Editing draft · ' : 'WYSIWYG editor · '}locked header &amp; footer are auto-populated from the approval workflow
           </div>
         </div>
         <button className="btn" onClick={onCancel}>Cancel</button>
         <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
           <Icon name="check" size={13} />
-          {saving ? 'Generating…' : 'Use this content'}
+          {saving ? 'Saving…' : initialHtml ? 'Save changes' : 'Use this content'}
         </button>
       </div>
 
@@ -327,6 +410,7 @@ const WysiwygEditor = ({ title, folder, docId, onSave, onCancel }) => {
         ref={iframeRef}
         srcDoc={template}
         sandbox="allow-scripts allow-same-origin"
+        onLoad={handleIframeLoad}
         style={{ flex: 1, border: 'none', background: '#e5e7eb' }}
         title="WYSIWYG document editor"
       />

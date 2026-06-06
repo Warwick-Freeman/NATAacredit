@@ -2,12 +2,13 @@ import React, { useEffect, useState, useCallback } from 'react';
 import Icon from './icons';
 import { Pill } from './components';
 import FormFiller, { RecordViewer } from './form-filler';
+import WysiwygEditor from './wysiwyg-editor';
 
-const STATUS_KIND = { Issued: 'good', Draft: 'outline', 'Under review': 'warn', 'Live form': 'info', Obsolete: 'bad' };
+const STATUS_KIND = { Issued: 'good', Draft: 'outline', 'Under review': 'warn', 'Live form': 'info', Obsolete: 'bad', Superseded: 'outline' };
 
 const BASE = import.meta.env.VITE_API_URL ?? '';
 
-const DocViewer = ({ doc, onClose, onAttach, onFormSaved }) => {
+const DocViewer = ({ doc, onClose, onAttach, onFormSaved, onDocUpdated, onRevisionCreated, onOpenRevision }) => {
   const [htmlContent, setHtmlContent]   = useState(null);
   const [htmlLoading, setHtmlLoading]   = useState(false);
   const [pdfBlobUrl,  setPdfBlobUrl]    = useState(null);
@@ -17,7 +18,19 @@ const DocViewer = ({ doc, onClose, onAttach, onFormSaved }) => {
   const [showRecords, setShowRecords]   = useState(false);
   const [viewingRecord, setViewingRecord] = useState(null);
 
-  const isForm = doc?.folder === 'forms' && doc?.fileType === 'html';
+  // Edit / revision state
+  const [editMode,     setEditMode]     = useState(false);
+  const [editRawHtml,  setEditRawHtml]  = useState(null);
+  const [loadingEdit,  setLoadingEdit]  = useState(false);
+  const [revisions,    setRevisions]    = useState(null);
+  const [showRevisions, setShowRevisions] = useState(false);
+  const [refreshKey,   setRefreshKey]   = useState(0);
+  const [revising,     setRevising]     = useState(false);
+
+  const isForm    = doc?.folder === 'forms' && doc?.fileType === 'html';
+  const canEdit   = doc?.status === 'Draft' && doc?.fileType === 'html';
+  const canRevise = (doc?.status === 'Issued' || doc?.status === 'Live form') && doc?.fileType === 'html';
+  const hasRevisionHistory = !!(doc?.revisionOf) || canRevise;
 
   useEffect(() => {
     const handler = (e) => { if (e.key === 'Escape') onClose(); };
@@ -31,10 +44,15 @@ const DocViewer = ({ doc, onClose, onAttach, onFormSaved }) => {
     setRecords(null);
     setShowRecords(false);
     setViewingRecord(null);
+    setEditMode(false);
+    setEditRawHtml(null);
+    setRevisions(null);
+    setShowRevisions(false);
+    setRefreshKey(0);
     setPdfBlobUrl(prev => { if (prev) URL.revokeObjectURL(prev); return null; });
   }, [doc?.id]);
 
-  // Fetch PDF as blob so the iframe can display it without auth headers
+  // Fetch PDF as blob
   useEffect(() => {
     if (!doc?.fileUrl || doc.fileType !== 'pdf') return;
     setPdfBlobUrl(null);
@@ -60,7 +78,7 @@ const DocViewer = ({ doc, onClose, onAttach, onFormSaved }) => {
       .catch(() => setRecords([]));
   }, [doc?.id]);
 
-  // Fetch HTML content with auth so it renders in the iframe via srcdoc
+  // Fetch HTML content (auth-gated), re-fetch when refreshKey changes
   useEffect(() => {
     if (!doc?.fileUrl || doc.fileType === 'pdf') return;
     setHtmlContent(null);
@@ -71,11 +89,91 @@ const DocViewer = ({ doc, onClose, onAttach, onFormSaved }) => {
       .then(html => setHtmlContent(html))
       .catch(() => setHtmlContent('<p style="padding:24px;color:#666">Could not load document.</p>'))
       .finally(() => setHtmlLoading(false));
-  }, [doc?.fileUrl, doc?.fileType]);
+  }, [doc?.fileUrl, doc?.fileType, refreshKey]);
+
+  const loadRevisions = useCallback(() => {
+    if (!doc?.id) return;
+    const tok = localStorage.getItem('nexus_token');
+    fetch(`${BASE}/api/documents/${encodeURIComponent(doc.id)}/revisions`, {
+      headers: tok ? { Authorization: `Bearer ${tok}` } : {},
+    })
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(list => setRevisions(list))
+      .catch(() => setRevisions([]));
+  }, [doc?.id]);
+
+  const handleOpenEditor = useCallback(async () => {
+    if (!doc?.fileUrl) return;
+    setLoadingEdit(true);
+    const tok = localStorage.getItem('nexus_token');
+    try {
+      const res = await fetch(`${doc.fileUrl}?raw=1`, {
+        headers: tok ? { Authorization: `Bearer ${tok}` } : {},
+      });
+      if (res.ok) {
+        const html = await res.text();
+        setEditRawHtml(html);
+        setEditMode(true);
+      }
+    } finally {
+      setLoadingEdit(false);
+    }
+  }, [doc?.fileUrl]);
+
+  const handleSaveEdit = useCallback(async (file) => {
+    const tok = localStorage.getItem('nexus_token');
+    const html = await file.text();
+    const res = await fetch(`${BASE}/api/documents/${encodeURIComponent(doc.id)}/html`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'text/html; charset=utf-8',
+        ...(tok ? { Authorization: `Bearer ${tok}` } : {}),
+      },
+      body: html,
+    });
+    if (res.ok) {
+      setEditMode(false);
+      setEditRawHtml(null);
+      setRefreshKey(k => k + 1);
+      onDocUpdated?.();
+    }
+  }, [doc?.id, onDocUpdated]);
+
+  const handleRevise = useCallback(async () => {
+    if (revising) return;
+    setRevising(true);
+    const tok = localStorage.getItem('nexus_token');
+    try {
+      const res = await fetch(`${BASE}/api/documents/${encodeURIComponent(doc.id)}/revise`, {
+        method: 'POST',
+        headers: tok ? { Authorization: `Bearer ${tok}` } : {},
+      });
+      if (res.ok) {
+        const newDoc = await res.json();
+        onRevisionCreated?.(newDoc.docId);
+      }
+    } finally {
+      setRevising(false);
+    }
+  }, [doc?.id, onRevisionCreated, revising]);
 
   if (!doc) return null;
   const hasFile = !!doc.fileUrl;
   const isPdf   = doc.fileType === 'pdf';
+
+  // Render: WYSIWYG edit mode (full-screen overlay)
+  if (editMode && editRawHtml) {
+    return (
+      <WysiwygEditor
+        title={doc.title}
+        folder={doc.folder}
+        docId={doc.id}
+        initialHtml={editRawHtml}
+        onSave={handleSaveEdit}
+        onCancel={() => { setEditMode(false); setEditRawHtml(null); }}
+      />
+    );
+  }
 
   // Render: record viewer mode
   if (viewingRecord) {
@@ -119,13 +217,47 @@ const DocViewer = ({ doc, onClose, onAttach, onFormSaved }) => {
               <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>v{doc.v}</span>
               <Pill kind={STATUS_KIND[doc.status] || 'outline'} dot>{doc.status}</Pill>
               {doc.fileName && <span style={{ fontSize: 11, color: 'var(--ink-4)' }}>{doc.fileName}</span>}
+              {doc.revisionOf && (
+                <span style={{ fontSize: 10, padding: '1px 6px', background: 'var(--surface-3)', borderRadius: 8, color: 'var(--ink-3)' }}>
+                  revision of {doc.revisionOf}
+                </span>
+              )}
             </div>
             <div style={{ fontSize: 15, fontWeight: 600, letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {doc.title}
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+          <div style={{ display: 'flex', gap: 8, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            {/* Edit Draft button */}
+            {canEdit && (
+              <button className="btn" onClick={handleOpenEditor} disabled={loadingEdit || !hasFile}>
+                <Icon name="edit" size={14} />
+                {loadingEdit ? 'Loading…' : 'Edit draft'}
+              </button>
+            )}
+
+            {/* Create Revision button */}
+            {canRevise && (
+              <button className="btn" onClick={handleRevise} disabled={revising}>
+                <Icon name="pen" size={14} />
+                {revising ? 'Creating…' : 'Create revision'}
+              </button>
+            )}
+
+            {/* Revision history button */}
+            {hasRevisionHistory && (
+              <button className="btn" onClick={() => { if (!revisions) loadRevisions(); setShowRevisions(v => !v); }}>
+                <Icon name="clock" size={14} />
+                Revisions
+                {revisions?.length > 0 && (
+                  <span style={{ marginLeft: 4, background: 'var(--surface-3)', color: 'var(--ink-2)', borderRadius: 8, padding: '0 5px', fontSize: 10, fontWeight: 700 }}>
+                    {revisions.length}
+                  </span>
+                )}
+              </button>
+            )}
+
             {isForm && htmlContent && (
               <button className="btn btn-primary" onClick={() => setFillMode(true)}>
                 <Icon name="edit" size={14} />Fill form
@@ -246,7 +378,45 @@ const DocViewer = ({ doc, onClose, onAttach, onFormSaved }) => {
           )}
         </div>
 
-        {/* Records panel — shown when Records button is toggled */}
+        {/* Revisions panel */}
+        {showRevisions && hasRevisionHistory && (
+          <div style={{ borderTop: '1px solid var(--border)', background: 'var(--surface-2)', maxHeight: 280, overflowY: 'auto', flexShrink: 0 }}>
+            <div style={{ padding: '10px 18px', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, flex: 1 }}>Revision history</div>
+              {revisions === null && <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>Loading…</span>}
+              {revisions?.length === 0 && <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>No revisions found.</span>}
+            </div>
+            {revisions?.map(r => {
+              const isCurrent = r.docId === doc.id;
+              return (
+                <div key={r.docId} style={{ padding: '8px 18px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 12, fontWeight: 600 }}>
+                      {r.docId}
+                      {isCurrent && (
+                        <span style={{ marginLeft: 6, fontSize: 10, padding: '1px 5px', background: 'var(--accent-soft)', color: 'var(--accent-ink)', borderRadius: 8 }}>
+                          current
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+                      v{r.version} · {r.status} · {r.updated}
+                    </div>
+                  </div>
+                  <Pill kind={STATUS_KIND[r.status] || 'outline'} dot>{r.status}</Pill>
+                  {!isCurrent && (
+                    <button className="btn btn-ghost" style={{ fontSize: 11 }}
+                      onClick={() => onOpenRevision?.(r.docId)}>
+                      View
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Records panel */}
         {showRecords && isForm && (
           <div style={{ borderTop: '1px solid var(--border)', background: 'var(--surface-2)', maxHeight: 280, overflowY: 'auto', flexShrink: 0 }}>
             <div style={{ padding: '10px 18px', display: 'flex', alignItems: 'center', gap: 10 }}>

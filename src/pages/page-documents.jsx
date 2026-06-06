@@ -179,18 +179,19 @@ function normaliseDocument(d) {
   let workflow = [];
   try { workflow = d.workflow ? JSON.parse(d.workflow) : []; } catch {}
   return {
-    id:        d.docId,
-    title:     d.title,
-    v:         d.version,
-    status:    d.status,
-    folder:    d.folder,
-    owner:     d.owner,
-    clauses:   d.clauses ? d.clauses.split(',').map(c => c.trim()).filter(Boolean) : [],
-    reviewDue: d.reviewDue,
-    updated:   d.updated,
-    fileType:  d.fileType  ?? null,
-    fileName:  d.fileName  ?? null,
-    fileUrl:   d.hasFile   ? `${BASE_API}/api/documents/${encodeURIComponent(d.docId)}/file` : null,
+    id:         d.docId,
+    title:      d.title,
+    v:          d.version,
+    status:     d.status,
+    folder:     d.folder,
+    owner:      d.owner,
+    clauses:    d.clauses ? d.clauses.split(',').map(c => c.trim()).filter(Boolean) : [],
+    reviewDue:  d.reviewDue,
+    updated:    d.updated,
+    fileType:   d.fileType   ?? null,
+    fileName:   d.fileName   ?? null,
+    fileUrl:    d.hasFile    ? `${BASE_API}/api/documents/${encodeURIComponent(d.docId)}/file` : null,
+    revisionOf: d.revisionOf ?? null,
     htmlContent: null,
     workflow,
   };
@@ -218,7 +219,7 @@ function docStandard(id = '') {
   return AASM_PREFIXES.some(p => id.startsWith(p)) ? 'aasm' : 'asa';
 }
 
-const STATUS_KIND = { Issued: 'good', Draft: 'outline', 'Under review': 'warn', 'Live form': 'info', Obsolete: 'bad' };
+const STATUS_KIND = { Issued: 'good', Draft: 'outline', 'Under review': 'warn', 'Live form': 'info', Obsolete: 'bad', Superseded: 'outline' };
 
 const STEP_PERM = [null, 'canPeerReviewDoc', 'canApproveDoc', 'canIssueDoc'];
 
@@ -485,7 +486,12 @@ const DocumentsPage = () => {
                   : `${contentResults.length} document${contentResults.length > 1 ? 's' : ''} contain "${search}" in content`
                 }
               </div>
-              {contentResults.map(r => (
+              {[...contentResults].sort((a, b) => {
+                const q = search.toLowerCase();
+                const aTitle = a.title?.toLowerCase().includes(q) || a.docId?.toLowerCase().includes(q);
+                const bTitle = b.title?.toLowerCase().includes(q) || b.docId?.toLowerCase().includes(q);
+                return (bTitle ? 1 : 0) - (aTitle ? 1 : 0);
+              }).map(r => (
                 <div key={r.docId}
                   onClick={() => { setDetailDocId(r.docId); }}
                   style={{ padding: '8px 10px', marginBottom: 6, background: 'var(--surface)', borderRadius: 6, cursor: 'pointer', border: '1px solid var(--border)' }}>
@@ -592,6 +598,23 @@ const DocumentsPage = () => {
           onClose={() => setViewingDoc(null)}
           onAttach={(doc) => { setViewingDoc(null); openUpload(doc); }}
           onFormSaved={handleFormSaved}
+          onDocUpdated={() => loadDocs()}
+          onRevisionCreated={async (newDocId) => {
+            loadDocs();
+            const tok = localStorage.getItem('nexus_token');
+            const res = await fetch(`${BASE_API}/api/documents/${encodeURIComponent(newDocId)}`, {
+              headers: tok ? { Authorization: `Bearer ${tok}` } : {},
+            });
+            if (res.ok) setViewingDoc(normaliseDocument(await res.json()));
+          }}
+          onOpenRevision={(docId) => {
+            const existing = docs.find(d => d.id === docId);
+            if (existing) { setViewingDoc(existing); return; }
+            const tok = localStorage.getItem('nexus_token');
+            fetch(`${BASE_API}/api/documents/${encodeURIComponent(docId)}`, {
+              headers: tok ? { Authorization: `Bearer ${tok}` } : {},
+            }).then(r => r.ok ? r.json() : null).then(d => { if (d) setViewingDoc(normaliseDocument(d)); });
+          }}
         />
       )}
 

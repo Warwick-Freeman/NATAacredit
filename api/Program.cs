@@ -118,6 +118,7 @@ using (var scope = app.Services.CreateScope())
         "ALTER TABLE Clauses ADD COLUMN Category TEXT",
         "ALTER TABLE ComplianceSections ADD COLUMN Standard TEXT NOT NULL DEFAULT 'asa'",
         "ALTER TABLE Documents ADD COLUMN ContentText TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE Documents ADD COLUMN RevisionOf TEXT",
     })
     {
         try { db.Database.ExecuteSqlRaw(col); } catch { /* column already exists */ }
@@ -506,7 +507,7 @@ app.MapGet("/api/activity", async (NexusDbContext db) =>
 DocumentDto ToDto(Document d) => new(
     d.DocId, d.Title, d.Version, d.Status, d.Folder,
     d.Owner, d.Clauses, d.ReviewDue, d.Updated,
-    d.FileType, d.FileName, d.StoredFileName != null, d.Workflow);
+    d.FileType, d.FileName, d.StoredFileName != null, d.Workflow, d.RevisionOf);
 
 app.MapGet("/api/documents/search", async (string q, NexusDbContext db) =>
 {
@@ -636,12 +637,118 @@ app.MapGet("/api/documents/{id}/file", async (string id, NexusDbContext db, Http
         return Results.File(path, "application/pdf");
     }
     var html = await File.ReadAllTextAsync(path);
-    var script = BuildDocScript(doc);
-    if (!string.IsNullOrEmpty(script))
-        html = html.Contains("</body>", StringComparison.OrdinalIgnoreCase)
-            ? html.Replace("</body>", script + "\n</body>", StringComparison.OrdinalIgnoreCase)
-            : html + script;
+    var raw = ctx.Request.Query.ContainsKey("raw");
+    if (!raw)
+    {
+        var script = BuildDocScript(doc);
+        if (!string.IsNullOrEmpty(script))
+            html = html.Contains("</body>", StringComparison.OrdinalIgnoreCase)
+                ? html.Replace("</body>", script + "\n</body>", StringComparison.OrdinalIgnoreCase)
+                : html + script;
+    }
     return Results.Content(html, "text/html; charset=utf-8");
+}).RequireAuthorization();
+
+app.MapPut("/api/documents/{id}/html", async (string id, HttpRequest req, NexusDbContext db, ClaimsPrincipal principal) =>
+{
+    var doc = await db.Documents.FirstOrDefaultAsync(d => d.DocId == id);
+    if (doc == null) return Results.NotFound();
+    if (doc.Status != "Draft") return Results.BadRequest("Only Draft documents can be edited.");
+    if (doc.FileType != "html") return Results.BadRequest("Only HTML documents can be edited.");
+    if (doc.StoredFileName == null) return Results.BadRequest("No file attached.");
+
+    using var reader = new StreamReader(req.Body, System.Text.Encoding.UTF8);
+    var html = await reader.ReadToEndAsync();
+    if (string.IsNullOrWhiteSpace(html)) return Results.BadRequest("Empty content.");
+
+    var path = Path.Combine(dataDir, doc.StoredFileName);
+    await File.WriteAllTextAsync(path, html, System.Text.Encoding.UTF8);
+    try { doc.ContentText = ExtractTextFromHtml(html); } catch { }
+    doc.Updated = DateTime.Now.ToString("dd MMM yyyy");
+    db.Activity.Add(MakeActivity(ActorName(principal), "edited HTML draft", doc.DocId, "edit", "documents", $"Draft {doc.DocId} updated in editor."));
+    await db.SaveChangesAsync();
+    return Results.Ok(ToDto(doc));
+}).RequireAuthorization();
+
+app.MapPost("/api/documents/{id}/revise", async (string id, NexusDbContext db, ClaimsPrincipal principal) =>
+{
+    var doc = await db.Documents.FirstOrDefaultAsync(d => d.DocId == id);
+    if (doc == null) return Results.NotFound();
+    if (doc.Status != "Issued" && doc.Status != "Live form") return Results.BadRequest("Only Issued or Live form documents can be revised.");
+    if (doc.FileType != "html") return Results.BadRequest("Only HTML documents can be revised.");
+
+    // Determine root DocId and next revision number
+    var rootId = doc.RevisionOf ?? doc.DocId;
+    var family = await db.Documents.Where(d => d.DocId == rootId || d.RevisionOf == rootId).ToListAsync();
+    var revNums = family
+        .Select(d => Regex.Match(d.DocId, @"-r(\d+)$"))
+        .Where(m => m.Success)
+        .Select(m => int.Parse(m.Groups[1].Value))
+        .ToList();
+    var nextRev = revNums.Count > 0 ? revNums.Max() + 1 : 2;
+    var newDocId = $"{rootId}-r{nextRev}";
+
+    // Increment version number
+    var verParts = (doc.Version ?? "1.0").Split('.');
+    var newVersion = verParts.Length == 2 && int.TryParse(verParts[0], out var major)
+        ? $"{major + 1}.0"
+        : "2.0";
+
+    // Copy the HTML file
+    string? newStoredFile = null;
+    if (doc.StoredFileName != null)
+    {
+        var src = Path.Combine(dataDir, doc.StoredFileName);
+        if (File.Exists(src))
+        {
+            var safeName = Regex.Replace(newDocId, @"[^a-zA-Z0-9\-]", "_") + ".html";
+            var dst = Path.Combine(dataDir, safeName);
+            File.Copy(src, dst, overwrite: true);
+            newStoredFile = safeName;
+        }
+    }
+
+    var now = DateTime.Now.ToString("dd MMM yyyy");
+
+    // Mark original as Superseded and move to obsolete folder
+    doc.Status = "Superseded";
+    doc.Folder = "obsolete";
+    doc.Updated = now;
+
+    // Create the new revision as Draft
+    var newDoc = new Document
+    {
+        DocId          = newDocId,
+        Title          = doc.Title,
+        Version        = newVersion,
+        Status         = "Draft",
+        Folder         = doc.Folder == "obsolete" ? (doc.RevisionOf != null ? family.FirstOrDefault(d => d.DocId == rootId)?.Folder ?? "sops" : "sops") : doc.Folder,
+        Owner          = doc.Owner,
+        Clauses        = doc.Clauses,
+        ReviewDue      = doc.ReviewDue,
+        Updated        = now,
+        FileType       = "html",
+        FileName       = newStoredFile != null ? newStoredFile : null,
+        StoredFileName = newStoredFile,
+        Workflow       = doc.Workflow,
+        ContentText    = doc.ContentText,
+        RevisionOf     = rootId,
+    };
+    db.Documents.Add(newDoc);
+    db.Activity.Add(MakeActivity(ActorName(principal), "created revision", $"{newDocId} from {id}", "revision", "documents", $"New revision {newDocId} (v{newVersion}) created from {id}."));
+    await db.SaveChangesAsync();
+    return Results.Ok(ToDto(newDoc));
+}).RequireAuthorization();
+
+app.MapGet("/api/documents/{id}/revisions", async (string id, NexusDbContext db) =>
+{
+    var doc = await db.Documents.FirstOrDefaultAsync(d => d.DocId == id);
+    if (doc == null) return Results.NotFound();
+    var rootId = doc.RevisionOf ?? doc.DocId;
+    var family = await db.Documents
+        .Where(d => d.DocId == rootId || d.RevisionOf == rootId)
+        .ToListAsync();
+    return Results.Ok(family.Select(ToDto).OrderBy(d => d.Version));
 }).RequireAuthorization();
 
 // ── Rooms ─────────────────────────────────────────────────────────────────────
@@ -1224,7 +1331,7 @@ record ClauseUpdateDto(string? Status, int? Evidence, string? Owner, string? Las
 record DocumentDto(
     string DocId, string Title, string Version, string Status, string Folder,
     string Owner, string Clauses, string ReviewDue, string Updated,
-    string? FileType, string? FileName, bool HasFile, string Workflow);
+    string? FileType, string? FileName, bool HasFile, string Workflow, string? RevisionOf);
 
 record DocumentUpdateDto(
     string Title, string Version, string Status, string Folder,

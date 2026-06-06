@@ -223,4 +223,5 @@ public class Document
     public string? StoredFileName { get; set; }
     public string Workflow { get; set; } = "[]";
     public string ContentText { get; set; } = "";
+    public string? RevisionOf { get; set; }
 }
