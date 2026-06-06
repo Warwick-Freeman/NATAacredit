@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import Icon from './icons';
+import WysiwygEditor from './wysiwyg-editor';
 
 const FOLDERS  = [
   { id: 'manual',   name: 'Quality manual' },
@@ -35,15 +36,16 @@ const fmtSize = (b) => b < 1048576 ? `${(b / 1024).toFixed(0)} KB` : `${(b / 104
 
 const DocUploadDrawer = ({ prefill, onSave, onClose }) => {
   const isAttach = !!(prefill?.id);
-  const [form, setForm]     = useState(() => initForm(prefill));
-  const [file, setFile]     = useState(null);   // { name, size, type:'pdf'|'html', fileUrl?, htmlContent? }
+  const [form, setForm]       = useState(() => initForm(prefill));
+  const [file, setFile]       = useState(null);   // { name, size, type:'pdf'|'html', rawFile, fromEditor? }
   const [dragging, setDragging] = useState(false);
-  const [errors, setErrors] = useState({});
+  const [errors, setErrors]   = useState({});
+  const [editorOpen, setEditorOpen] = useState(false);
   const inputRef = useRef();
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
-  const processFile = (f) => {
+  const processFile = (f, fromEditor = false) => {
     if (!f) return;
     const isPdf  = f.type === 'application/pdf' || /\.pdf$/i.test(f.name);
     const isHtml = f.type === 'text/html' || /\.(html|htm)$/i.test(f.name);
@@ -52,10 +54,8 @@ const DocUploadDrawer = ({ prefill, onSave, onClose }) => {
       return;
     }
     setErrors(e => ({ ...e, file: undefined }));
-
-    setFile({ name: f.name, size: f.size, type: isPdf ? 'pdf' : 'html', rawFile: f });
-    // Auto-fill title from filename when blank
-    if (!form.title) {
+    setFile({ name: f.name, size: f.size, type: isPdf ? 'pdf' : 'html', rawFile: f, fromEditor });
+    if (!form.title && !fromEditor) {
       set('title', f.name.replace(/\.(pdf|html|htm)$/i, '').replace(/[-_]/g, ' '));
     }
   };
@@ -117,7 +117,8 @@ const DocUploadDrawer = ({ prefill, onSave, onClose }) => {
               onDragOver={e => { e.preventDefault(); setDragging(true); }}
               onDragLeave={() => setDragging(false)}
               onDrop={handleDrop}
-              onClick={() => inputRef.current?.click()}
+              onClick={file ? undefined : () => inputRef.current?.click()}
+              style={file ? { cursor: 'default' } : undefined}
             >
               <input ref={inputRef} type="file" accept=".pdf,.html,.htm"
                 style={{ display: 'none' }} onChange={e => processFile(e.target.files[0])} />
@@ -126,14 +127,18 @@ const DocUploadDrawer = ({ prefill, onSave, onClose }) => {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <div style={{
                     width: 36, height: 36, borderRadius: 8, display: 'grid', placeItems: 'center',
-                    background: file.type === 'pdf' ? 'var(--bad-soft)' : 'var(--info-soft)',
-                    color:      file.type === 'pdf' ? 'var(--bad)'      : 'var(--info)',
+                    background: file.fromEditor ? 'var(--accent-soft)' : file.type === 'pdf' ? 'var(--bad-soft)' : 'var(--info-soft)',
+                    color:      file.fromEditor ? 'var(--accent-ink)' : file.type === 'pdf' ? 'var(--bad)'      : 'var(--info)',
                   }}>
-                    <Icon name={file.type === 'pdf' ? 'paper' : 'file'} size={18} />
+                    <Icon name={file.fromEditor ? 'edit' : file.type === 'pdf' ? 'paper' : 'file'} size={18} />
                   </div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 13, fontWeight: 500 }}>{file.name}</div>
-                    <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{file.type.toUpperCase()} · {fmtSize(file.size)}</div>
+                    <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+                      {file.type.toUpperCase()}
+                      {file.fromEditor && <span style={{ marginLeft: 4, padding: '1px 6px', background: 'var(--accent-soft)', color: 'var(--accent-ink)', borderRadius: 8, fontSize: 10, fontWeight: 600 }}>created in editor</span>}
+                      {' · '}{fmtSize(file.size)}
+                    </div>
                   </div>
                   <button className="btn btn-ghost" style={{ fontSize: 12 }}
                     onClick={e => { e.stopPropagation(); setFile(null); }}>
@@ -149,6 +154,25 @@ const DocUploadDrawer = ({ prefill, onSave, onClose }) => {
               )}
             </div>
             {errors.file && <div className="form-error" style={{ marginTop: 8 }}>{errors.file}</div>}
+
+            {/* WYSIWYG editor option — only shown when no file is selected */}
+            {!file && (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '10px 0 8px' }}>
+                  <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+                  <span style={{ fontSize: 11, color: 'var(--ink-3)', flexShrink: 0 }}>or</span>
+                  <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+                </div>
+                <button
+                  className="btn"
+                  style={{ width: '100%', justifyContent: 'center' }}
+                  onClick={() => setEditorOpen(true)}
+                >
+                  <Icon name="edit" size={13} />
+                  Create with WYSIWYG editor
+                </button>
+              </>
+            )}
           </div>
         )}
 
@@ -260,11 +284,22 @@ const DocUploadDrawer = ({ prefill, onSave, onClose }) => {
         <div style={{ display: 'flex', gap: 8, marginTop: 8, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
           <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleSave}>
             <Icon name="upload" size={14} />
-            {isAttach ? 'Attach file' : 'Upload document'}
+            {isAttach ? 'Attach file' : file?.fromEditor ? 'Create document' : 'Upload document'}
           </button>
           <button className="btn" onClick={onClose}>Cancel</button>
         </div>
       </div>
+
+      {/* WYSIWYG editor overlay */}
+      {editorOpen && (
+        <WysiwygEditor
+          title={form.title}
+          folder={form.folder}
+          docId={form.id}
+          onSave={(f) => { processFile(f, true); setEditorOpen(false); }}
+          onCancel={() => setEditorOpen(false)}
+        />
+      )}
     </div>
   );
 };

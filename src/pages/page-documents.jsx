@@ -209,7 +209,12 @@ const FOLDER_META = [
 // AASM-specific ID prefixes (network/clinic/lab/hsat/dme sections)
 const AASM_PREFIXES = ['POL-NET', 'POL-CLI', 'POL-LAB', 'POL-HST', 'POL-DME', 'PRO-LAB', 'PRO-HST', 'FRM-AASM'];
 
+// Prefixes that apply to both ASA and AASM modes (cross-cutting QMS/HR/data documents)
+const CROSS_CUTTING_PREFIXES = ['SOP-QMS', 'SOP-HR', 'SOP-DATA', 'FRM-027', 'FRM-028'];
+
+// Returns 'aasm', 'asa', or 'both'
 function docStandard(id = '') {
+  if (CROSS_CUTTING_PREFIXES.some(p => id.startsWith(p))) return 'both';
   return AASM_PREFIXES.some(p => id.startsWith(p)) ? 'aasm' : 'asa';
 }
 
@@ -261,9 +266,13 @@ const DocumentsPage = () => {
 
   const detailDoc = docs.find(d => d.id === detailDocId) || null;
 
-  // Only show documents belonging to the active standard; records are cross-cutting
+  // Only show documents belonging to the active standard; records and cross-cutting QMS docs show in both
   const standardDocs = useMemo(
-    () => docs.filter(d => d.folder === 'records' || docStandard(d.id) === (activeStandard ?? 'asa')),
+    () => docs.filter(d => {
+      if (d.folder === 'records') return true;
+      const std = docStandard(d.id);
+      return std === 'both' || std === (activeStandard ?? 'asa');
+    }),
     [docs, activeStandard]
   );
 
