@@ -232,8 +232,10 @@ const DocumentsPage = () => {
   const [docs, setDocs]           = useState(SEED_DOCS);
   const [folder, setFolder]       = useState('all');
   const [search, setSearch]       = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [detailDocId, setDetailDocId] = useState(null);
   const [viewingDoc,  setViewingDoc]  = useState(null);
+  const [autoEdit,    setAutoEdit]    = useState(false);
   const [uploadPrefill, setUploadPrefill] = useState(null);
   const [uploadOpen,    setUploadOpen]    = useState(false);
 
@@ -290,9 +292,10 @@ const DocumentsPage = () => {
     return standardDocs.filter(d => {
       const matchFolder = folder === 'all' || d.folder === folder;
       const matchSearch = !q || d.id.toLowerCase().includes(q) || d.title.toLowerCase().includes(q) || (d.owner || '').toLowerCase().includes(q);
-      return matchFolder && matchSearch;
+      const matchStatus = statusFilter === 'all' || d.status === statusFilter;
+      return matchFolder && matchSearch && matchStatus;
     });
-  }, [standardDocs, folder, search]);
+  }, [standardDocs, folder, search, statusFilter]);
 
   const overdueCount   = standardDocs.filter(d => d.reviewDue?.includes('Overdue')).length;
   const draftCount     = standardDocs.filter(d => d.status === 'Draft' || d.status === 'Under review').length;
@@ -476,6 +479,22 @@ const DocumentsPage = () => {
             </div>
           </div>
 
+          {/* Status filter bar */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '8px 14px', borderBottom: '1px solid var(--border)', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 11, color: 'var(--ink-3)', marginRight: 4 }}>Status:</span>
+            {['all', 'Draft', 'Under review', 'Issued', 'Live form'].map(s => (
+              <button key={s} onClick={() => setStatusFilter(s)} style={{
+                padding: '2px 10px', borderRadius: 12, border: '1px solid',
+                fontSize: 11, cursor: 'pointer', fontWeight: statusFilter === s ? 600 : 400,
+                background: statusFilter === s ? 'var(--accent-soft)' : 'transparent',
+                borderColor: statusFilter === s ? 'var(--accent)' : 'var(--border)',
+                color: statusFilter === s ? 'var(--accent-ink)' : 'var(--ink-3)',
+              }}>
+                {s === 'all' ? 'All' : s}
+              </button>
+            ))}
+          </div>
+
           {/* Content search results */}
           {contentResults !== null && (
             <div style={{ borderBottom: '2px solid var(--accent)', background: 'var(--accent-soft)', padding: '10px 14px' }}>
@@ -585,8 +604,9 @@ const DocumentsPage = () => {
             doc={detailDoc}
             onUpdate={handleUpdateDoc}
             onClose={() => setDetailDocId(null)}
-            onView={() => setViewingDoc(detailDoc)}
+            onView={() => { setDetailDocId(null); setAutoEdit(false); setViewingDoc(detailDoc); }}
             onEdit={() => { setDetailDocId(null); openUpload(detailDoc); }}
+            onEditHtml={() => { setDetailDocId(null); setAutoEdit(true); setViewingDoc(detailDoc); }}
           />
         )}
       </Drawer>
@@ -595,7 +615,8 @@ const DocumentsPage = () => {
       {viewingDoc && (
         <DocViewer
           doc={viewingDoc}
-          onClose={() => setViewingDoc(null)}
+          autoEdit={autoEdit}
+          onClose={() => { setViewingDoc(null); setAutoEdit(false); }}
           onAttach={(doc) => { setViewingDoc(null); openUpload(doc); }}
           onFormSaved={handleFormSaved}
           onDocUpdated={() => loadDocs()}

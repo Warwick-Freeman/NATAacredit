@@ -119,6 +119,7 @@ using (var scope = app.Services.CreateScope())
         "ALTER TABLE ComplianceSections ADD COLUMN Standard TEXT NOT NULL DEFAULT 'asa'",
         "ALTER TABLE Documents ADD COLUMN ContentText TEXT NOT NULL DEFAULT ''",
         "ALTER TABLE Documents ADD COLUMN RevisionOf TEXT",
+        "ALTER TABLE Tasks ADD COLUMN AssignedTo TEXT NOT NULL DEFAULT ''",
     })
     {
         try { db.Database.ExecuteSqlRaw(col); } catch { /* column already exists */ }
@@ -481,7 +482,27 @@ app.MapGet("/api/compliance", async (NexusDbContext db) =>
         return new { section = s.Section, title = s.Title, total, ok, nc, na, status };
     });
 }).RequireAuthorization();
-app.MapGet("/api/tasks",       async (NexusDbContext db) => await db.Tasks.ToListAsync()).RequireAuthorization();
+app.MapGet("/api/tasks", async (NexusDbContext db) => await db.Tasks.ToListAsync()).RequireAuthorization();
+app.MapPost("/api/tasks", async (NexusDbContext db, HttpRequest req) =>
+{
+    using var reader = new System.IO.StreamReader(req.Body);
+    var body = await reader.ReadToEndAsync();
+    var data = JsonSerializer.Deserialize<JsonElement>(body);
+    string Get(string k, string def = "") => data.TryGetProperty(k, out var v) ? (v.GetString() ?? def) : def;
+    var count = await db.Tasks.CountAsync();
+    var task  = new NexusTask
+    {
+        TaskId     = $"T-{count + 1:D3}",
+        Title      = Get("title"),
+        Clause     = Get("clause", "4.3.1"),
+        Due        = Get("due", "in 5 days"),
+        Priority   = Get("priority", "high"),
+        AssignedTo = Get("assignedTo"),
+    };
+    db.Tasks.Add(task);
+    await db.SaveChangesAsync();
+    return Results.Ok(task);
+}).RequireAuthorization();
 app.MapGet("/api/activity", async (NexusDbContext db) =>
 {
     var entries = await db.Activity.OrderByDescending(a => a.Ts).ThenByDescending(a => a.Id).ToListAsync();
@@ -716,6 +737,26 @@ app.MapPost("/api/documents/{id}/revise", async (string id, NexusDbContext db, C
     doc.Updated = now;
 
     // Create the new revision as Draft
+    // Build a fresh Draft workflow — preserving the approver/issuer names from
+    // the parent but resetting all completion state.
+    string freshWorkflow;
+    try
+    {
+        var parentSteps = JsonSerializer.Deserialize<JsonElement[]>(doc.Workflow ?? "[]");
+        string Who(int i, string def) =>
+            parentSteps != null && i < parentSteps.Length &&
+            parentSteps[i].TryGetProperty("who", out var v) ? (v.GetString() ?? def) : def;
+        freshWorkflow = JsonSerializer.Serialize(new object[]
+        {
+            new { step = "Draft",           who = doc.Owner,      date = now,  done = true,  active = false, rejected = false, comment = "" },
+            new { step = "Peer review",     who = Who(1, "—"),    date = "—",  done = false, active = true,  rejected = false, comment = "" },
+            new { step = "Approval",        who = Who(2, "—"),    date = "—",  done = false, active = false, rejected = false, comment = "" },
+            new { step = "Issue",           who = Who(3, "—"),    date = "—",  done = false, active = false, rejected = false, comment = "" },
+            new { step = "Periodic review", who = "+24 mo",       date = "—",  done = false, active = false, rejected = false, comment = "" },
+        });
+    }
+    catch { freshWorkflow = "[]"; }
+
     var newDoc = new Document
     {
         DocId          = newDocId,
@@ -730,7 +771,7 @@ app.MapPost("/api/documents/{id}/revise", async (string id, NexusDbContext db, C
         FileType       = "html",
         FileName       = newStoredFile != null ? newStoredFile : null,
         StoredFileName = newStoredFile,
-        Workflow       = doc.Workflow,
+        Workflow       = freshWorkflow,
         ContentText    = doc.ContentText,
         RevisionOf     = rootId,
     };

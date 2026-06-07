@@ -3,6 +3,7 @@ import Icon from './icons';
 import { Pill, Avatar } from './components';
 import { useAuth } from './AuthContext';
 import { useNexusData } from './NexusDataContext';
+import { ROLE_PERMISSIONS } from './AuthContext';
 
 const STATUS_KIND = { Issued: 'good', Draft: 'outline', 'Under review': 'warn', 'Live form': 'info', Obsolete: 'bad' };
 
@@ -50,7 +51,9 @@ const StepCircle = ({ index, step, isLast }) => {
   );
 };
 
-const DocDetailDrawer = ({ doc, onUpdate, onClose, onView, onEdit }) => {
+const BASE = import.meta.env.VITE_API_URL ?? '';
+
+const DocDetailDrawer = ({ doc, onUpdate, onClose, onView, onEdit, onEditHtml }) => {
   const { hasPerm, user, users } = useAuth();
   const { refreshData, activeStandard } = useNexusData();
   const PERM_ROLE = activeStandard === 'aasm' ? PERM_ROLE_AASM : PERM_ROLE_ASA;
@@ -58,11 +61,17 @@ const DocDetailDrawer = ({ doc, onUpdate, onClose, onView, onEdit }) => {
   const wf = doc.workflow || [];
   const activeIdx = wf.findIndex(s => s.active && !s.done);
 
+  // Filter users by the permission required for each workflow step
+  const usersWithPerm = (perm) =>
+    (users || []).filter(u => !!(ROLE_PERMISSIONS[u.role]?.[perm]));
+
   const [pendingAction, setPendingAction] = useState(null); // null | 'advance' | 'reject'
   const [comment,       setComment]       = useState('');
   const [reviewer,      setReviewer]      = useState(
-    wf[1]?.who !== '—' && wf[1]?.who !== 'M. Chen' ? wf[1]?.who : ''
+    wf[1]?.who !== '—' ? wf[1]?.who : ''
   );
+  const [approver, setApprover] = useState(wf[2]?.who !== '—' ? wf[2]?.who : '');
+  const [issuer,   setIssuer]   = useState(wf[3]?.who !== '—' ? wf[3]?.who : '');
 
   useEffect(() => {
     setPendingAction(null);
@@ -72,10 +81,12 @@ const DocDetailDrawer = ({ doc, onUpdate, onClose, onView, onEdit }) => {
   const handleAdvance = () => {
     if (activeIdx < 0) return;
     const t = today();
+    // Pick the who for the next step from the appropriate dropdown
+    const nextWho = activeIdx === 0 ? reviewer : activeIdx === 1 ? approver : activeIdx === 2 ? issuer : null;
     const wfNext = wf.map((s, i) => {
       if (i === activeIdx) return { ...s, done: true, active: false, date: t, comment, who: user.name };
       if (i === activeIdx + 1) {
-        const who = (activeIdx === 0 && reviewer) ? reviewer : s.who;
+        const who = nextWho || s.who;
         return { ...s, active: true, who };
       }
       return s;
@@ -85,6 +96,22 @@ const DocDetailDrawer = ({ doc, onUpdate, onClose, onView, onEdit }) => {
     const newReviewDue = allCoreDone ? addMonths(24) : doc.reviewDue;
     onUpdate({ ...doc, workflow: wfNext, status: newStatus, reviewDue: newReviewDue, updated: 'today' });
     refreshData();
+    // Create a task for the person assigned to the next step
+    if (nextWho && activeIdx < 3) {
+      const stepNames = ['Peer review', 'Approval', 'Issue'];
+      const tok = localStorage.getItem('nexus_token');
+      fetch(`${BASE}/api/tasks`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(tok ? { Authorization: `Bearer ${tok}` } : {}) },
+        body: JSON.stringify({
+          title:      `${stepNames[activeIdx]}: ${doc.id} — ${doc.title}`,
+          clause:     '4.3.1',
+          due:        'in 5 days',
+          priority:   'high',
+          assignedTo: nextWho,
+        }),
+      }).catch(() => {});
+    }
     setPendingAction(null);
     setComment('');
   };
@@ -199,13 +226,31 @@ const DocDetailDrawer = ({ doc, onUpdate, onClose, onView, onEdit }) => {
                   Awaiting: <span style={{ color: 'var(--accent-ink)' }}>{wf[activeIdx].step}</span>
                 </div>
 
-                {/* Reviewer selection for peer review step */}
+                {/* Assignee selection — filtered to roles with the required permission */}
                 {activeIdx === 0 && (
                   <div className="form-field" style={{ marginBottom: 10 }}>
                     <label className="form-label">Assign peer reviewer</label>
                     <select className="form-input" value={reviewer} onChange={e => setReviewer(e.target.value)}>
                       <option value="">— select reviewer —</option>
-                      {(users || []).map(u => <option key={u.id} value={u.name}>{u.name} · {u.role}</option>)}
+                      {usersWithPerm('canPeerReviewDoc').map(u => <option key={u.id} value={u.name}>{u.name} · {u.role}</option>)}
+                    </select>
+                  </div>
+                )}
+                {activeIdx === 1 && (
+                  <div className="form-field" style={{ marginBottom: 10 }}>
+                    <label className="form-label">Assign approver</label>
+                    <select className="form-input" value={approver} onChange={e => setApprover(e.target.value)}>
+                      <option value="">— select approver —</option>
+                      {usersWithPerm('canApproveDoc').map(u => <option key={u.id} value={u.name}>{u.name} · {u.role}</option>)}
+                    </select>
+                  </div>
+                )}
+                {activeIdx === 2 && (
+                  <div className="form-field" style={{ marginBottom: 10 }}>
+                    <label className="form-label">Assign issuer</label>
+                    <select className="form-input" value={issuer} onChange={e => setIssuer(e.target.value)}>
+                      <option value="">— select issuer —</option>
+                      {usersWithPerm('canIssueDoc').map(u => <option key={u.id} value={u.name}>{u.name} · {u.role}</option>)}
                     </select>
                   </div>
                 )}
@@ -310,10 +355,15 @@ const DocDetailDrawer = ({ doc, onUpdate, onClose, onView, onEdit }) => {
         </div>
 
         {/* Bottom actions */}
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button className="btn" style={{ flex: 1 }} onClick={onView}>
             <Icon name="eye" size={14} />{doc.fileType ? 'View document' : 'Attach file'}
           </button>
+          {doc.status === 'Draft' && doc.fileType === 'html' && onEditHtml && (
+            <button className="btn btn-primary" onClick={onEditHtml}>
+              <Icon name="edit" size={14} />Edit draft
+            </button>
+          )}
           {hasPerm('canUploadDoc') && (
             <button className="btn" onClick={onEdit}>
               <Icon name="edit" size={14} />Edit details

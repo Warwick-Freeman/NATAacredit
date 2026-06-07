@@ -8,7 +8,7 @@ const STATUS_KIND = { Issued: 'good', Draft: 'outline', 'Under review': 'warn', 
 
 const BASE = import.meta.env.VITE_API_URL ?? '';
 
-const DocViewer = ({ doc, onClose, onAttach, onFormSaved, onDocUpdated, onRevisionCreated, onOpenRevision }) => {
+const DocViewer = ({ doc, autoEdit, onClose, onAttach, onFormSaved, onDocUpdated, onRevisionCreated, onOpenRevision }) => {
   const [htmlContent, setHtmlContent]   = useState(null);
   const [htmlLoading, setHtmlLoading]   = useState(false);
   const [pdfBlobUrl,  setPdfBlobUrl]    = useState(null);
@@ -119,6 +119,12 @@ const DocViewer = ({ doc, onClose, onAttach, onFormSaved, onDocUpdated, onRevisi
       setLoadingEdit(false);
     }
   }, [doc?.fileUrl]);
+
+  // Auto-trigger edit mode when opened via "Edit draft" button in detail drawer
+  useEffect(() => {
+    if (autoEdit && canEdit && doc?.fileUrl) handleOpenEditor();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoEdit, doc?.id]);
 
   const handleSaveEdit = useCallback(async (file) => {
     const tok = localStorage.getItem('nexus_token');

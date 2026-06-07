@@ -149,6 +149,7 @@ public class NexusTask
     public string Clause { get; set; } = "";
     public string Due { get; set; } = "";
     public string Priority { get; set; } = "";
+    public string AssignedTo { get; set; } = "";
 }
 
 public class ActivityEntry
