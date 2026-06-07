@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import Icon from '../icons';
 import { PageHeader, Pill, Avatar, Tabs, Drawer } from '../components';
+import NexusGrid from '../nexus-grid';
 import { useLocation } from '../LocationContext';
 import { useTaskContext } from '../TaskContext';
 import { useAuth } from '../AuthContext';
@@ -1141,51 +1142,51 @@ const PatientsPage = ({ openStudy }) => {
           </div>
 
           <div className="card">
-            <table className="tbl">
-              <thead>
-                <tr>
-                  <th>Patient</th><th>MRN</th><th>Site</th><th>Diagnosis (primary)</th>
-                  <th>Treatment</th><th>Compliance</th><th>Physician</th><th>Next review</th><th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map(p => (
-                  <tr key={p.id} className="row-clickable" onClick={() => setSelectedId(p.id)}>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <Avatar name={p.initials} size={24} idx={parseInt(p.id.slice(-1))} />
-                        <div>
-                          <div style={{ fontWeight: 500, fontSize: 13 }}>{p.name}</div>
-                          <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{p.age}y {p.sex}</div>
-                        </div>
+            <NexusGrid
+              rowData={filtered}
+              onRowClicked={p => setSelectedId(p.data.id)}
+              columnDefs={[
+                { headerName: 'Patient', field: 'name', flex: 2,
+                  cellRenderer: p => (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <Avatar name={p.data.initials} size={24} idx={parseInt(p.data.id.slice(-1))} />
+                      <div>
+                        <div style={{ fontWeight: 500, fontSize: 13 }}>{p.data.name}</div>
+                        <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{p.data.age}y {p.data.sex}</div>
                       </div>
-                    </td>
-                    <td><span className="mono" style={{ fontSize: 12 }}>{p.mrn}</span></td>
-                    <td className="muted">{p.site}</td>
-                    <td style={{ fontSize: 12, maxWidth: 200 }}>{p.diagnoses[0]}</td>
-                    <td><TreatmentBadge treatment={p.treatment} /></td>
-                    <td>
-                      {p.compliance ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <CompliancePill rate={p.compliance.rate} />
-                          <div style={{ width: 60, overflow: 'hidden' }}>
-                            <ComplianceBar patientId={p.id} rate={p.compliance.rate} meanUsage={p.compliance.meanUsage} />
-                          </div>
-                        </div>
-                      ) : <span className="muted">—</span>}
-                    </td>
-                    <td className="muted">{p.physician}</td>
-                    <td style={{ color: p.nextReview && new Date(p.nextReview) < new Date() ? 'var(--bad)' : 'var(--ink-2)', fontSize: 12 }}>
-                      {p.nextReview ?? '—'}
-                    </td>
-                    <td><StatusBadge status={p.status} /></td>
-                  </tr>
-                ))}
-                {filtered.length === 0 && (
-                  <tr><td colSpan={9} style={{ textAlign: 'center', color: 'var(--ink-3)', padding: '24px 0', fontSize: 13 }}>No patients match your filter.</td></tr>
-                )}
-              </tbody>
-            </table>
+                    </div>
+                  )},
+                { headerName: 'MRN', field: 'mrn', width: 110,
+                  cellRenderer: p => <span className="mono" style={{ fontSize: 12 }}>{p.value}</span> },
+                { headerName: 'Site', field: 'site', width: 160,
+                  cellStyle: { color: 'var(--ink-3)', fontSize: 12 } },
+                { headerName: 'Diagnosis (primary)', field: 'diagnoses', flex: 2,
+                  cellStyle: { fontSize: 12 },
+                  valueFormatter: p => p.value?.[0] ?? '—' },
+                { headerName: 'Treatment', field: 'treatment', width: 140,
+                  cellRenderer: p => <TreatmentBadge treatment={p.value} /> },
+                { headerName: 'Compliance', field: 'compliance', width: 160,
+                  sortable: false,
+                  cellRenderer: p => p.value ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <CompliancePill rate={p.value.rate} />
+                      <div style={{ width: 60, overflow: 'hidden' }}>
+                        <ComplianceBar patientId={p.data.id} rate={p.value.rate} meanUsage={p.value.meanUsage} />
+                      </div>
+                    </div>
+                  ) : <span className="muted">—</span> },
+                { headerName: 'Physician', field: 'physician', width: 140,
+                  cellStyle: { color: 'var(--ink-3)', fontSize: 12 } },
+                { headerName: 'Next review', field: 'nextReview', width: 120,
+                  cellRenderer: p => (
+                    <span style={{ fontSize: 12, color: p.value && new Date(p.value) < new Date() ? 'var(--bad)' : 'var(--ink-2)' }}>
+                      {p.value ?? '—'}
+                    </span>
+                  )},
+                { headerName: 'Status', field: 'status', width: 130,
+                  cellRenderer: p => <StatusBadge status={p.value} /> },
+              ]}
+            />
           </div>
         </>
       )}
@@ -1258,35 +1259,42 @@ const PatientsPage = ({ openStudy }) => {
       {/* ── PRESCRIPTIONS ─────────────────────────────────────────────────────── */}
       {tab === 'prescriptions' && (
         <div className="card">
-          <table className="tbl">
-            <thead>
-              <tr><th>Patient</th><th>Treatment type</th><th>Device</th><th>Mode / settings</th><th>Mask</th><th>Start date</th><th>Physician</th></tr>
-            </thead>
-            <tbody>
-              {patients.filter(p => p.treatment).map(p => (
-                <tr key={p.id} className="row-clickable" onClick={() => setSelectedId(p.id)}>
-                  <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <Avatar name={p.initials} size={22} idx={parseInt(p.id.slice(-1))} />
-                      <div>
-                        <div style={{ fontWeight: 500, fontSize: 13 }}>{p.name}</div>
-                        <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{p.mrn}</div>
-                      </div>
+          <NexusGrid
+            rowData={patients.filter(p => p.treatment)}
+            onRowClicked={p => setSelectedId(p.data.id)}
+            columnDefs={[
+              { headerName: 'Patient', field: 'name', flex: 2,
+                cellRenderer: p => (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Avatar name={p.data.initials} size={22} idx={parseInt(p.data.id.slice(-1))} />
+                    <div>
+                      <div style={{ fontWeight: 500, fontSize: 13 }}>{p.data.name}</div>
+                      <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{p.data.mrn}</div>
                     </div>
-                  </td>
-                  <td><TreatmentBadge treatment={p.treatment} /></td>
-                  <td style={{ fontSize: 12 }}>{p.treatment.device ?? '—'}</td>
-                  <td style={{ fontSize: 12, color: 'var(--ink-2)' }}>
-                    {p.treatment.prescription.mode}
-                    {p.treatment.prescription.pMin != null && ` · ${p.treatment.prescription.pMin}–${p.treatment.prescription.pMax} cmH₂O`}
-                  </td>
-                  <td style={{ fontSize: 12, color: 'var(--ink-2)' }}>{p.treatment.prescription.mask ?? '—'}</td>
-                  <td className="muted">{p.treatment.startDate}</td>
-                  <td className="muted">{p.physician}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </div>
+                )},
+              { headerName: 'Treatment type', field: 'treatment', width: 150,
+                cellRenderer: p => <TreatmentBadge treatment={p.value} /> },
+              { headerName: 'Device', field: 'treatment', colId: 'device', width: 140,
+                cellStyle: { fontSize: 12 },
+                valueFormatter: p => p.value?.device ?? '—' },
+              { headerName: 'Mode / settings', field: 'treatment', colId: 'mode', flex: 2,
+                cellStyle: { fontSize: 12, color: 'var(--ink-2)' },
+                valueFormatter: p => {
+                  const rx = p.value?.prescription;
+                  if (!rx) return '—';
+                  return rx.mode + (rx.pMin != null ? ` · ${rx.pMin}–${rx.pMax} cmH₂O` : '');
+                }},
+              { headerName: 'Mask', field: 'treatment', colId: 'mask', width: 160,
+                cellStyle: { fontSize: 12, color: 'var(--ink-2)' },
+                valueFormatter: p => p.value?.prescription?.mask ?? '—' },
+              { headerName: 'Start date', field: 'treatment', colId: 'startDate', width: 120,
+                cellStyle: { color: 'var(--ink-3)', fontSize: 12 },
+                valueFormatter: p => p.value?.startDate ?? '—' },
+              { headerName: 'Physician', field: 'physician', width: 130,
+                cellStyle: { color: 'var(--ink-3)', fontSize: 12 } },
+            ]}
+          />
         </div>
       )}
 

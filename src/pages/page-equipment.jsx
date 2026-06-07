@@ -7,6 +7,7 @@ import { HstDispatchDrawer, HstReturnDrawer } from '../hst-dispatch-drawer';
 import { SEED_PATIENTS } from './page-patients';
 import { COURIERS } from '../courier-api';
 import { ConsumableFormDrawer, StockReceiveDrawer, StockUseDrawer, PlaceOrderDrawer } from '../consumables-drawers';
+import NexusGrid from '../nexus-grid';
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 const fmtDate = (iso) => {
@@ -598,6 +599,287 @@ const EquipmentPage = () => {
     setPlacingOrderCon(null);
   };
 
+  // ─── Column definitions ───────────────────────────────────────────────────
+
+  const registerColDefs = useMemo(() => [
+    {
+      headerName: 'Asset ID', field: 'id', width: 150,
+      cellRenderer: p => (
+        <span className="mono" style={{ fontWeight: 500 }}>{p.value}</span>
+      ),
+    },
+    {
+      headerName: 'Device', field: 'name', flex: 2,
+      cellRenderer: p => (
+        <div>
+          <div style={{ fontWeight: 500 }}>{p.data.name}</div>
+          <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{p.data.manufacturer} · {p.data.model}</div>
+        </div>
+      ),
+    },
+    { headerName: 'Type', field: 'type', width: 150, cellStyle: { fontSize: 12 } },
+    { headerName: 'Site', field: 'site', flex: 1, cellClass: 'muted' },
+    {
+      headerName: 'Serial', field: 'serial', width: 130,
+      cellRenderer: p => (
+        <span className="mono" style={{ fontSize: 11 }}>{p.value}</span>
+      ),
+    },
+    {
+      headerName: 'ARTG', field: 'artg', width: 100,
+      cellRenderer: p => (
+        <span className="mono" style={{ fontSize: 11, color: p.value === '—' ? 'var(--ink-4)' : 'var(--ink-2)' }}>{p.value}</span>
+      ),
+    },
+    {
+      headerName: 'Status', field: 'status', width: 130,
+      cellRenderer: p => (
+        <Pill kind={STATUS_KIND[p.value] || 'outline'} dot>{p.value}</Pill>
+      ),
+    },
+    {
+      headerName: 'Next verification', field: 'nextVerify', width: 160,
+      cellRenderer: p => (
+        <Pill kind={VSTATUS_KIND[p.data.verifyStatus]} dot>{fmtDate(p.value)}</Pill>
+      ),
+    },
+  ], []);
+
+  const hstFleetColDefs = useMemo(() => [
+    {
+      headerName: 'Asset ID', field: 'id', width: 150,
+      cellRenderer: p => (
+        <span className="mono" style={{ fontWeight: 700, cursor: 'pointer', color: 'var(--accent)' }}
+          onClick={() => setDetailId(p.value)}>{p.value}</span>
+      ),
+    },
+    {
+      headerName: 'Device', field: 'name', flex: 2,
+      cellRenderer: p => (
+        <div>
+          <div style={{ fontWeight: 500 }}>{p.data.name}</div>
+          <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{p.data.manufacturer} {p.data.model} · {p.data.serial}</div>
+        </div>
+      ),
+    },
+    {
+      headerName: 'HST status', field: 'hstStatus', width: 130,
+      cellRenderer: p => (
+        <Pill kind={HST_STATUS_KIND[p.value] ?? 'outline'} dot>{p.value}</Pill>
+      ),
+    },
+    {
+      headerName: 'Current patient', field: 'id', width: 220, sortable: false,
+      cellRenderer: p => {
+        const e = p.data;
+        const lastDispatch = (e.hstHistory ?? []).find(h => h.type === 'dispatch');
+        const activeEntry  = e.hstStatus === 'Dispatched' ? lastDispatch : null;
+        return activeEntry ? (
+          <div>
+            <div style={{ fontWeight: 500, fontSize: 12 }}>{activeEntry.patient?.name}</div>
+            <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+              {activeEntry.patient?.studyRef} · {activeEntry.patient?.phone}
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+              {[activeEntry.address?.suburb, activeEntry.address?.state].filter(Boolean).join(', ')}
+            </div>
+          </div>
+        ) : <span className="muted">—</span>;
+      },
+    },
+    {
+      headerName: 'Courier · tracking', field: 'hstStatus', width: 200, sortable: false,
+      cellRenderer: p => {
+        const e = p.data;
+        const lastDispatch = (e.hstHistory ?? []).find(h => h.type === 'dispatch');
+        const activeEntry  = e.hstStatus === 'Dispatched' ? lastDispatch : null;
+        const courierId    = activeEntry?.courier;
+        const courierInfo  = courierId ? COURIERS.find(c => c.id === courierId) : null;
+        return activeEntry ? (
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 2 }}>
+              {courierInfo && <div style={{ width: 8, height: 8, borderRadius: 2, background: courierInfo.color, flexShrink: 0 }} />}
+              <span style={{ fontSize: 11, fontWeight: 600 }}>{courierInfo?.name ?? activeEntry.courier}</span>
+              <span style={{ fontSize: 10, color: 'var(--ink-3)' }}>{activeEntry.service}</span>
+            </div>
+            {activeEntry.trackingNumber && (
+              <a href={`${courierInfo?.trackingBase ?? ''}${activeEntry.trackingNumber}`}
+                target="_blank" rel="noreferrer"
+                className="mono" style={{ fontSize: 11, color: 'var(--accent)', textDecoration: 'none' }}>
+                {activeEntry.trackingNumber} ↗
+              </a>
+            )}
+          </div>
+        ) : <span className="muted">—</span>;
+      },
+    },
+    {
+      headerName: 'Return by', field: 'hstStatus', width: 120, sortable: false,
+      cellRenderer: p => {
+        const e = p.data;
+        const lastDispatch = (e.hstHistory ?? []).find(h => h.type === 'dispatch');
+        const activeEntry  = e.hstStatus === 'Dispatched' ? lastDispatch : null;
+        const isOverdue    = activeEntry?.returnBy && new Date(activeEntry.returnBy) < new Date();
+        return activeEntry?.returnBy ? (
+          <span style={{ fontSize: 12, fontWeight: 500, color: isOverdue ? 'var(--bad)' : 'inherit' }}>
+            {fmtDate(activeEntry.returnBy)}
+            {isOverdue && <div style={{ fontSize: 10, color: 'var(--bad)' }}>Overdue</div>}
+          </span>
+        ) : <span className="muted">—</span>;
+      },
+    },
+    {
+      headerName: 'Actions', field: 'id', width: 160, sortable: false,
+      cellRenderer: p => {
+        const e = p.data;
+        return (
+          <div style={{ display: 'flex', gap: 6 }}>
+            {e.hstStatus === 'Available' && e.status !== 'Quarantined' && (
+              <button className="btn btn-primary" style={{ fontSize: 11, padding: '3px 10px', whiteSpace: 'nowrap' }}
+                onClick={ev => { ev.stopPropagation(); setHstDispatchEq(e); }}>
+                <Icon name="send" size={11} />Dispatch
+              </button>
+            )}
+            {e.hstStatus === 'Dispatched' && (
+              <button className="btn" style={{ fontSize: 11, padding: '3px 10px', whiteSpace: 'nowrap' }}
+                onClick={ev => { ev.stopPropagation(); setHstReturnEq(e); }}>
+                <Icon name="rotate_ccw" size={11} />Record return
+              </button>
+            )}
+            {(e.hstStatus === 'Quarantined' || (e.hstStatus === 'Available' && e.status === 'Quarantined')) && (
+              <Pill kind="bad" dot>Quarantined</Pill>
+            )}
+          </div>
+        );
+      },
+    },
+  ], []);
+
+  const dispatchHistoryColDefs = useMemo(() => [
+    { headerName: 'Date', field: 'date', width: 120, valueFormatter: p => fmtDate(p.value) },
+    {
+      headerName: 'Device', field: 'deviceId', width: 150,
+      cellRenderer: p => (
+        <span className="mono" style={{ fontSize: 12, fontWeight: 600 }}>{p.value}</span>
+      ),
+    },
+    {
+      headerName: 'Patient', field: 'patient', flex: 1,
+      cellRenderer: p => (
+        <div>
+          <div style={{ fontWeight: 500, fontSize: 12 }}>{p.value?.name}</div>
+          <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{p.value?.studyRef}</div>
+        </div>
+      ),
+    },
+    {
+      headerName: 'Courier', field: 'courier', width: 130,
+      cellRenderer: p => {
+        const ci = COURIERS.find(c => c.id === p.value);
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            {ci && <div style={{ width: 8, height: 8, borderRadius: 2, background: ci.color }} />}
+            <span style={{ fontSize: 12 }}>{ci?.name ?? p.value}</span>
+          </div>
+        );
+      },
+    },
+    {
+      headerName: 'Outbound tracking', field: 'trackingNumber', width: 180,
+      cellRenderer: p => {
+        const h = p.data;
+        const ci = COURIERS.find(c => c.id === h.courier);
+        return p.value ? (
+          <a href={`${ci?.trackingBase ?? ''}${p.value}`} target="_blank" rel="noreferrer"
+            className="mono" style={{ fontSize: 11, color: 'var(--accent)', textDecoration: 'none' }}>
+            {p.value} ↗
+          </a>
+        ) : <span className="muted">—</span>;
+      },
+    },
+    {
+      headerName: 'Return tracking', field: 'returnTrackingNumber', width: 170,
+      cellRenderer: p => p.value
+        ? <span className="mono" style={{ fontSize: 11, color: 'var(--ink-2)' }}>{p.value}</span>
+        : <span className="muted">—</span>,
+    },
+    { headerName: 'Return by', field: 'returnBy', width: 120, valueFormatter: p => fmtDate(p.value) },
+  ], []);
+
+  const scheduleColDefs = useMemo(() => [
+    {
+      headerName: 'Asset ID', field: 'id', width: 150,
+      cellRenderer: p => (
+        <span className="mono" style={{ fontWeight: 500 }}>{p.value}</span>
+      ),
+    },
+    {
+      headerName: 'Device', field: 'name', flex: 2,
+      cellRenderer: p => (
+        <div>
+          <div style={{ fontWeight: 500 }}>{p.data.name}</div>
+          <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{p.data.type}</div>
+        </div>
+      ),
+    },
+    { headerName: 'Site', field: 'site', flex: 1, cellClass: 'muted' },
+    {
+      headerName: 'Interval', field: 'verifyInterval', width: 100,
+      valueFormatter: p => `${p.value} mo`,
+    },
+    { headerName: 'Last verified', field: 'lastVerify', width: 130, valueFormatter: p => fmtDate(p.value) },
+    {
+      headerName: 'Next due', field: 'nextVerify', width: 160,
+      cellRenderer: p => {
+        const e = p.data;
+        return (
+          <div>
+            <div style={{ fontWeight: 500, color: e.verifyStatus === 'bad' ? 'var(--bad)' : e.verifyStatus === 'warn' ? 'var(--warn)' : 'inherit' }}>
+              {fmtDate(p.value)}
+            </div>
+            <div style={{ fontSize: 11, color: e.verifyStatus === 'bad' ? 'var(--bad)' : 'var(--ink-3)' }}>
+              {e.diffDays < 0 ? `Overdue ${Math.abs(e.diffDays)}d` : `in ${e.diffDays}d`}
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      headerName: 'Status', field: 'verifyStatus', width: 120,
+      cellRenderer: p => (
+        <Pill kind={VSTATUS_KIND[p.value]} dot>
+          {p.value === 'bad' ? 'Overdue' : p.value === 'warn' ? 'Due soon' : 'Current'}
+        </Pill>
+      ),
+    },
+  ], []);
+
+  const incidentsColDefs = useMemo(() => [
+    { headerName: 'Date', field: 'date', width: 120, valueFormatter: p => fmtDate(p.value) },
+    {
+      headerName: 'Asset', field: 'assetId', width: 180,
+      cellRenderer: p => (
+        <div>
+          <div className="mono" style={{ fontSize: 12, fontWeight: 600 }}>{p.value}</div>
+          <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{p.data.assetName}</div>
+        </div>
+      ),
+    },
+    { headerName: 'Description', field: 'description', flex: 1 },
+    {
+      headerName: 'TGA ref', field: 'tgaReported', width: 140,
+      cellRenderer: p => p.value
+        ? <Pill kind="good">{p.data.tgaRef !== '—' ? p.data.tgaRef : 'Reported'}</Pill>
+        : <span className="muted">—</span>,
+    },
+    {
+      headerName: 'Status', field: 'status', width: 130,
+      cellRenderer: p => (
+        <Pill kind={INC_KIND[p.value] || 'outline'} dot>{p.value}</Pill>
+      ),
+    },
+  ], []);
+
   return (
     <div className="page page-wide">
       <PageHeader
@@ -682,33 +964,11 @@ const EquipmentPage = () => {
             {filtered.length === 0
               ? <div className="empty">No equipment matches your filter.</div>
               : (
-                <table className="tbl">
-                  <thead>
-                    <tr>
-                      <th>Asset ID</th><th>Device</th><th>Type</th><th>Site</th>
-                      <th>Serial</th><th>ARTG</th><th>Status</th><th>Next verification</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filtered.map(e => (
-                      <tr key={e.id} className="row-clickable" onClick={() => setDetailId(e.id)}>
-                        <td className="mono" style={{ fontWeight: 500 }}>{e.id}</td>
-                        <td>
-                          <div style={{ fontWeight: 500 }}>{e.name}</div>
-                          <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{e.manufacturer} · {e.model}</div>
-                        </td>
-                        <td style={{ fontSize: 12 }}>{e.type}</td>
-                        <td className="muted">{e.site}</td>
-                        <td className="mono" style={{ fontSize: 11 }}>{e.serial}</td>
-                        <td className="mono" style={{ fontSize: 11, color: e.artg === '—' ? 'var(--ink-4)' : 'var(--ink-2)' }}>{e.artg}</td>
-                        <td><Pill kind={STATUS_KIND[e.status] || 'outline'} dot>{e.status}</Pill></td>
-                        <td>
-                          <Pill kind={VSTATUS_KIND[e.verifyStatus]} dot>{fmtDate(e.nextVerify)}</Pill>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <NexusGrid
+                  rowData={filtered}
+                  columnDefs={registerColDefs}
+                  onRowClicked={p => setDetailId(p.data.id)}
+                />
               )
             }
           </div>
@@ -720,6 +980,13 @@ const EquipmentPage = () => {
         const available   = hstDevices.filter(e => e.hstStatus === 'Available').length;
         const dispatched  = hstDevices.filter(e => e.hstStatus === 'Dispatched').length;
         const quarantined = hstDevices.filter(e => e.hstStatus === 'Quarantined').length;
+
+        const recentDispatches = hstDevices
+          .flatMap(e => (e.hstHistory ?? []).map(h => ({ ...h, deviceId: e.id })))
+          .filter(h => h.type === 'dispatch')
+          .sort((a, b) => b.date.localeCompare(a.date))
+          .slice(0, 8);
+
         return (
           <>
             {/* Status summary */}
@@ -752,149 +1019,23 @@ const EquipmentPage = () => {
               {hstDevices.length === 0
                 ? <div className="empty">No HST-enabled devices in register.</div>
                 : (
-                  <table className="tbl">
-                    <thead>
-                      <tr>
-                        <th>Asset ID</th><th>Device</th><th>HST status</th>
-                        <th>Current patient</th><th>Courier · tracking</th><th>Return by</th><th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {hstDevices.map(e => {
-                        const activeDispatch = (e.hstHistory ?? []).find(h => h.type === 'dispatch' &&
-                          (e.hstHistory ?? []).findIndex(x => x.type === 'return_processed') <
-                          (e.hstHistory ?? []).findIndex(x => x === h));
-                        const lastDispatch = (e.hstHistory ?? []).find(h => h.type === 'dispatch');
-                        const activeEntry  = e.hstStatus === 'Dispatched' ? lastDispatch : null;
-                        const courierId    = activeEntry?.courier;
-                        const courierInfo  = courierId ? COURIERS.find(c => c.id === courierId) : null;
-                        const isOverdue    = activeEntry?.returnBy && new Date(activeEntry.returnBy) < new Date();
-
-                        return (
-                          <tr key={e.id}>
-                            <td>
-                              <span className="mono" style={{ fontWeight: 700, cursor: 'pointer', color: 'var(--accent)' }}
-                                onClick={() => setDetailId(e.id)}>{e.id}</span>
-                            </td>
-                            <td>
-                              <div style={{ fontWeight: 500 }}>{e.name}</div>
-                              <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{e.manufacturer} {e.model} · {e.serial}</div>
-                            </td>
-                            <td>
-                              <Pill kind={HST_STATUS_KIND[e.hstStatus] ?? 'outline'} dot>{e.hstStatus}</Pill>
-                            </td>
-                            <td>
-                              {activeEntry ? (
-                                <div>
-                                  <div style={{ fontWeight: 500, fontSize: 12 }}>{activeEntry.patient?.name}</div>
-                                  <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>
-                                    {activeEntry.patient?.studyRef} · {activeEntry.patient?.phone}
-                                  </div>
-                                  <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>
-                                    {[activeEntry.address?.suburb, activeEntry.address?.state].filter(Boolean).join(', ')}
-                                  </div>
-                                </div>
-                              ) : <span className="muted">—</span>}
-                            </td>
-                            <td>
-                              {activeEntry ? (
-                                <div>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 2 }}>
-                                    {courierInfo && <div style={{ width: 8, height: 8, borderRadius: 2, background: courierInfo.color, flexShrink: 0 }} />}
-                                    <span style={{ fontSize: 11, fontWeight: 600 }}>{courierInfo?.name ?? activeEntry.courier}</span>
-                                    <span style={{ fontSize: 10, color: 'var(--ink-3)' }}>{activeEntry.service}</span>
-                                  </div>
-                                  {activeEntry.trackingNumber && (
-                                    <a href={`${courierInfo?.trackingBase ?? ''}${activeEntry.trackingNumber}`}
-                                      target="_blank" rel="noreferrer"
-                                      className="mono" style={{ fontSize: 11, color: 'var(--accent)', textDecoration: 'none' }}>
-                                      {activeEntry.trackingNumber} ↗
-                                    </a>
-                                  )}
-                                </div>
-                              ) : <span className="muted">—</span>}
-                            </td>
-                            <td>
-                              {activeEntry?.returnBy ? (
-                                <span style={{ fontSize: 12, fontWeight: 500, color: isOverdue ? 'var(--bad)' : 'inherit' }}>
-                                  {fmtDate(activeEntry.returnBy)}
-                                  {isOverdue && <div style={{ fontSize: 10, color: 'var(--bad)' }}>Overdue</div>}
-                                </span>
-                              ) : <span className="muted">—</span>}
-                            </td>
-                            <td>
-                              <div style={{ display: 'flex', gap: 6 }}>
-                                {e.hstStatus === 'Available' && e.status !== 'Quarantined' && (
-                                  <button className="btn btn-primary" style={{ fontSize: 11, padding: '3px 10px', whiteSpace: 'nowrap' }}
-                                    onClick={() => setHstDispatchEq(e)}>
-                                    <Icon name="send" size={11} />Dispatch
-                                  </button>
-                                )}
-                                {e.hstStatus === 'Dispatched' && (
-                                  <button className="btn" style={{ fontSize: 11, padding: '3px 10px', whiteSpace: 'nowrap' }}
-                                    onClick={() => setHstReturnEq(e)}>
-                                    <Icon name="rotate_ccw" size={11} />Record return
-                                  </button>
-                                )}
-                                {(e.hstStatus === 'Quarantined' || (e.hstStatus === 'Available' && e.status === 'Quarantined')) && (
-                                  <Pill kind="bad" dot>Quarantined</Pill>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                  <NexusGrid
+                    rowData={hstDevices}
+                    columnDefs={hstFleetColDefs}
+                  />
                 )
               }
 
               {/* HST dispatch history */}
               <div style={{ padding: '14px 20px', borderTop: '1px solid var(--border)' }}>
                 <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-2)', marginBottom: 10 }}>Recent dispatch history</div>
-                {hstDevices.flatMap(e => (e.hstHistory ?? []).map(h => ({ ...h, deviceId: e.id, deviceName: e.name }))).filter(h => h.type === 'dispatch').sort((a, b) => b.date.localeCompare(a.date)).slice(0, 8).length === 0
+                {recentDispatches.length === 0
                   ? <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>No dispatches recorded.</div>
                   : (
-                    <table className="tbl">
-                      <thead>
-                        <tr><th>Date</th><th>Device</th><th>Patient</th><th>Courier</th><th>Outbound tracking</th><th>Return tracking</th><th>Return by</th></tr>
-                      </thead>
-                      <tbody>
-                        {hstDevices.flatMap(e => (e.hstHistory ?? []).map(h => ({ ...h, deviceId: e.id }))).filter(h => h.type === 'dispatch').sort((a, b) => b.date.localeCompare(a.date)).slice(0, 8).map((h, i) => {
-                          const ci = COURIERS.find(c => c.id === h.courier);
-                          return (
-                            <tr key={i}>
-                              <td className="muted">{fmtDate(h.date)}</td>
-                              <td><span className="mono" style={{ fontSize: 12, fontWeight: 600 }}>{h.deviceId}</span></td>
-                              <td>
-                                <div style={{ fontWeight: 500, fontSize: 12 }}>{h.patient?.name}</div>
-                                <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{h.patient?.studyRef}</div>
-                              </td>
-                              <td>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                                  {ci && <div style={{ width: 8, height: 8, borderRadius: 2, background: ci.color }} />}
-                                  <span style={{ fontSize: 12 }}>{ci?.name ?? h.courier}</span>
-                                </div>
-                              </td>
-                              <td>
-                                {h.trackingNumber ? (
-                                  <a href={`${ci?.trackingBase ?? ''}${h.trackingNumber}`} target="_blank" rel="noreferrer"
-                                    className="mono" style={{ fontSize: 11, color: 'var(--accent)', textDecoration: 'none' }}>
-                                    {h.trackingNumber} ↗
-                                  </a>
-                                ) : <span className="muted">—</span>}
-                              </td>
-                              <td>
-                                {h.returnTrackingNumber
-                                  ? <span className="mono" style={{ fontSize: 11, color: 'var(--ink-2)' }}>{h.returnTrackingNumber}</span>
-                                  : <span className="muted">—</span>}
-                              </td>
-                              <td className="muted">{fmtDate(h.returnBy)}</td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                    <NexusGrid
+                      rowData={recentDispatches}
+                      columnDefs={dispatchHistoryColDefs}
+                    />
                   )
                 }
               </div>
@@ -912,38 +1053,11 @@ const EquipmentPage = () => {
               <div className="card-sub">All devices sorted by next verification date · overdue first</div>
             </div>
           </div>
-          <table className="tbl">
-            <thead>
-              <tr><th>Asset ID</th><th>Device</th><th>Site</th><th>Interval</th><th>Last verified</th><th>Next due</th><th>Status</th></tr>
-            </thead>
-            <tbody>
-              {scheduleItems.map(e => (
-                <tr key={e.id} className="row-clickable" onClick={() => setDetailId(e.id)}>
-                  <td className="mono" style={{ fontWeight: 500 }}>{e.id}</td>
-                  <td>
-                    <div style={{ fontWeight: 500 }}>{e.name}</div>
-                    <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{e.type}</div>
-                  </td>
-                  <td className="muted">{e.site}</td>
-                  <td style={{ fontSize: 12 }}>{e.verifyInterval} mo</td>
-                  <td className="muted">{fmtDate(e.lastVerify)}</td>
-                  <td>
-                    <div style={{ fontWeight: 500, color: e.verifyStatus === 'bad' ? 'var(--bad)' : e.verifyStatus === 'warn' ? 'var(--warn)' : 'inherit' }}>
-                      {fmtDate(e.nextVerify)}
-                    </div>
-                    <div style={{ fontSize: 11, color: e.verifyStatus === 'bad' ? 'var(--bad)' : 'var(--ink-3)' }}>
-                      {e.diffDays < 0 ? `Overdue ${Math.abs(e.diffDays)}d` : `in ${e.diffDays}d`}
-                    </div>
-                  </td>
-                  <td>
-                    <Pill kind={VSTATUS_KIND[e.verifyStatus]} dot>
-                      {e.verifyStatus === 'bad' ? 'Overdue' : e.verifyStatus === 'warn' ? 'Due soon' : 'Current'}
-                    </Pill>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <NexusGrid
+            rowData={scheduleItems}
+            columnDefs={scheduleColDefs}
+            onRowClicked={p => setDetailId(p.data.id)}
+          />
         </div>
       )}
 
@@ -995,27 +1109,10 @@ const EquipmentPage = () => {
           {incidents.length === 0
             ? <div className="empty">No adverse incidents recorded.</div>
             : (
-              <table className="tbl">
-                <thead><tr><th>Date</th><th>Asset</th><th>Description</th><th>TGA ref</th><th>Status</th></tr></thead>
-                <tbody>
-                  {incidents.map(inc => (
-                    <tr key={inc.id}>
-                      <td className="muted">{fmtDate(inc.date)}</td>
-                      <td>
-                        <div className="mono" style={{ fontSize: 12, fontWeight: 600 }}>{inc.assetId}</div>
-                        <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{inc.assetName}</div>
-                      </td>
-                      <td style={{ maxWidth: 320 }}>{inc.description}</td>
-                      <td>
-                        {inc.tgaReported
-                          ? <Pill kind="good">{inc.tgaRef !== '—' ? inc.tgaRef : 'Reported'}</Pill>
-                          : <span className="muted">—</span>}
-                      </td>
-                      <td><Pill kind={INC_KIND[inc.status] || 'outline'} dot>{inc.status}</Pill></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <NexusGrid
+                rowData={incidents}
+                columnDefs={incidentsColDefs}
+              />
             )
           }
         </div>
@@ -1052,6 +1149,91 @@ const EquipmentPage = () => {
           if (diff < 90)  return 'var(--warn)';
           return undefined;
         };
+
+        const consumablesColDefs = [
+          {
+            headerName: 'SKU / Category', field: 'sku', width: 160,
+            cellRenderer: p => (
+              <div>
+                <div className="mono" style={{ fontWeight: 600, fontSize: 11 }}>{p.value}</div>
+                <div style={{ fontSize: 10, color: 'var(--ink-4)', marginTop: 1 }}>{p.data.category}</div>
+              </div>
+            ),
+          },
+          { headerName: 'Description', field: 'description', flex: 2, cellStyle: { fontWeight: 500 } },
+          { headerName: 'Site', field: 'site', flex: 1, cellClass: 'muted' },
+          {
+            headerName: 'In stock', field: 'stock', width: 160,
+            cellRenderer: p => {
+              const c = p.data;
+              return (
+                <div>
+                  <span style={{ fontWeight: 700, color: c.stockStatus === 'critical' ? 'var(--bad)' : c.stockStatus === 'low' ? 'var(--warn)' : 'var(--good)' }}>
+                    {c.stock}
+                  </span>
+                  <span className="muted" style={{ marginLeft: 4, fontSize: 11 }}>
+                    {c.unit}{c.stock !== 1 ? 's' : ''} · reorder ≤{c.reorder}
+                  </span>
+                </div>
+              );
+            },
+          },
+          {
+            headerName: 'Next expiry', field: 'sku', width: 130, sortable: false,
+            cellRenderer: p => {
+              const exp = nextExpiry(p.data);
+              return exp ? (
+                <span style={{ fontSize: 12, fontWeight: 500, color: expiryColor(exp) }}>
+                  {fmtDate(exp)}
+                  {(new Date(exp) - new Date()) / 86400000 < 0 && (
+                    <div style={{ fontSize: 10, color: 'var(--bad)' }}>Expired</div>
+                  )}
+                </span>
+              ) : <span className="muted">—</span>;
+            },
+          },
+          {
+            headerName: 'Status', field: 'stockStatus', width: 140,
+            cellRenderer: p => (
+              <Pill kind={STOCK_KIND[p.value]} dot>
+                {p.value === 'critical' ? 'Out of stock' : p.value === 'low' ? 'Low — reorder' : 'OK'}
+              </Pill>
+            ),
+          },
+          {
+            headerName: 'Order', field: 'pendingOrder', width: 160,
+            cellRenderer: p => p.value
+              ? <Pill kind="warn" dot>{p.value.qty} {p.data.unit}s pending</Pill>
+              : <span className="muted">—</span>,
+          },
+          {
+            headerName: 'Actions', field: 'sku', width: 220, sortable: false,
+            cellRenderer: p => {
+              const c = p.data;
+              return (
+                <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}
+                  onClick={e => e.stopPropagation()}>
+                  <button className="btn" style={{ fontSize: 11, padding: '2px 8px' }}
+                    title="Receive stock" onClick={() => setStockReceiveCon(c)}>
+                    <Icon name="download" size={11} />Receive
+                  </button>
+                  <button className="btn" style={{ fontSize: 11, padding: '2px 8px' }}
+                    title="Record usage" onClick={() => setStockUseCon(c)}>
+                    <Icon name="minus" size={11} />Use
+                  </button>
+                  <button className="btn" style={{ fontSize: 11, padding: '2px 8px' }}
+                    title="Place order" onClick={() => setPlacingOrderCon(c)}>
+                    <Icon name="package" size={11} />Order
+                  </button>
+                  <button className="icon-btn" title="Edit consumable"
+                    onClick={() => setConFormTarget(c)}>
+                    <Icon name="edit" size={13} />
+                  </button>
+                </div>
+              );
+            },
+          },
+        ];
 
         return (
           <>
@@ -1121,163 +1303,99 @@ const EquipmentPage = () => {
               {filteredCons.length === 0
                 ? <div className="empty">No consumables match your filter.</div>
                 : (
-                  <table className="tbl">
-                    <thead>
-                      <tr>
-                        <th>SKU / Category</th><th>Description</th><th>Site</th>
-                        <th>In stock</th><th>Next expiry</th><th>Status</th><th>Order</th>
-                        <th style={{ textAlign: 'right' }}>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredCons.map(c => {
-                        const expanded = expandedConSku === c.sku;
-                        const exp = nextExpiry(c);
-                        return (
-                          <React.Fragment key={c.sku}>
-                            <tr className="row-clickable" onClick={() => setExpandedConSku(expanded ? null : c.sku)}>
-                              <td>
-                                <div className="mono" style={{ fontWeight: 600, fontSize: 11 }}>{c.sku}</div>
-                                <div style={{ fontSize: 10, color: 'var(--ink-4)', marginTop: 1 }}>{c.category}</div>
-                              </td>
-                              <td style={{ fontWeight: 500 }}>{c.description}</td>
-                              <td className="muted">{c.site}</td>
-                              <td>
-                                <span style={{ fontWeight: 700, color: c.stockStatus === 'critical' ? 'var(--bad)' : c.stockStatus === 'low' ? 'var(--warn)' : 'var(--good)' }}>
-                                  {c.stock}
-                                </span>
-                                <span className="muted" style={{ marginLeft: 4, fontSize: 11 }}>
-                                  {c.unit}{c.stock !== 1 ? 's' : ''} · reorder ≤{c.reorder}
-                                </span>
-                              </td>
-                              <td>
-                                {exp
-                                  ? <span style={{ fontSize: 12, fontWeight: 500, color: expiryColor(exp) }}>
-                                      {fmtDate(exp)}
-                                      {(new Date(exp) - new Date()) / 86400000 < 0 && (
-                                        <div style={{ fontSize: 10, color: 'var(--bad)' }}>Expired</div>
-                                      )}
-                                    </span>
-                                  : <span className="muted">—</span>
-                                }
-                              </td>
-                              <td>
-                                <Pill kind={STOCK_KIND[c.stockStatus]} dot>
-                                  {c.stockStatus === 'critical' ? 'Out of stock' : c.stockStatus === 'low' ? 'Low — reorder' : 'OK'}
-                                </Pill>
-                              </td>
-                              <td>
-                                {c.pendingOrder
-                                  ? <Pill kind="warn" dot>{c.pendingOrder.qty} {c.unit}s pending</Pill>
-                                  : <span className="muted">—</span>
-                                }
-                              </td>
-                              <td onClick={e => e.stopPropagation()}>
-                                <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
-                                  <button className="btn" style={{ fontSize: 11, padding: '2px 8px' }}
-                                    title="Receive stock" onClick={() => setStockReceiveCon(c)}>
-                                    <Icon name="download" size={11} />Receive
-                                  </button>
-                                  <button className="btn" style={{ fontSize: 11, padding: '2px 8px' }}
-                                    title="Record usage" onClick={() => setStockUseCon(c)}>
-                                    <Icon name="minus" size={11} />Use
-                                  </button>
-                                  <button className="btn" style={{ fontSize: 11, padding: '2px 8px' }}
-                                    title="Place order" onClick={() => setPlacingOrderCon(c)}>
-                                    <Icon name="package" size={11} />Order
-                                  </button>
-                                  <button className="icon-btn" title="Edit consumable"
-                                    onClick={() => setConFormTarget(c)}>
-                                    <Icon name="edit" size={13} />
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                            {expanded && (
-                              <tr>
-                                <td colSpan={8} style={{ padding: 0, background: 'var(--surface-2)' }}>
-                                  <div style={{ padding: '14px 20px 16px' }}>
-
-                                    {/* Lots */}
-                                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-2)', marginBottom: 6 }}>
-                                      Lots on hand
-                                    </div>
-                                    {c.lots.length === 0
-                                      ? <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 14 }}>No lots recorded — use Receive to add stock.</div>
-                                      : (
-                                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, marginBottom: 14 }}>
-                                          <thead>
-                                            <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                                              {['Lot No.', 'Expiry', 'In stock', 'Received', 'Invoice ref', 'Received by'].map(h => (
-                                                <th key={h} style={{ textAlign: 'left', padding: '4px 10px 4px 0', fontWeight: 600, color: 'var(--ink-3)', fontSize: 11 }}>{h}</th>
-                                              ))}
-                                            </tr>
-                                          </thead>
-                                          <tbody>
-                                            {[...c.lots].sort((a, b) => a.expiry.localeCompare(b.expiry)).map(l => (
-                                              <tr key={l.lotNo} style={{ borderBottom: '1px solid var(--border)' }}>
-                                                <td style={{ padding: '5px 10px 5px 0' }}>
-                                                  <span className="mono" style={{ fontWeight: 600 }}>{l.lotNo}</span>
-                                                </td>
-                                                <td style={{ padding: '5px 10px 5px 0' }}>
-                                                  <span style={{ color: expiryColor(l.expiry) }}>{fmtDate(l.expiry)}</span>
-                                                </td>
-                                                <td style={{ padding: '5px 10px 5px 0' }}>
-                                                  <span style={{ fontWeight: 600, color: l.qty === 0 ? 'var(--ink-4)' : undefined }}>
-                                                    {l.qty} {c.unit}{l.qty !== 1 ? 's' : ''}
-                                                  </span>
-                                                  {l.qty === 0 && <span style={{ marginLeft: 4, color: 'var(--ink-4)', fontSize: 11 }}>depleted</span>}
-                                                </td>
-                                                <td className="muted" style={{ padding: '5px 10px 5px 0' }}>{fmtDate(l.received)}</td>
-                                                <td className="mono muted" style={{ padding: '5px 10px 5px 0', fontSize: 11 }}>{l.invoiceRef || '—'}</td>
-                                                <td className="muted" style={{ padding: '5px 10px 5px 0' }}>{l.receivedBy || '—'}</td>
-                                              </tr>
-                                            ))}
-                                          </tbody>
-                                        </table>
-                                      )
-                                    }
-
-                                    {/* Usage history */}
-                                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-2)', marginBottom: 6 }}>
-                                      Recent usage {c.usageHistory.length > 5 ? `(showing 5 of ${c.usageHistory.length})` : `(${c.usageHistory.length})`}
-                                    </div>
-                                    {c.usageHistory.length === 0
-                                      ? <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>No usage recorded.</div>
-                                      : (
-                                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-                                          <thead>
-                                            <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                                              {['Date', 'Qty', 'Lot', 'Study / patient ref', 'Used by'].map(h => (
-                                                <th key={h} style={{ textAlign: 'left', padding: '4px 10px 4px 0', fontWeight: 600, color: 'var(--ink-3)', fontSize: 11 }}>{h}</th>
-                                              ))}
-                                            </tr>
-                                          </thead>
-                                          <tbody>
-                                            {c.usageHistory.slice(0, 5).map((u, i) => (
-                                              <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
-                                                <td className="muted" style={{ padding: '5px 10px 5px 0' }}>{fmtDate(u.date)}</td>
-                                                <td style={{ padding: '5px 10px 5px 0', fontWeight: 600 }}>{u.qty} {c.unit}{u.qty !== 1 ? 's' : ''}</td>
-                                                <td style={{ padding: '5px 10px 5px 0' }}><span className="mono" style={{ fontSize: 11 }}>{u.lotNo}</span></td>
-                                                <td className="muted" style={{ padding: '5px 10px 5px 0' }}>{u.studyRef || '—'}</td>
-                                                <td className="muted" style={{ padding: '5px 10px 5px 0' }}>{u.by}</td>
-                                              </tr>
-                                            ))}
-                                          </tbody>
-                                        </table>
-                                      )
-                                    }
-                                  </div>
-                                </td>
-                              </tr>
-                            )}
-                          </React.Fragment>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                  <NexusGrid
+                    rowData={filteredCons}
+                    columnDefs={consumablesColDefs}
+                    onRowClicked={p => setExpandedConSku(expandedConSku === p.data.sku ? null : p.data.sku)}
+                  />
                 )
               }
+
+              {/* Expandable detail panel — rendered below the grid, controlled by expandedConSku */}
+              {expandedConSku && (() => {
+                const c = filteredCons.find(x => x.sku === expandedConSku);
+                if (!c) return null;
+                const expiryColor = (exp) => {
+                  if (!exp) return undefined;
+                  const diff = (new Date(exp) - new Date()) / 86400000;
+                  if (diff < 0)  return 'var(--bad)';
+                  if (diff < 90) return 'var(--warn)';
+                  return undefined;
+                };
+                return (
+                  <div style={{ padding: '14px 20px 16px', background: 'var(--surface-2)', borderTop: '1px solid var(--border)' }}>
+                    {/* Lots */}
+                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-2)', marginBottom: 6 }}>
+                      Lots on hand
+                    </div>
+                    {c.lots.length === 0
+                      ? <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 14 }}>No lots recorded — use Receive to add stock.</div>
+                      : (
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, marginBottom: 14 }}>
+                          <thead>
+                            <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                              {['Lot No.', 'Expiry', 'In stock', 'Received', 'Invoice ref', 'Received by'].map(h => (
+                                <th key={h} style={{ textAlign: 'left', padding: '4px 10px 4px 0', fontWeight: 600, color: 'var(--ink-3)', fontSize: 11 }}>{h}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {[...c.lots].sort((a, b) => a.expiry.localeCompare(b.expiry)).map(l => (
+                              <tr key={l.lotNo} style={{ borderBottom: '1px solid var(--border)' }}>
+                                <td style={{ padding: '5px 10px 5px 0' }}>
+                                  <span className="mono" style={{ fontWeight: 600 }}>{l.lotNo}</span>
+                                </td>
+                                <td style={{ padding: '5px 10px 5px 0' }}>
+                                  <span style={{ color: expiryColor(l.expiry) }}>{fmtDate(l.expiry)}</span>
+                                </td>
+                                <td style={{ padding: '5px 10px 5px 0' }}>
+                                  <span style={{ fontWeight: 600, color: l.qty === 0 ? 'var(--ink-4)' : undefined }}>
+                                    {l.qty} {c.unit}{l.qty !== 1 ? 's' : ''}
+                                  </span>
+                                  {l.qty === 0 && <span style={{ marginLeft: 4, color: 'var(--ink-4)', fontSize: 11 }}>depleted</span>}
+                                </td>
+                                <td className="muted" style={{ padding: '5px 10px 5px 0' }}>{fmtDate(l.received)}</td>
+                                <td className="mono muted" style={{ padding: '5px 10px 5px 0', fontSize: 11 }}>{l.invoiceRef || '—'}</td>
+                                <td className="muted" style={{ padding: '5px 10px 5px 0' }}>{l.receivedBy || '—'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )
+                    }
+
+                    {/* Usage history */}
+                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-2)', marginBottom: 6 }}>
+                      Recent usage {c.usageHistory.length > 5 ? `(showing 5 of ${c.usageHistory.length})` : `(${c.usageHistory.length})`}
+                    </div>
+                    {c.usageHistory.length === 0
+                      ? <div style={{ fontSize: 12, color: 'var(--ink-3)' }}>No usage recorded.</div>
+                      : (
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                          <thead>
+                            <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                              {['Date', 'Qty', 'Lot', 'Study / patient ref', 'Used by'].map(h => (
+                                <th key={h} style={{ textAlign: 'left', padding: '4px 10px 4px 0', fontWeight: 600, color: 'var(--ink-3)', fontSize: 11 }}>{h}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {c.usageHistory.slice(0, 5).map((u, i) => (
+                              <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
+                                <td className="muted" style={{ padding: '5px 10px 5px 0' }}>{fmtDate(u.date)}</td>
+                                <td style={{ padding: '5px 10px 5px 0', fontWeight: 600 }}>{u.qty} {c.unit}{u.qty !== 1 ? 's' : ''}</td>
+                                <td style={{ padding: '5px 10px 5px 0' }}><span className="mono" style={{ fontSize: 11 }}>{u.lotNo}</span></td>
+                                <td className="muted" style={{ padding: '5px 10px 5px 0' }}>{u.studyRef || '—'}</td>
+                                <td className="muted" style={{ padding: '5px 10px 5px 0' }}>{u.by}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )
+                    }
+                  </div>
+                );
+              })()}
             </div>
           </>
         );

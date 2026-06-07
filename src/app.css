@@ -391,6 +391,53 @@ body {
 .tbl tr.row-clickable { cursor: pointer; }
 .tbl tr.row-clickable:hover td { background: var(--surface-2); }
 
+/* ─── AG Grid / NexusGrid theme ─────────────────────────────────────────── */
+/* Maps every app palette to the AG Grid quartz theme CSS variables.        */
+.ag-theme-quartz {
+  --ag-background-color:              var(--surface);
+  --ag-foreground-color:              var(--ink);
+  --ag-header-background-color:       var(--surface-2);
+  --ag-header-foreground-color:       var(--ink-3);
+  --ag-header-column-separator-color: var(--border);
+  --ag-border-color:                  var(--border);
+  --ag-row-hover-color:               var(--surface-2);
+  --ag-selected-row-background-color: var(--accent-soft);
+  --ag-odd-row-background-color:      var(--surface);
+  --ag-accent-color:                  var(--accent);
+
+  --ag-font-size:              13px;
+  --ag-font-family:            inherit;
+  --ag-row-height:             45px;
+  --ag-header-height:          37px;
+  --ag-cell-horizontal-padding: 14px;
+
+  /* Remove heavy default chrome */
+  --ag-border-radius:         0px;
+  --ag-wrapper-border-radius: 0px;
+  --ag-grid-size:             4px;
+
+  font-size: 13px;
+  font-family: inherit;
+}
+
+/* Header: uppercase label style matching .tbl th */
+.ag-theme-quartz .ag-header-cell-text {
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+/* Remove the default sort icon left-spacing when no sort applied */
+.ag-theme-quartz .ag-header-cell-sorted-none .ag-sort-none-icon { display: none; }
+
+/* Pointer cursor for clickable grids */
+.nexus-grid--clickable .ag-row { cursor: pointer; }
+
+/* Cell vertical alignment */
+.ag-theme-quartz .ag-cell { display: flex; align-items: center; }
+
+/* ─────────────────────────────────────────────────────────────────────── */
+
 /* Progress */
 .progress { height: 6px; background: var(--surface-3); border-radius: 3px; overflow: hidden; }
 .progress-bar { height: 100%; background: var(--accent); border-radius: 3px; }

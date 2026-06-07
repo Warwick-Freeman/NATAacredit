@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import Icon from './icons';
 import { Pill, Avatar } from './components';
 import { useTaskContext } from './TaskContext';
+import NexusGrid from './nexus-grid';
 
 const MONTHS_SHORT = ['May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar', 'Apr'];
 
@@ -191,6 +192,24 @@ const IndicatorDetailDrawer = ({ indicator, onClose, onUpdate }) => {
   const PHASE_LABEL = { pre: 'Pre-study', study: 'Study', post: 'Post-study' };
   const offTarget = indicator.status === 'warn' || indicator.status === 'bad';
 
+  const monthlyRowData = trend.map((v, i) => {
+    const ok = dir === 'up' ? (targetNum == null || v >= targetNum) : (targetNum == null || v <= targetNum);
+    return {
+      month: MONTHS_SHORT[i],
+      value: v + (indicator.unit ? ' ' + indicator.unit : ''),
+      ok,
+    };
+  });
+
+  const monthlyColDefs = [
+    { headerName: 'Month', field: 'month', flex: 1,
+      cellRenderer: p => <span style={{ color: 'var(--ink-3)' }}>{p.value}</span> },
+    { headerName: 'Value', field: 'value', flex: 1,
+      cellRenderer: p => <span style={{ fontWeight: 500 }}>{p.value}</span> },
+    { headerName: 'vs Target', field: 'ok', width: 130,
+      cellRenderer: p => <Pill kind={p.value ? 'good' : 'warn'}>{p.value ? 'On target' : 'Off target'}</Pill> },
+  ];
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
 
@@ -279,23 +298,9 @@ const IndicatorDetailDrawer = ({ indicator, onClose, onUpdate }) => {
             <Icon name={showTable ? 'chev_down' : 'chev_right'} size={11} />Monthly data
           </button>
           {showTable && (
-            <table className="tbl" style={{ marginTop: 10 }}>
-              <thead>
-                <tr><th>Month</th><th>Value</th><th>vs Target</th></tr>
-              </thead>
-              <tbody>
-                {trend.map((v, i) => {
-                  const ok = dir === 'up' ? (targetNum == null || v >= targetNum) : (targetNum == null || v <= targetNum);
-                  return (
-                    <tr key={i}>
-                      <td className="muted">{MONTHS_SHORT[i]}</td>
-                      <td style={{ fontWeight: 500 }}>{v}{indicator.unit ? ' ' + indicator.unit : ''}</td>
-                      <td><Pill kind={ok ? 'good' : 'warn'}>{ok ? 'On target' : 'Off target'}</Pill></td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <div className="card" style={{ marginTop: 10 }}>
+              <NexusGrid rowData={monthlyRowData} columnDefs={monthlyColDefs} />
+            </div>
           )}
         </div>
 

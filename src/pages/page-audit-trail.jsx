@@ -3,6 +3,7 @@ import Icon from '../icons';
 import { PageHeader, Pill, Avatar } from '../components';
 import { useAuth } from '../AuthContext';
 import { useNexusData } from '../NexusDataContext';
+import NexusGrid from '../nexus-grid';
 
 // ─── Seed data ─────────────────────────────────────────────────────────────────
 // ~70 events covering all modules over 28 days. Ordered newest-first.
@@ -224,6 +225,90 @@ const AuditTrailPage = () => {
   }
 
   const isFiltered = moduleFilter !== 'all' || userFilter !== 'all' || kindFilter !== 'all' || dateFilter !== '30d' || search;
+
+  // ── AG Grid column definitions for table view ──────────────────────────────
+  const tableColumnDefs = useMemo(() => [
+    {
+      headerName: 'Timestamp',
+      field: 'ts',
+      width: 170,
+      valueFormatter: p => fmtTs(p.value),
+      cellClass: 'mono',
+      cellStyle: { fontSize: 11, whiteSpace: 'nowrap' },
+    },
+    {
+      headerName: 'User',
+      field: 'who',
+      width: 150,
+      cellRenderer: p => {
+        const who = p.data.who;
+        if (who !== 'System' && who !== 'Unknown') {
+          return (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Avatar name={who} size={20} idx={avatarIdx(who)} />
+              <span style={{ fontSize: 12 }}>{who}</span>
+            </div>
+          );
+        }
+        return <span className="muted">{who}</span>;
+      },
+    },
+    {
+      headerName: 'Module',
+      field: 'module',
+      width: 140,
+      cellRenderer: p => {
+        const meta = MODULE_META[p.data.module] || MODULE_META.system;
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <Icon name={meta.icon} size={12} style={{ color: meta.color }} />
+            <span style={{ fontSize: 12, color: 'var(--ink-2)' }}>{meta.label}</span>
+          </div>
+        );
+      },
+    },
+    {
+      headerName: 'Action',
+      field: 'action',
+      flex: 1,
+      cellRenderer: p => (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span style={{ color: kindColor(p.data.kind) }}>
+            <Icon name={KIND_ICON[p.data.kind] || 'edit'} size={11} />
+          </span>
+          <span style={{ fontSize: 12 }}>{p.data.action}</span>
+        </div>
+      ),
+    },
+    {
+      headerName: 'Target',
+      field: 'target',
+      flex: 2,
+      cellRenderer: p => {
+        const isExpanded = expandedId === p.data.id;
+        return (
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 500 }}>{p.data.target}</div>
+            {isExpanded && p.data.detail && (
+              <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 3 }}>{p.data.detail}</div>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      headerName: 'Integrity',
+      field: 'hash',
+      width: 150,
+      sortable: false,
+      cellRenderer: p => (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <Icon name="shield" size={11} style={{ color: 'var(--good)' }} />
+          <code style={{ fontSize: 10, color: 'var(--ink-3)' }}>{p.data.hash.slice(0, 8)}…</code>
+        </div>
+      ),
+    },
+  ], [expandedId]);
 
   return (
     <div className="page page-wide">
@@ -473,75 +558,11 @@ const AuditTrailPage = () => {
       {/* ── TABLE VIEW ──────────────────────────────────────────────────────── */}
       {view === 'table' && filtered.length > 0 && (
         <div className="card">
-          <table className="tbl">
-            <thead>
-              <tr>
-                <th>Timestamp</th>
-                <th>User</th>
-                <th>Module</th>
-                <th>Action</th>
-                <th>Target</th>
-                <th>Integrity</th>
-              </tr>
-            </thead>
-            <tbody>
-              {paged.map(ev => {
-                const meta = MODULE_META[ev.module] || MODULE_META.system;
-                return (
-                  <tr
-                    key={ev.id}
-                    className="row-clickable"
-                    onClick={() => setExpandedId(expandedId === ev.id ? null : ev.id)}
-                  >
-                    <td className="mono" style={{ fontSize: 11, whiteSpace: 'nowrap' }}>{fmtTs(ev.ts)}</td>
-                    <td>
-                      {ev.who !== 'System' && ev.who !== 'Unknown' ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <Avatar name={ev.who} size={20} idx={avatarIdx(ev.who)} />
-                          <span style={{ fontSize: 12 }}>{ev.who}</span>
-                        </div>
-                      ) : (
-                        <span className="muted">{ev.who}</span>
-                      )}
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                        <Icon name={meta.icon} size={12} style={{ color: meta.color }} />
-                        <span style={{ fontSize: 12, color: 'var(--ink-2)' }}>{meta.label}</span>
-                      </div>
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                        <span style={{ color: kindColor(ev.kind) }}><Icon name={KIND_ICON[ev.kind] || 'edit'} size={11} /></span>
-                        <span style={{ fontSize: 12 }}>{ev.action}</span>
-                      </div>
-                    </td>
-                    <td>
-                      <div>
-                        <div style={{ fontSize: 12, fontWeight: 500 }}>{ev.target}</div>
-                        {expandedId === ev.id && ev.detail && (
-                          <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 3 }}>{ev.detail}</div>
-                        )}
-                      </div>
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                        <Icon name="shield" size={11} style={{ color: 'var(--good)' }} />
-                        <code style={{ fontSize: 10, color: 'var(--ink-3)' }}>{ev.hash.slice(0, 8)}…</code>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          {hasMore && (
-            <div style={{ padding: '12px 18px', borderTop: '1px solid var(--border)', textAlign: 'center' }}>
-              <button className="btn" onClick={() => setPage(p => p + 1)}>
-                Load more <span style={{ color: 'var(--ink-3)', fontSize: 12 }}>({filtered.length - paged.length} remaining)</span>
-              </button>
-            </div>
-          )}
+          <NexusGrid
+            rowData={filtered}
+            columnDefs={tableColumnDefs}
+            onRowClicked={p => setExpandedId(expandedId === p.data.id ? null : p.data.id)}
+          />
         </div>
       )}
     </div>

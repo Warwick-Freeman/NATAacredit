@@ -3,6 +3,7 @@ import Icon from '../icons';
 import { PageHeader, Pill, Tabs, Donut, Drawer } from '../components';
 import NCRaiseDrawer, { DEFAULT_WHYS } from '../nc-raise-drawer';
 import NCDetailDrawer from '../nc-detail-drawer';
+import NexusGrid from '../nexus-grid';
 
 // --- Seed data ---------------------------------------------------------------
 const SEED_NCS = [
@@ -153,6 +154,141 @@ const SEV_KIND    = { Critical: 'bad', High: 'warn', Medium: 'info', Low: 'outli
 const PHASE_KIND  = { raised: 'warn', rca: 'warn', capa: 'warn', effectiveness: 'accent', closed: 'good' };
 const PHASE_LABEL = { raised: 'Open · Raised', rca: 'Open · RCA', capa: 'Open · CAPA', effectiveness: 'Effectiveness review', closed: 'Closed' };
 
+// --- Column definitions ------------------------------------------------------
+const registerColumnDefs = [
+  {
+    headerName: 'NC ID',
+    field: 'id',
+    width: 150,
+    cellRenderer: p => (
+      <span className="mono" style={{ fontWeight: 500 }}>{p.value}</span>
+    ),
+  },
+  {
+    headerName: 'Title',
+    field: 'title',
+    flex: 2,
+    cellRenderer: p => (
+      <div>
+        <div style={{ fontWeight: 500 }}>{p.data.title}</div>
+        {p.data.capaActions.length > 0 && (
+          <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+            {p.data.capaActions.filter(a => a.done).length}/{p.data.capaActions.length} actions done
+          </div>
+        )}
+      </div>
+    ),
+  },
+  {
+    headerName: 'Source',
+    field: 'source',
+    flex: 1,
+    cellRenderer: p => <span className="muted">{p.value}</span>,
+  },
+  {
+    headerName: 'Clause',
+    field: 'clause',
+    width: 90,
+    cellRenderer: p => <span className="mono">{p.value}</span>,
+  },
+  {
+    headerName: 'Severity',
+    field: 'severity',
+    width: 110,
+    cellRenderer: p => <Pill kind={SEV_KIND[p.value]}>{p.value}</Pill>,
+  },
+  {
+    headerName: 'Clinical sig.',
+    field: 'clinicalSig',
+    flex: 1,
+    cellRenderer: p => (
+      <span style={{ fontSize: 12, color: p.value.startsWith('Yes') ? 'var(--bad)' : 'var(--ink-3)' }}>
+        {p.value}
+      </span>
+    ),
+  },
+  {
+    headerName: 'Phase',
+    field: 'phase',
+    flex: 1,
+    cellRenderer: p => (
+      <Pill kind={PHASE_KIND[p.value] || 'warn'} dot>{PHASE_LABEL[p.value]}</Pill>
+    ),
+  },
+  {
+    headerName: 'Owner',
+    field: 'owner',
+    width: 110,
+    cellRenderer: p => <span style={{ fontSize: 12 }}>{p.value}</span>,
+  },
+  {
+    headerName: 'Due',
+    field: 'due',
+    width: 110,
+    cellRenderer: p => (
+      <span style={{ fontSize: 12, color: p.value.includes('Overdue') ? 'var(--bad)' : 'var(--ink-3)' }}>
+        {p.value}
+      </span>
+    ),
+  },
+];
+
+const capaColumnDefs = [
+  {
+    headerName: 'NC',
+    field: 'ncId',
+    width: 160,
+    cellRenderer: p => (
+      <div>
+        <div className="mono" style={{ fontSize: 12, fontWeight: 600 }}>{p.data.ncId}</div>
+        <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{p.data.ncTitle}</div>
+      </div>
+    ),
+  },
+  {
+    headerName: 'Type',
+    field: 'type',
+    width: 120,
+    cellRenderer: p => (
+      <Pill kind={p.value === 'corrective' ? 'warn' : 'info'}>
+        {p.value === 'corrective' ? 'Corrective' : 'Preventive'}
+      </Pill>
+    ),
+  },
+  {
+    headerName: 'Action',
+    field: 'description',
+    flex: 2,
+    cellRenderer: p => (
+      <div style={{ fontSize: 13, fontWeight: 500 }}>{p.value}</div>
+    ),
+  },
+  {
+    headerName: 'Owner',
+    field: 'owner',
+    width: 110,
+    cellRenderer: p => <span style={{ fontSize: 12 }}>{p.value}</span>,
+  },
+  {
+    headerName: 'Due',
+    field: 'dueDate',
+    width: 120,
+    cellRenderer: p => (
+      <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>{p.value || '—'}</span>
+    ),
+  },
+  {
+    headerName: 'Status',
+    field: 'done',
+    width: 110,
+    cellRenderer: p => (
+      p.value
+        ? <Pill kind="good"><Icon name="check" size={10} /> Done</Pill>
+        : <Pill kind="warn" dot>Pending</Pill>
+    ),
+  },
+];
+
 // --- Component ---------------------------------------------------------------
 const NCRPage = () => {
   const [items, setItems]   = useState(SEED_NCS);
@@ -274,36 +410,11 @@ const NCRPage = () => {
           </div>
 
           <div className="card">
-            <table className="tbl">
-              <thead>
-                <tr>
-                  <th>NC ID</th><th>Title</th><th>Source</th><th>Clause</th>
-                  <th>Severity</th><th>Clinical sig.</th><th>Phase</th><th>Owner</th><th>Due</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map(n => (
-                  <tr key={n.id} className="row-clickable" onClick={() => setDetailNcId(n.id)} title="Click to view / manage">
-                    <td className="mono" style={{ fontWeight: 500 }}>{n.id}</td>
-                    <td>
-                      <div style={{ fontWeight: 500 }}>{n.title}</div>
-                      {n.capaActions.length > 0 && (
-                        <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>
-                          {n.capaActions.filter(a => a.done).length}/{n.capaActions.length} actions done
-                        </div>
-                      )}
-                    </td>
-                    <td className="muted">{n.source}</td>
-                    <td className="mono">{n.clause}</td>
-                    <td><Pill kind={SEV_KIND[n.severity]}>{n.severity}</Pill></td>
-                    <td style={{ fontSize: 12, color: n.clinicalSig.startsWith("Yes") ? 'var(--bad)' : 'var(--ink-3)' }}>{n.clinicalSig}</td>
-                    <td><Pill kind={PHASE_KIND[n.phase] || 'warn'} dot>{PHASE_LABEL[n.phase]}</Pill></td>
-                    <td style={{ fontSize: 12 }}>{n.owner}</td>
-                    <td style={{ fontSize: 12, color: n.due.includes("Overdue") ? 'var(--bad)' : 'var(--ink-3)' }}>{n.due}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <NexusGrid
+              rowData={filtered}
+              columnDefs={registerColumnDefs}
+              onRowClicked={p => setDetailNcId(p.data.id)}
+            />
           </div>
         </>
       )}
@@ -320,35 +431,11 @@ const NCRPage = () => {
           {allCapaActions.length === 0 ? (
             <div className="empty">No CAPA actions recorded on open NCs.</div>
           ) : (
-            <table className="tbl">
-              <thead>
-                <tr><th>NC</th><th>Type</th><th>Action</th><th>Owner</th><th>Due</th><th>Status</th></tr>
-              </thead>
-              <tbody>
-                {allCapaActions.map(a => (
-                  <tr key={a.id} className="row-clickable" onClick={() => setDetailNcId(a.ncId)} title="Click to open NC">
-                    <td>
-                      <div className="mono" style={{ fontSize: 12, fontWeight: 600 }}>{a.ncId}</div>
-                      <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{a.ncTitle}</div>
-                    </td>
-                    <td><Pill kind={a.type === 'corrective' ? 'warn' : 'info'}>
-                      {a.type === 'corrective' ? 'Corrective' : 'Preventive'}
-                    </Pill></td>
-                    <td style={{ maxWidth: 240 }}>
-                      <div style={{ fontSize: 13, fontWeight: 500 }}>{a.description}</div>
-                    </td>
-                    <td style={{ fontSize: 12 }}>{a.owner}</td>
-                    <td style={{ fontSize: 12, color: 'var(--ink-3)' }}>{a.dueDate || '—'}</td>
-                    <td>
-                      {a.done
-                        ? <Pill kind="good"><Icon name="check" size={10} /> Done</Pill>
-                        : <Pill kind="warn" dot>Pending</Pill>
-                      }
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <NexusGrid
+              rowData={allCapaActions}
+              columnDefs={capaColumnDefs}
+              onRowClicked={p => setDetailNcId(p.data.ncId)}
+            />
           )}
         </div>
       )}

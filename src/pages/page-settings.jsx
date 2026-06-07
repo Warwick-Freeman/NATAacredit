@@ -6,6 +6,7 @@ import UserFormDrawer from '../user-form-drawer';
 import { useNexusData } from '../NexusDataContext';
 import { getStdCfg } from '../standardConfig';
 import { fetchRooms, createRoom, updateRoom, deleteRoom } from '../api';
+import NexusGrid from '../nexus-grid';
 
 // ─── Toggle switch ─────────────────────────────────────────────────────────────
 
@@ -67,7 +68,7 @@ const SECURITY_EVENTS = [
   { who: 'M. Chen',        event: 'Sign in',               method: 'Okta SSO + TOTP', time: '5 h ago',      ip: '203.0.113.62',  ok: true  },
   { who: 'A. Singh',       event: 'Sign in',               method: 'Okta SSO + TOTP', time: 'yesterday',    ip: '203.0.113.58',  ok: true  },
   { who: 'J. Roy',         event: 'Sign in',               method: 'Local + TOTP',    time: '16 Mar 2026',  ip: '198.51.100.22', ok: true  },
-  { who: 'Unknown',        event: 'Failed sign-in attempt','method': '—',             time: '2 days ago',   ip: '185.220.101.44',ok: false },
+  { who: 'Unknown',        event: 'Failed sign-in attempt', method: '—',              time: '2 days ago',   ip: '185.220.101.44',ok: false },
 ];
 
 const PERM_LABELS = {
@@ -274,6 +275,146 @@ const SettingsPage = () => {
   }
 
   const pendingIntName = integrations.find(i => i.id === pendingOff)?.name;
+
+  // ── Column definitions ────────────────────────────────────────────────────────
+
+  const userColDefs = [
+    {
+      headerName: 'User',
+      field: 'name',
+      flex: 2,
+      cellRenderer: p => {
+        const u = p.data;
+        const i = users.indexOf(u);
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Avatar name={u.name} idx={i} size={22} />
+            <span>{u.name}</span>
+            {u.id === user?.id && <Pill kind="accent">You</Pill>}
+          </div>
+        );
+      },
+    },
+    { headerName: 'Role', field: 'role', flex: 1, valueFormatter: p => p.value },
+    {
+      headerName: 'MFA',
+      field: 'mfa',
+      width: 110,
+      cellRenderer: p => p.value
+        ? <Pill kind="good"><Icon name="check" size={10} /> TOTP</Pill>
+        : <Pill kind="bad">Off</Pill>,
+    },
+    { headerName: 'Auth', field: 'auth', flex: 1 },
+    { headerName: 'Last sign-in', field: 'lastSeen', flex: 1 },
+  ];
+
+  const permMatrixRoles = activeStandard === 'aasm' ? AASM_ROLES : ASA_ROLES;
+  const permMatrixRowData = permMatrixRoles.map(role => ({
+    role,
+    ...Object.fromEntries(Object.keys(PERM_LABELS).map(key => [key, !!(ROLE_PERMISSIONS[role]?.[key])])),
+  }));
+  const permMatrixColDefs = [
+    { headerName: 'Role', field: 'role', width: 160, pinned: 'left', cellStyle: { fontWeight: 500, whiteSpace: 'nowrap' } },
+    ...Object.entries(PERM_LABELS).map(([key, label]) => ({
+      headerName: label,
+      field: key,
+      width: 130,
+      headerClass: 'ag-header-center',
+      cellStyle: { textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+      cellRenderer: p => p.value
+        ? <span style={{ color: 'var(--good)' }}><Icon name="check" size={14} /></span>
+        : <span style={{ color: 'var(--surface-3)' }}>—</span>,
+    })),
+  ];
+
+  const retentionColDefs = [
+    { headerName: 'Record type', field: 'type', flex: 2, cellStyle: { fontWeight: 500 } },
+    {
+      headerName: 'Retention period',
+      field: 'period',
+      flex: 3,
+      cellRenderer: p => {
+        const r = p.data;
+        if (editRetId === r.id) {
+          return (
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              <input
+                className="input"
+                style={{ flex: 1, fontSize: 12 }}
+                value={retDraft}
+                onChange={e => setRetDraft(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') saveRet(r.id); if (e.key === 'Escape') setEditRetId(null); }}
+                autoFocus
+              />
+              <button className="btn btn-primary" style={{ fontSize: 11, padding: '2px 7px' }} onClick={() => saveRet(r.id)}>Save</button>
+              <button className="btn" style={{ fontSize: 11, padding: '2px 7px' }} onClick={() => setEditRetId(null)}>&#x2715;</button>
+            </div>
+          );
+        }
+        return <span style={{ fontSize: 12, color: 'var(--ink-2)' }}>{r.period}</span>;
+      },
+    },
+    { headerName: 'Storage', field: 'storage', flex: 1 },
+    {
+      headerName: 'Object-lock',
+      field: 'lock',
+      width: 130,
+      cellRenderer: p => p.value
+        ? <Pill kind="good"><Icon name="check" size={10} /> Locked</Pill>
+        : <span className="muted">—</span>,
+    },
+    {
+      headerName: '',
+      field: 'id',
+      width: 60,
+      sortable: false,
+      cellRenderer: p => {
+        const r = p.data;
+        if (!r.lock && editRetId !== r.id) {
+          return <button className="btn-icon" title="Edit" onClick={e => { e.stopPropagation(); beginEditRet(r); }}><Icon name="edit" size={13} /></button>;
+        }
+        if (r.lock) {
+          return <Icon name="shield" size={13} style={{ color: 'var(--ink-3)', opacity: 0.4 }} />;
+        }
+        return null;
+      },
+    },
+  ];
+
+  const securityEventColDefs = [
+    {
+      headerName: 'User',
+      field: 'who',
+      flex: 1,
+      cellRenderer: p => {
+        const e = p.data;
+        const i = SECURITY_EVENTS.indexOf(e);
+        if (e.who !== 'Unknown' && e.who !== 'System') {
+          return (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Avatar name={e.who} size={20} idx={i} />
+              {e.who}
+            </div>
+          );
+        }
+        return <span className="muted">{e.who}</span>;
+      },
+    },
+    {
+      headerName: 'Event',
+      field: 'event',
+      flex: 1,
+      cellRenderer: p => <Pill kind={p.data.ok ? 'good' : 'bad'}>{p.value}</Pill>,
+    },
+    { headerName: 'Method', field: 'method', flex: 1 },
+    {
+      headerName: 'IP address',
+      field: 'ip',
+      flex: 1,
+      cellRenderer: p => <code style={{ fontSize: 12 }}>{p.value}</code>,
+    },
+    { headerName: 'Time', field: 'time', flex: 1 },
+  ];
 
   // ─────────────────────────────────────────────────────────────────────────────
 
@@ -655,36 +796,15 @@ const SettingsPage = () => {
                 </button>
               )}
             </div>
-            <table className="tbl">
-              <thead>
-                <tr><th>User</th><th>Role</th><th>MFA</th><th>Auth</th><th>Last sign-in</th></tr>
-              </thead>
-              <tbody>
-                {users.map((u, i) => {
-                  const theirLevel = ROLE_LEVEL[u.role] ?? 0;
-                  const clickable  = canManage && myLevel > theirLevel;
-                  return (
-                    <tr key={u.id}
-                      className={clickable ? 'row-clickable' : ''}
-                      onClick={() => clickable && openEdit(u)}
-                      title={clickable ? 'Click to edit' : undefined}
-                    >
-                      <td>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <Avatar name={u.name} idx={i} size={22} />
-                          <span>{u.name}</span>
-                          {u.id === user?.id && <Pill kind="accent">You</Pill>}
-                        </div>
-                      </td>
-                      <td style={{ fontSize: 12 }}>{u.role}</td>
-                      <td>{u.mfa ? <Pill kind="good"><Icon name="check" size={10} /> TOTP</Pill> : <Pill kind="bad">Off</Pill>}</td>
-                      <td className="muted">{u.auth}</td>
-                      <td className="muted">{u.lastSeen}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <NexusGrid
+              rowData={users}
+              columnDefs={userColDefs}
+              onRowClicked={p => {
+                const u = p.data;
+                const theirLevel = ROLE_LEVEL[u.role] ?? 0;
+                if (canManage && myLevel > theirLevel) openEdit(u);
+              }}
+            />
           </div>
 
           {/* Permission matrix */}
@@ -694,36 +814,10 @@ const SettingsPage = () => {
                 <div className="card-title">Permission matrix</div>
                 <button className="btn-icon" onClick={() => setShowPermMatrix(false)}><Icon name="x" size={14} /></button>
               </div>
-              <div style={{ overflowX: 'auto' }}>
-                <table className="tbl" style={{ minWidth: 700 }}>
-                  <thead>
-                    <tr>
-                      <th>Role</th>
-                      {Object.values(PERM_LABELS).map(l => (
-                        <th key={l} style={{ fontSize: 11, textAlign: 'center', whiteSpace: 'nowrap' }}>{l}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(activeStandard === 'aasm' ? AASM_ROLES : ASA_ROLES).map(role => {
-                      const perms = ROLE_PERMISSIONS[role] ?? {};
-                      return (
-                      <tr key={role}>
-                        <td style={{ fontSize: 12, fontWeight: 500, whiteSpace: 'nowrap' }}>{role}</td>
-                        {Object.keys(PERM_LABELS).map(key => (
-                          <td key={key} style={{ textAlign: 'center' }}>
-                            {perms[key]
-                              ? <span style={{ color: 'var(--good)' }}><Icon name="check" size={14} /></span>
-                              : <span style={{ color: 'var(--surface-3)' }}>—</span>
-                            }
-                          </td>
-                        ))}
-                      </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+              <NexusGrid
+                rowData={permMatrixRowData}
+                columnDefs={permMatrixColDefs}
+              />
             </div>
           )}
         </>
@@ -825,48 +919,10 @@ const SettingsPage = () => {
               <div className="card-sub">Click any policy period to edit · object-locked records cannot be shortened</div>
             </div>
           </div>
-          <table className="tbl">
-            <thead>
-              <tr><th>Record type</th><th>Retention period</th><th>Storage</th><th>Object-lock</th><th></th></tr>
-            </thead>
-            <tbody>
-              {retention.map(r => (
-                <tr key={r.id}>
-                  <td style={{ fontWeight: 500 }}>{r.type}</td>
-                  <td>
-                    {editRetId === r.id ? (
-                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                        <input
-                          className="input"
-                          style={{ flex: 1, fontSize: 12 }}
-                          value={retDraft}
-                          onChange={e => setRetDraft(e.target.value)}
-                          onKeyDown={e => { if (e.key === 'Enter') saveRet(r.id); if (e.key === 'Escape') setEditRetId(null); }}
-                          autoFocus
-                        />
-                        <button className="btn btn-primary" style={{ fontSize: 11, padding: '2px 7px' }} onClick={() => saveRet(r.id)}>Save</button>
-                        <button className="btn" style={{ fontSize: 11, padding: '2px 7px' }} onClick={() => setEditRetId(null)}>✕</button>
-                      </div>
-                    ) : (
-                      <span style={{ fontSize: 12, color: 'var(--ink-2)' }}>{r.period}</span>
-                    )}
-                  </td>
-                  <td className="muted">{r.storage}</td>
-                  <td>
-                    {r.lock
-                      ? <Pill kind="good"><Icon name="check" size={10} /> Locked</Pill>
-                      : <span className="muted">—</span>}
-                  </td>
-                  <td>
-                    {!r.lock && editRetId !== r.id && (
-                      <button className="btn-icon" title="Edit" onClick={() => beginEditRet(r)}><Icon name="edit" size={13} /></button>
-                    )}
-                    {r.lock && <Icon name="shield" size={13} style={{ color: 'var(--ink-3)', opacity: 0.4 }} />}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <NexusGrid
+            rowData={retention}
+            columnDefs={retentionColDefs}
+          />
         </div>
       )}
 
@@ -992,26 +1048,10 @@ const SettingsPage = () => {
           {/* Recent sign-in events */}
           <div className="card">
             <div className="card-head"><div className="card-title">Recent sign-in events</div></div>
-            <table className="tbl">
-              <thead><tr><th>User</th><th>Event</th><th>Method</th><th>IP address</th><th>Time</th></tr></thead>
-              <tbody>
-                {SECURITY_EVENTS.map((e, i) => (
-                  <tr key={i}>
-                    <td>
-                      {e.who !== 'Unknown' && e.who !== 'System'
-                        ? <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Avatar name={e.who} size={20} idx={i} />{e.who}</div>
-                        : <span className="muted">{e.who}</span>}
-                    </td>
-                    <td>
-                      <Pill kind={e.ok ? 'good' : 'bad'}>{e.event}</Pill>
-                    </td>
-                    <td className="muted">{e.method}</td>
-                    <td><code style={{ fontSize: 12 }}>{e.ip}</code></td>
-                    <td className="muted">{e.time}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <NexusGrid
+              rowData={SECURITY_EVENTS}
+              columnDefs={securityEventColDefs}
+            />
           </div>
         </div>
       )}

@@ -3,6 +3,7 @@ import Icon from '../icons';
 import { PageHeader, Pill, Avatar, Tabs, Drawer } from '../components';
 import StaffFormDrawer from '../staff-form-drawer';
 import { useTaskContext } from '../TaskContext';
+import NexusGrid from '../nexus-grid';
 
 const INITIAL_STAFF = [
   { name: "Dr. R. Okafor",  role: "Medical Director",           site: "All",              bls: { ok: true,  expires: "Aug 2026"   }, eqa: "—",                training: 100 },
@@ -43,6 +44,143 @@ const StaffPage = () => {
 
   const blsLapsed  = staff.filter(s => !s.bls.ok);
   const avgTraining = Math.round(staff.reduce((s, x) => s + x.training, 0) / staff.length);
+
+  const staffColumnDefs = [
+    {
+      headerName: 'Staff',
+      field: 'name',
+      flex: 2,
+      cellRenderer: p => (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <Avatar name={p.data.name} size={28} idx={staff.indexOf(p.data)} />
+          <div style={{ fontWeight: 500 }}>{p.data.name}</div>
+        </div>
+      ),
+    },
+    {
+      headerName: 'Role',
+      field: 'role',
+      flex: 2,
+      cellRenderer: p => <span style={{ fontSize: 12 }}>{p.value}</span>,
+    },
+    {
+      headerName: 'Site',
+      field: 'site',
+      flex: 1,
+      cellRenderer: p => <span className="muted">{p.value}</span>,
+    },
+    {
+      headerName: 'Credentials',
+      field: 'name',
+      width: 160,
+      sortable: false,
+      cellRenderer: p => (
+        <div style={{ display: 'flex', gap: 4 }}>
+          {p.data.rpsgt    && <Pill kind="info">RPSGT</Pill>}
+          {p.data.paedsBLS && <Pill kind="accent">Paeds BLS</Pill>}
+        </div>
+      ),
+    },
+    {
+      headerName: 'BLS',
+      field: 'bls',
+      width: 160,
+      cellRenderer: p => (
+        <Pill kind={p.value.ok ? "good" : "bad"} dot>{p.value.expires}</Pill>
+      ),
+    },
+    {
+      headerName: 'EQA / κ',
+      field: 'eqa',
+      width: 160,
+      cellRenderer: p => (
+        <span style={{ fontSize: 12, color: p.value.includes("Investigate") ? 'var(--bad)' : 'var(--ink-2)' }}>
+          {p.value}
+        </span>
+      ),
+    },
+    {
+      headerName: 'Training',
+      field: 'training',
+      width: 150,
+      cellRenderer: p => (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div className="progress" style={{ width: 80 }}>
+            <div
+              className={`progress-bar ${p.value >= 95 ? 'good' : p.value >= 85 ? 'warn' : 'bad'}`}
+              style={{ width: `${p.value}%` }}
+            />
+          </div>
+          <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>{p.value}%</span>
+        </div>
+      ),
+    },
+  ];
+
+  const blsRowData = staff.filter(s => !s.bls.ok || s.bls.expires.includes("2026"));
+
+  const blsColumnDefs = [
+    {
+      headerName: 'Staff',
+      field: 'name',
+      flex: 2,
+      cellRenderer: p => (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Avatar name={p.data.name} idx={blsRowData.indexOf(p.data) + 2} size={22} />
+          {p.data.name}
+        </div>
+      ),
+    },
+    {
+      headerName: 'BLS expires',
+      field: 'bls',
+      width: 160,
+      cellRenderer: p => (
+        <Pill kind={p.value.ok ? "warn" : "bad"} dot>{p.value.expires}</Pill>
+      ),
+    },
+    {
+      headerName: 'Paeds BLS',
+      field: 'paedsBLS',
+      width: 120,
+      cellRenderer: p => (
+        p.value
+          ? <Pill kind="good"><Icon name="check" size={10} /></Pill>
+          : <span className="muted">—</span>
+      ),
+    },
+    {
+      headerName: 'Last training',
+      field: 'bls',
+      width: 140,
+      cellRenderer: p => (
+        <span className="muted">{p.value.ok ? "Apr 2025" : "Apr 2024"}</span>
+      ),
+    },
+    {
+      headerName: 'Action',
+      field: 'name',
+      width: 120,
+      sortable: false,
+      cellRenderer: p => (
+        <button
+          className="btn"
+          style={{ fontSize: 11, padding: '3px 8px' }}
+          onClick={e => {
+            e.stopPropagation();
+            openCreateTask({
+              title: `Book BLS recertification — ${p.data.name}`,
+              clause: '5.1.4',
+              source: 'BLS',
+              sourceType: 'staff',
+              priority: p.data.bls.ok ? 'medium' : 'high',
+              assignedTo: 'K. Patel',
+            });
+          }}
+        >Book recert</button>
+      ),
+    },
+  ];
 
   return (
     <div className="page page-wide">
@@ -92,41 +230,12 @@ const StaffPage = () => {
 
       {tab === "staff" && (
         <div className="card">
-          <table className="tbl">
-            <thead>
-              <tr><th>Staff</th><th>Role</th><th>Site</th><th>Credentials</th><th>BLS</th><th>EQA / κ</th><th>Training</th></tr>
-            </thead>
-            <tbody>
-              {staff.map((s, i) => (
-                <tr key={s.name} className="row-clickable" onClick={() => openEdit(s)}>
-                  <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <Avatar name={s.name} size={28} idx={i} />
-                      <div style={{ fontWeight: 500 }}>{s.name}</div>
-                    </div>
-                  </td>
-                  <td style={{ fontSize: 12 }}>{s.role}</td>
-                  <td className="muted">{s.site}</td>
-                  <td>
-                    <div style={{ display: 'flex', gap: 4 }}>
-                      {s.rpsgt    && <Pill kind="info">RPSGT</Pill>}
-                      {s.paedsBLS && <Pill kind="accent">Paeds BLS</Pill>}
-                    </div>
-                  </td>
-                  <td><Pill kind={s.bls.ok ? "good" : "bad"} dot>{s.bls.expires}</Pill></td>
-                  <td style={{ fontSize: 12, color: s.eqa.includes("Investigate") ? 'var(--bad)' : 'var(--ink-2)' }}>{s.eqa}</td>
-                  <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <div className="progress" style={{ width: 80 }}>
-                        <div className={`progress-bar ${s.training >= 95 ? 'good' : s.training >= 85 ? 'warn' : 'bad'}`} style={{ width: `${s.training}%` }} />
-                      </div>
-                      <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>{s.training}%</span>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <NexusGrid
+            rowData={staff}
+            columnDefs={staffColumnDefs}
+            onRowClicked={p => openEdit(p.data)}
+            domLayout="autoHeight"
+          />
         </div>
       )}
 
@@ -187,28 +296,11 @@ const StaffPage = () => {
       {tab === "bls" && (
         <div className="card">
           <div className="card-head"><div><div className="card-title">BLS recertification · cl. 5.1.4</div><div className="card-sub">Annual recert mandatory · paediatric BLS for paeds lab staff</div></div></div>
-          <table className="tbl">
-            <thead><tr><th>Staff</th><th>BLS expires</th><th>Paeds BLS</th><th>Last training</th><th>Action</th></tr></thead>
-            <tbody>
-              {staff.filter(s => !s.bls.ok || s.bls.expires.includes("2026")).map((s, i) => (
-                <tr key={s.name}>
-                  <td><div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Avatar name={s.name} idx={i+2} size={22} />{s.name}</div></td>
-                  <td><Pill kind={s.bls.ok ? "warn" : "bad"} dot>{s.bls.expires}</Pill></td>
-                  <td>{s.paedsBLS ? <Pill kind="good"><Icon name="check" size={10} /></Pill> : <span className="muted">—</span>}</td>
-                  <td className="muted">{s.bls.ok ? "Apr 2025" : "Apr 2024"}</td>
-                  <td><button className="btn" style={{ fontSize: 11, padding: '3px 8px' }}
-                    onClick={() => openCreateTask({
-                      title: `Book BLS recertification — ${s.name}`,
-                      clause: '5.1.4',
-                      source: 'BLS',
-                      sourceType: 'staff',
-                      priority: s.bls.ok ? 'medium' : 'high',
-                      assignedTo: 'K. Patel',
-                    })}>Book recert</button></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <NexusGrid
+            rowData={blsRowData}
+            columnDefs={blsColumnDefs}
+            domLayout="autoHeight"
+          />
         </div>
       )}
 

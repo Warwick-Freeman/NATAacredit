@@ -7,6 +7,7 @@ import DocDetailDrawer from '../doc-detail-drawer';
 import { useAuth } from '../AuthContext';
 import { useNexusData } from '../NexusDataContext';
 import { searchDocumentContent } from '../api';
+import NexusGrid from '../nexus-grid';
 
 // --- Workflow helpers -------------------------------------------------------
 function mkWorkflow(steps) {
@@ -403,12 +404,95 @@ const DocumentsPage = () => {
     closeUpload();
   };
 
-  // Determine active step for a doc (for showing in the table)
+  // Determine active step for a doc (for showing in the grid)
   const getActiveStep = (doc) => {
     if (!doc.workflow) return null;
     const idx = doc.workflow.findIndex(s => s.active && !s.done);
     return idx >= 0 ? doc.workflow[idx] : null;
   };
+
+  const columnDefs = useMemo(() => [
+    {
+      headerName: 'Doc ID',
+      field: 'id',
+      width: 180,
+      cellRenderer: p => (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {p.data.fileType && (
+            <span style={{
+              fontSize: 10, padding: '1px 5px', borderRadius: 3,
+              background: p.data.fileType === 'pdf' ? 'var(--bad-soft)' : 'var(--info-soft)',
+              color:      p.data.fileType === 'pdf' ? 'var(--bad)'      : 'var(--info)',
+              fontWeight: 600, fontFamily: 'monospace',
+            }}>
+              {p.data.fileType.toUpperCase()}
+            </span>
+          )}
+          <span className="mono" style={{ fontWeight: 500 }}>{p.data.id}</span>
+        </div>
+      ),
+    },
+    {
+      headerName: 'Title',
+      field: 'title',
+      flex: 2,
+      cellRenderer: p => (
+        <div>
+          <div style={{ fontWeight: 500 }}>{p.data.title}</div>
+          <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{p.data.owner} · Updated {p.data.updated}</div>
+        </div>
+      ),
+    },
+    {
+      headerName: 'Ver.',
+      field: 'v',
+      width: 80,
+      cellRenderer: p => <span className="mono">v{p.data.v}</span>,
+    },
+    {
+      headerName: 'Status',
+      field: 'status',
+      width: 140,
+      cellRenderer: p => (
+        <Pill kind={STATUS_KIND[p.data.status] || 'outline'} dot>{p.data.status}</Pill>
+      ),
+    },
+    {
+      headerName: 'Workflow step',
+      field: 'workflow',
+      flex: 1,
+      sortable: false,
+      cellRenderer: p => {
+        const activeStep = getActiveStep(p.data);
+        if (activeStep) {
+          return (
+            <span style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 5 }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent)', display: 'inline-block', flexShrink: 0 }} />
+              {activeStep.step}
+              {activeStep.who && activeStep.who !== '—' && (
+                <span style={{ color: 'var(--ink-3)', fontSize: 11 }}>· {activeStep.who}</span>
+              )}
+            </span>
+          );
+        }
+        return (
+          <span style={{ color: 'var(--ink-4)', fontSize: 12 }}>
+            {p.data.status === 'Issued' ? '✓ Issued' : p.data.status === 'Live form' ? 'Live' : '—'}
+          </span>
+        );
+      },
+    },
+    {
+      headerName: 'Review due',
+      field: 'reviewDue',
+      width: 140,
+      cellRenderer: p => (
+        <span style={{ fontSize: 12, color: p.data.reviewDue?.includes('Overdue') ? 'var(--bad)' : 'var(--ink-3)' }}>
+          {p.data.reviewDue}
+        </span>
+      ),
+    },
+  ], []);
 
   return (
     <div className="page page-wide">
@@ -479,7 +563,7 @@ const DocumentsPage = () => {
           </div>
         </div>
 
-        {/* Document table */}
+        {/* Document grid */}
         <div className="card">
           <div className="card-head">
             <div className="card-title">
@@ -562,66 +646,12 @@ const DocumentsPage = () => {
             </div>
           )}
 
-          {visibleDocs.length === 0 ? (
-            <div className="empty">No documents match your filter.</div>
-          ) : (
-            <table className="tbl">
-              <thead>
-                <tr>
-                  <th>Doc ID</th><th>Title</th><th>Ver.</th><th>Status</th>
-                  <th>Workflow step</th><th>Review due</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visibleDocs.map(d => {
-                  const activeStep = getActiveStep(d);
-                  return (
-                    <tr key={d.id} className="row-clickable" onClick={() => setDetailDocId(d.id)}>
-                      <td>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          {d.fileType && (
-                            <span style={{ fontSize: 10, padding: '1px 5px', borderRadius: 3,
-                              background: d.fileType === 'pdf' ? 'var(--bad-soft)' : 'var(--info-soft)',
-                              color:      d.fileType === 'pdf' ? 'var(--bad)'      : 'var(--info)',
-                              fontWeight: 600, fontFamily: 'monospace' }}>
-                              {d.fileType.toUpperCase()}
-                            </span>
-                          )}
-                          <span className="mono" style={{ fontWeight: 500 }}>{d.id}</span>
-                        </div>
-                      </td>
-                      <td>
-                        <div style={{ fontWeight: 500 }}>{d.title}</div>
-                        <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{d.owner} · Updated {d.updated}</div>
-                      </td>
-                      <td className="mono">v{d.v}</td>
-                      <td><Pill kind={STATUS_KIND[d.status] || 'outline'} dot>{d.status}</Pill></td>
-                      <td>
-                        {activeStep ? (
-                          <span style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 5 }}>
-                            <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent)', display: 'inline-block', flexShrink: 0 }} />
-                            {activeStep.step}
-                            {activeStep.who && activeStep.who !== '—' && (
-                              <span style={{ color: 'var(--ink-3)', fontSize: 11 }}>· {activeStep.who}</span>
-                            )}
-                          </span>
-                        ) : (
-                          <span style={{ color: 'var(--ink-4)', fontSize: 12 }}>
-                            {d.status === 'Issued' ? '✓ Issued' : d.status === 'Live form' ? 'Live' : '—'}
-                          </span>
-                        )}
-                      </td>
-                      <td>
-                        <span style={{ fontSize: 12, color: d.reviewDue?.includes('Overdue') ? 'var(--bad)' : 'var(--ink-3)' }}>
-                          {d.reviewDue}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
+          <NexusGrid
+            rowData={visibleDocs}
+            columnDefs={columnDefs}
+            onRowClicked={p => setDetailDocId(p.data.id)}
+            domLayout="autoHeight"
+          />
         </div>
       </div>
 

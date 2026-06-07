@@ -3,6 +3,7 @@ import Icon from '../icons';
 import { PageHeader, Pill, Avatar, Sparkline, Drawer } from '../components';
 import { useTaskContext } from '../TaskContext';
 import IndicatorDetailDrawer from '../indicator-detail-drawer';
+import NexusGrid from '../nexus-grid';
 
 const MONTHS = ['May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar', 'Apr'];
 
@@ -144,6 +145,108 @@ const IndicatorsPage = ({ data: D }) => {
   }
 
   const selectedIndicator = indicators.find(k => k.id === selectedId);
+
+  // ── Column definitions ────────────────────────────────────────────────────────
+
+  const kpiColumnDefs = useMemo(() => [
+    {
+      headerName: 'Indicator',
+      field: 'name',
+      flex: 2,
+      cellRenderer: p => <span style={{ fontWeight: 500 }}>{p.value}</span>,
+    },
+    {
+      headerName: 'Phase',
+      field: 'phase',
+      width: 130,
+      cellRenderer: p => <Pill kind="outline">{PHASE_LABELS[p.value]}</Pill>,
+    },
+    {
+      headerName: 'Current',
+      field: 'value',
+      width: 110,
+      cellRenderer: p => (
+        <span style={{ fontWeight: 600 }}>
+          {p.value}{p.data.unit ? ' ' + p.data.unit : ''}
+        </span>
+      ),
+    },
+    {
+      headerName: 'Target',
+      field: 'target',
+      width: 130,
+      cellRenderer: p => <span style={{ color: 'var(--ink-3)' }}>{p.value}</span>,
+    },
+    {
+      headerName: `Trend (${period.toUpperCase()})`,
+      field: 'trend',
+      width: 140,
+      sortable: false,
+      cellRenderer: p => {
+        const dir = parseDir(p.data.target);
+        const td  = trendDir(p.value);
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Sparkline
+              data={p.value}
+              width={80}
+              height={22}
+              color={p.data.status === 'good' ? 'var(--good)' : p.data.status === 'warn' ? 'var(--warn)' : 'var(--bad)'}
+            />
+            <TrendArrow dir={td} goodDir={{ dir }} />
+          </div>
+        );
+      },
+    },
+    {
+      headerName: 'Status',
+      field: 'status',
+      width: 130,
+      cellRenderer: p => (
+        <Pill kind={p.value} dot>
+          {p.value === 'good' ? 'On target' : p.value === 'warn' ? 'Watch' : 'Off target'}
+        </Pill>
+      ),
+    },
+  ], [period]);
+
+  const eqaColumnDefs = useMemo(() => [
+    {
+      headerName: 'Scorer',
+      field: 'name',
+      flex: 1,
+      cellRenderer: p => (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Avatar name={p.value} idx={eqaRecords.findIndex(r => r.name === p.value)} size={22} />
+          {p.value}
+        </div>
+      ),
+    },
+    {
+      headerName: 'Provider',
+      field: 'provider',
+      width: 130,
+      cellRenderer: p => <span style={{ color: 'var(--ink-3)' }}>{p.value}</span>,
+    },
+    {
+      headerName: 'Last event',
+      field: 'last',
+      width: 120,
+      cellRenderer: p => <span style={{ color: 'var(--ink-3)' }}>{p.value}</span>,
+    },
+    {
+      headerName: 'Result',
+      field: 'result',
+      flex: 1,
+      cellRenderer: p => <Pill kind={p.data.status}>{p.value}</Pill>,
+    },
+    {
+      headerName: 'Next due',
+      field: 'next',
+      width: 110,
+      cellRenderer: p => <span style={{ color: 'var(--ink-3)' }}>{p.value}</span>,
+    },
+  ], [eqaRecords]);
 
   // ── Render ───────────────────────────────────────────────────────────────────
 
@@ -324,44 +427,12 @@ const IndicatorsPage = ({ data: D }) => {
       {/* KPI table view */}
       {view === 'table' && (
         <div className="card" style={{ marginBottom: 32 }}>
-          <table className="tbl">
-            <thead>
-              <tr>
-                <th>Indicator</th>
-                <th>Phase</th>
-                <th>Current</th>
-                <th>Target</th>
-                <th>Trend ({period.toUpperCase()})</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {displayIndicators.map(k => {
-                const dir = parseDir(k.target);
-                const td  = trendDir(k.trend);
-                return (
-                  <tr key={k.id} className="row-clickable" onClick={() => setSelectedId(k.id)}>
-                    <td style={{ fontWeight: 500 }}>{k.name}</td>
-                    <td><Pill kind="outline">{PHASE_LABELS[k.phase]}</Pill></td>
-                    <td style={{ fontWeight: 600 }}>{k.value}{k.unit ? ' ' + k.unit : ''}</td>
-                    <td className="muted">{k.target}</td>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <Sparkline data={k.trend} width={80} height={22}
-                          color={k.status === 'good' ? 'var(--good)' : k.status === 'warn' ? 'var(--warn)' : 'var(--bad)'} />
-                        <TrendArrow dir={td} goodDir={{ dir }} />
-                      </div>
-                    </td>
-                    <td>
-                      <Pill kind={k.status} dot>
-                        {k.status === 'good' ? 'On target' : k.status === 'warn' ? 'Watch' : 'Off target'}
-                      </Pill>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <NexusGrid
+            rowData={displayIndicators}
+            columnDefs={kpiColumnDefs}
+            onRowClicked={p => setSelectedId(p.data.id)}
+            domLayout="autoHeight"
+          />
         </div>
       )}
 
@@ -411,27 +482,11 @@ const IndicatorsPage = ({ data: D }) => {
             </div>
           )}
 
-          <table className="tbl">
-            <thead>
-              <tr><th>Scorer</th><th>Provider</th><th>Last event</th><th>Result</th><th>Next due</th></tr>
-            </thead>
-            <tbody>
-              {eqaRecords.map((r, i) => (
-                <tr key={r.id}>
-                  <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <Avatar name={r.name} idx={i} size={22} />
-                      {r.name}
-                    </div>
-                  </td>
-                  <td className="muted">{r.provider}</td>
-                  <td className="muted">{r.last}</td>
-                  <td><Pill kind={r.status}>{r.result}</Pill></td>
-                  <td className="muted">{r.next}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <NexusGrid
+            rowData={eqaRecords}
+            columnDefs={eqaColumnDefs}
+            domLayout="autoHeight"
+          />
         </div>
 
         <div className="card">

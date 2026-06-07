@@ -7,6 +7,7 @@ import { useAuth } from '../AuthContext';
 import { useNexusData } from '../NexusDataContext';
 import { getStdCfg } from '../standardConfig';
 import { patchClause } from '../api';
+import NexusGrid from '../nexus-grid';
 
 const BASE = import.meta.env.VITE_API_URL ?? '';
 
@@ -444,6 +445,75 @@ const AccreditationPage = ({ data: D }) => {
 
   const needsCount = totalNc + totalPartial;
 
+  // Gap report column definitions
+  const gapColumnDefs = useMemo(() => [
+    {
+      headerName: 'Clause',
+      field: 'id',
+      width: 110,
+      cellRenderer: p => (
+        <span className="mono">{p.value}</span>
+      ),
+    },
+    {
+      headerName: 'Requirement',
+      field: 'title',
+      flex: 2,
+    },
+    {
+      headerName: 'Status',
+      field: 'status',
+      width: 130,
+      cellRenderer: p => <StatusPill status={p.value} />,
+    },
+    {
+      headerName: 'Gap / notes',
+      field: 'notes',
+      flex: 2,
+      cellRenderer: p => (
+        <span style={{ color: 'var(--ink-3)', fontSize: 12 }}>
+          {p.data.notes || (p.data.status === 'nc' ? 'No current evidence on file' : 'Evidence outdated or partial')}
+        </span>
+      ),
+    },
+    {
+      headerName: 'Owner',
+      field: 'owner',
+      width: 140,
+    },
+    {
+      headerName: 'Actions',
+      field: 'id',
+      width: 140,
+      sortable: false,
+      cellRenderer: p => (
+        <div style={{ display: 'flex', gap: 6 }} onClick={e => e.stopPropagation()}>
+          <button
+            className="btn btn-ghost"
+            style={{ padding: '4px 10px', fontSize: 12 }}
+            onClick={() => setDetailId(p.data.id)}
+          >
+            Resolve →
+          </button>
+          <button
+            className="btn btn-ghost"
+            style={{ padding: '4px 8px', fontSize: 12 }}
+            onClick={() => openCreateTask({
+              title: `Resolve cl. ${p.data.id} — ${p.data.title}`,
+              clause: p.data.id,
+              source: p.data.id,
+              sourceType: 'audit',
+              priority: p.data.status === 'nc' ? 'high' : 'medium',
+              assignedTo: p.data.owner,
+            })}
+          >
+            <Icon name="plus" size={11} />Task
+          </button>
+        </div>
+      ),
+    },
+  ], [openCreateTask]);
+
   return (
     <div className="page page-wide">
       <PageHeader
@@ -632,45 +702,12 @@ const AccreditationPage = ({ data: D }) => {
               <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 4 }}>No gaps to report.</div>
             </div>
           ) : (
-            <table className="tbl">
-              <thead>
-                <tr>
-                  <th>Clause</th><th>Requirement</th><th>Status</th><th>Gap / notes</th><th>Owner</th><th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {clauses.filter(c => c.status !== 'compliant' && c.status !== 'na').map(c => (
-                  <tr key={c.id} className="row-clickable" onClick={() => setDetailId(c.id)}>
-                    <td><span className="mono">{c.id}</span></td>
-                    <td>{c.title}</td>
-                    <td><StatusPill status={c.status} /></td>
-                    <td style={{ color: 'var(--ink-3)', fontSize: 12 }}>
-                      {c.notes || (c.status === 'nc' ? 'No current evidence on file' : 'Evidence outdated or partial')}
-                    </td>
-                    <td>{c.owner}</td>
-                    <td>
-                      <div style={{ display: 'flex', gap: 6 }} onClick={e => e.stopPropagation()}>
-                        <button className="btn btn-ghost" style={{ padding: '4px 10px', fontSize: 12 }}
-                          onClick={() => setDetailId(c.id)}>
-                          Resolve →
-                        </button>
-                        <button className="btn btn-ghost" style={{ padding: '4px 8px', fontSize: 12 }}
-                          onClick={() => openCreateTask({
-                            title: `Resolve cl. ${c.id} — ${c.title}`,
-                            clause: c.id,
-                            source: c.id,
-                            sourceType: 'audit',
-                            priority: c.status === 'nc' ? 'high' : 'medium',
-                            assignedTo: c.owner,
-                          })}>
-                          <Icon name="plus" size={11} />Task
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <NexusGrid
+              rowData={clauses.filter(c => c.status !== 'compliant' && c.status !== 'na')}
+              columnDefs={gapColumnDefs}
+              onRowClicked={p => setDetailId(p.data.id)}
+              domLayout="autoHeight"
+            />
           )}
         </div>
       )}

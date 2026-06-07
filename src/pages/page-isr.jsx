@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Icon from '../icons';
 import { PageHeader, Pill, Tabs } from '../components';
 import { useAuth } from '../AuthContext';
+import NexusGrid from '../nexus-grid';
 
 const BASE = import.meta.env.VITE_API_URL ?? '';
 
@@ -101,6 +102,52 @@ const AssessmentCard = ({ assessment, onUpdate, onSign, users }) => {
 
   const [expanded, setExpanded] = useState(false);
 
+  const concordanceRowData = PARAMS.map(p => {
+    const val = results[p.id] ?? null;
+    const thr = thresholds[p.id] ?? DEFAULT_THRESHOLDS[p.id] ?? 80;
+    return { id: p.id, label: p.label, required: p.required, concordance: val, threshold: thr };
+  });
+
+  const concordanceColDefs = [
+    {
+      headerName: 'Parameter', field: 'label', flex: 1,
+      cellRenderer: p => (
+        <span style={{ fontSize: 12 }}>
+          {p.data.label}
+          {!p.data.required && <span style={{ fontSize: 10, color: 'var(--ink-3)', marginLeft: 4 }}>(optional)</span>}
+        </span>
+      ),
+    },
+    {
+      headerName: 'Concordance %', field: 'concordance', width: 130,
+      cellStyle: { textAlign: 'center' },
+      cellRenderer: p => (
+        <span className="mono" style={{ fontSize: 12 }}>
+          {p.data.concordance != null ? `${p.data.concordance}%` : '—'}
+        </span>
+      ),
+    },
+    {
+      headerName: 'Threshold %', field: 'threshold', width: 130,
+      cellStyle: { textAlign: 'center' },
+      cellRenderer: p => (
+        <span className="mono" style={{ fontSize: 12 }}>{p.data.threshold}%</span>
+      ),
+    },
+    {
+      headerName: 'Result', field: 'concordance', width: 120, sortable: false,
+      cellStyle: { textAlign: 'center' },
+      cellRenderer: p => {
+        const val = p.data.concordance;
+        const thr = p.data.threshold;
+        const kind = val != null ? statusColor(val, thr) : 'outline';
+        return val != null
+          ? <Pill kind={kind}>{val >= thr ? 'Met' : 'Not met'}</Pill>
+          : <span style={{ color: 'var(--ink-3)', fontSize: 11 }}>—</span>;
+      },
+    },
+  ];
+
   return (
     <div className="card" style={{ marginBottom: 12 }}>
       {/* Header row */}
@@ -137,24 +184,12 @@ const AssessmentCard = ({ assessment, onUpdate, onSign, users }) => {
             </div>
           </div>
 
-          {/* Concordance table */}
+          {/* Concordance results grid */}
           <div style={{ marginBottom: 14 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-2)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
               Concordance results
             </div>
-            <table className="tbl">
-              <thead>
-                <tr><th>Parameter</th><th style={{ textAlign: 'center', width: 100 }}>Concordance %</th><th style={{ textAlign: 'center', width: 100 }}>Threshold %</th><th style={{ textAlign: 'center', width: 110 }}>Result</th></tr>
-              </thead>
-              <tbody>
-                {PARAMS.map(p => (
-                  <ConcordanceRow key={p.id} param={p} readOnly
-                    concordance={results[p.id]}
-                    threshold={thresholds[p.id] ?? DEFAULT_THRESHOLDS[p.id]}
-                    onChange={() => {}} />
-                ))}
-              </tbody>
-            </table>
+            <NexusGrid rowData={concordanceRowData} columnDefs={concordanceColDefs} />
           </div>
 
           {/* Attestation / Sign-off */}
@@ -352,6 +387,19 @@ const AdminTab = ({ assessments, onRefresh }) => {
     } finally { setSaving(false); }
   };
 
+  const prodigiRowData = fetchedResults && !fetchedResults.error && fetchedResults.concordance
+    ? Object.entries(fetchedResults.concordance).map(([k, v]) => ({ key: k, label: v.label, value: v.value }))
+    : [];
+
+  const prodigiColDefs = [
+    { headerName: 'Parameter', field: 'label', flex: 1 },
+    {
+      headerName: 'Concordance %', field: 'value', width: 160,
+      cellStyle: { textAlign: 'center' },
+      cellRenderer: p => <span style={{ fontWeight: 600 }}>{p.data.value}%</span>,
+    },
+  ];
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
       {/* Prodigi API notice */}
@@ -456,17 +504,7 @@ const AdminTab = ({ assessments, onRefresh }) => {
                 <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-2)', marginBottom: 8 }}>
                   Results from Prodigi <span style={{ fontWeight: 400, color: 'var(--ink-3)' }}>(placeholder data)</span>
                 </div>
-                <table className="tbl" style={{ fontSize: 11 }}>
-                  <thead><tr><th>Parameter</th><th style={{ textAlign: 'center' }}>Concordance %</th></tr></thead>
-                  <tbody>
-                    {Object.entries(fetchedResults.concordance).map(([k, v]) => (
-                      <tr key={k}>
-                        <td>{v.label}</td>
-                        <td style={{ textAlign: 'center', fontWeight: 600 }}>{v.value}%</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <NexusGrid rowData={prodigiRowData} columnDefs={prodigiColDefs} />
                 <button className="btn btn-primary" style={{ marginTop: 8, width: '100%', fontSize: 12 }}
                   onClick={handleSaveResults} disabled={saving || !selectedAssessment}>
                   <Icon name="check" size={12} />Save results to assessment
@@ -517,6 +555,40 @@ const ISRPage = () => {
     setSignNotes('');
     load();
   };
+
+  const quarterlyRowData = thisQ.map(a => {
+    const res = (() => { try { return JSON.parse(a.results || '{}'); } catch { return {}; } })();
+    const thr = (() => { try { return JSON.parse(a.thresholds || '{}'); } catch { return {}; } })();
+    const allMet = PARAMS.filter(p => p.required).every(p => { const v = res[p.id]; const t = thr[p.id] ?? DEFAULT_THRESHOLDS[p.id]; return v != null && v >= t; });
+    const anyData = PARAMS.some(p => res[p.id] != null);
+    return { ...a, allMet, anyData, studyCount: JSON.parse(a.studyIds || '[]').length };
+  });
+
+  const quarterlyColDefs = [
+    {
+      headerName: 'Scorer', field: 'scorer', flex: 1,
+      cellRenderer: p => <span style={{ fontWeight: 500 }}>{p.data.scorer}</span>,
+    },
+    { headerName: 'Reviewer', field: 'reviewer', flex: 1, cellStyle: { fontSize: 12 } },
+    {
+      headerName: 'Studies', field: 'studyCount', width: 100,
+      cellRenderer: p => <span className="mono" style={{ fontSize: 11 }}>{p.data.studyCount}/3</span>,
+    },
+    {
+      headerName: 'Status', field: 'status', width: 130,
+      cellRenderer: p => (
+        <Pill kind={p.data.status === 'signed' ? 'good' : p.data.status === 'complete' ? 'warn' : 'outline'}>
+          {p.data.status}
+        </Pill>
+      ),
+    },
+    {
+      headerName: 'All met?', field: 'allMet', width: 110,
+      cellRenderer: p => p.data.anyData
+        ? <Pill kind={p.data.allMet ? 'good' : 'bad'}>{p.data.allMet ? 'Yes' : 'No'}</Pill>
+        : <span className="muted">—</span>,
+    },
+  ];
 
   return (
     <div className="page page-wide">
@@ -602,28 +674,11 @@ const ISRPage = () => {
                 No assessments for {quarter} yet. Click "New assessment" to create one.
               </div>
             ) : (
-              <table className="tbl">
-                <thead>
-                  <tr><th>Scorer</th><th>Reviewer</th><th>Studies</th><th>Status</th><th>All met?</th></tr>
-                </thead>
-                <tbody>
-                  {thisQ.map(a => {
-                    const res = (() => { try { return JSON.parse(a.results || '{}'); } catch { return {}; } })();
-                    const thr = (() => { try { return JSON.parse(a.thresholds || '{}'); } catch { return {}; } })();
-                    const allMet = PARAMS.filter(p => p.required).every(p => { const v = res[p.id]; const t = thr[p.id] ?? DEFAULT_THRESHOLDS[p.id]; return v != null && v >= t; });
-                    const anyData = PARAMS.some(p => res[p.id] != null);
-                    return (
-                      <tr key={a.id} className="row-clickable" onClick={() => setTab('reports')}>
-                        <td style={{ fontWeight: 500 }}>{a.scorer}</td>
-                        <td style={{ fontSize: 12 }}>{a.reviewer}</td>
-                        <td><span className="mono" style={{ fontSize: 11 }}>{JSON.parse(a.studyIds || '[]').length}/3</span></td>
-                        <td><Pill kind={a.status === 'signed' ? 'good' : a.status === 'complete' ? 'warn' : 'outline'}>{a.status}</Pill></td>
-                        <td>{anyData ? <Pill kind={allMet ? 'good' : 'bad'}>{allMet ? 'Yes' : 'No'}</Pill> : <span className="muted">—</span>}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+              <NexusGrid
+                rowData={quarterlyRowData}
+                columnDefs={quarterlyColDefs}
+                onRowClicked={() => setTab('reports')}
+              />
             )}
           </div>
         </div>

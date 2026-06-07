@@ -6,6 +6,7 @@ import { useAuth } from '../AuthContext';
 import { useLocation } from '../LocationContext';
 import { useNexusData } from '../NexusDataContext';
 import { getStdCfg } from '../standardConfig';
+import NexusGrid from '../nexus-grid';
 
 function exportEvidencePack(D, site, user) {
   const now = new Date();
@@ -403,40 +404,42 @@ const HomePage = ({ data: D, goTo, openClause }) => {
               <div className="topbar-spacer" />
               <button className="btn btn-ghost" onClick={() => goTo('studies')}>Open queue<Icon name="arrow_right" size={13} /></button>
             </div>
-            <table className="tbl">
-              <thead>
-                <tr>
-                  <th>Study</th>
-                  <th>Type</th>
-                  <th>Reporting physician</th>
-                  <th>Status</th>
-                  <th>SLA</th>
-                </tr>
-              </thead>
-              <tbody>
-                {D.studies.filter(s => s.status !== "Final").slice(0, 5).map(s => (
-                  <tr key={s.id} className="row-clickable" onClick={() => goTo('studies')}>
-                    <td><span className="mono">{s.id}</span></td>
-                    <td>{s.type}</td>
-                    <td>{s.physician}</td>
-                    <td><Pill kind={s.status === "Awaiting sign-off" ? "warn" : s.status === "Preliminary" ? "info" : "outline"}>{s.status}</Pill></td>
-                    <td>
-                      <div className="sla">
-                        <div className="sla-bar">
-                          <div className="sla-bar-fill" style={{
-                            width: `${Math.min(100, ((10 - s.due) / 10) * 100)}%`,
-                            background: s.sla === 'bad' ? 'var(--bad)' : s.sla === 'warn' ? 'var(--warn)' : 'var(--good)',
-                          }} />
-                        </div>
-                        <span style={{ color: s.sla === 'bad' ? 'var(--bad)' : s.sla === 'warn' ? 'var(--warn)' : 'var(--ink-3)' }}>
-                          {s.due === 0 ? "Due today" : s.due > 0 ? `${s.due}d left` : `${Math.abs(s.due)}d over`}
-                        </span>
+            <NexusGrid
+              rowData={D.studies.filter(s => s.status !== "Final").slice(0, 5)}
+              columnDefs={[
+                {
+                  headerName: 'Study', field: 'id', width: 120,
+                  cellRenderer: p => <span className="mono">{p.value}</span>,
+                },
+                { headerName: 'Type', field: 'type', flex: 1 },
+                { headerName: 'Reporting physician', field: 'physician', flex: 2 },
+                {
+                  headerName: 'Status', field: 'status', width: 160,
+                  cellRenderer: p => (
+                    <Pill kind={p.value === 'Awaiting sign-off' ? 'warn' : p.value === 'Preliminary' ? 'info' : 'outline'}>
+                      {p.value}
+                    </Pill>
+                  ),
+                },
+                {
+                  headerName: 'SLA', field: 'due', width: 160, sortable: false,
+                  cellRenderer: p => (
+                    <div className="sla">
+                      <div className="sla-bar">
+                        <div className="sla-bar-fill" style={{
+                          width: `${Math.min(100, ((10 - p.value) / 10) * 100)}%`,
+                          background: p.data.sla === 'bad' ? 'var(--bad)' : p.data.sla === 'warn' ? 'var(--warn)' : 'var(--good)',
+                        }} />
                       </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                      <span style={{ color: p.data.sla === 'bad' ? 'var(--bad)' : p.data.sla === 'warn' ? 'var(--warn)' : 'var(--ink-3)' }}>
+                        {p.value === 0 ? 'Due today' : p.value > 0 ? `${p.value}d left` : `${Math.abs(p.value)}d over`}
+                      </span>
+                    </div>
+                  ),
+                },
+              ]}
+              onRowClicked={() => goTo('studies')}
+            />
           </div>}
         </div>
 

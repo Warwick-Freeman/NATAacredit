@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import Icon from '../icons';
 import { PageHeader, Pill, Avatar, Tabs } from '../components';
 import { studyStatusKind } from './page-patients';
+import NexusGrid from '../nexus-grid';
 
 const StudiesPage = ({ data: D, openStudy }) => {
   const [tab, setTab] = useState("queue");
@@ -19,6 +20,92 @@ const StudiesPage = ({ data: D, openStudy }) => {
     if (filter === 'prelim') return s.status === 'Preliminary';
     return true;
   });
+
+  const studyColumnDefs = [
+    {
+      headerName: 'Study ID',
+      field: 'id',
+      width: 150,
+      cellRenderer: p => (
+        <div>
+          <div className="mono" style={{ fontWeight: 500 }}>{p.data.id}</div>
+          <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{p.data.patient}</div>
+        </div>
+      ),
+    },
+    {
+      headerName: 'Type',
+      field: 'type',
+      flex: 1,
+    },
+    {
+      headerName: 'Site',
+      field: 'siteCode',
+      width: 100,
+      cellRenderer: p => <span className="pill outline">{p.data.siteCode}</span>,
+    },
+    {
+      headerName: 'Scorer',
+      field: 'scorer',
+      flex: 1,
+      cellRenderer: p => (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <Avatar name={p.data.scorer} size={20} idx={p.data.scorer.charCodeAt(0) % 9} />
+          {p.data.scorer}
+        </div>
+      ),
+    },
+    {
+      headerName: 'Reporting physician',
+      field: 'physician',
+      flex: 1,
+    },
+    {
+      headerName: 'Status',
+      field: 'status',
+      width: 160,
+      cellRenderer: p => (
+        <Pill kind={studyStatusKind(p.data.status)}>{p.data.status}</Pill>
+      ),
+    },
+    {
+      headerName: 'SLA · 10 days',
+      field: 'due',
+      width: 160,
+      sortable: false,
+      cellRenderer: p => {
+        const s = p.data;
+        return (
+          <div className="sla">
+            <div className="sla-bar" style={{ width: 80 }}>
+              <div className="sla-bar-fill" style={{
+                width: s.status === 'Final'
+                  ? '100%'
+                  : `${Math.min(100, ((10 - s.due) / 10) * 100)}%`,
+                background: s.sla === 'bad' ? 'var(--bad)' : s.sla === 'warn' ? 'var(--warn)' : 'var(--good)',
+              }} />
+            </div>
+            <span style={{
+              color: s.status === 'Final' ? 'var(--ink-3)' : s.sla === 'bad' ? 'var(--bad)' : s.sla === 'warn' ? 'var(--warn)' : 'var(--ink-3)',
+              fontSize: 12,
+            }}>
+              {s.status === 'Final'
+                ? `${s.signedDays}d ✓`
+                : s.due === 0 ? 'Due today'
+                : s.due > 0 ? `${s.due}d left` : `${Math.abs(s.due)}d over`}
+            </span>
+          </div>
+        );
+      },
+    },
+    {
+      headerName: '',
+      field: 'id',
+      width: 48,
+      sortable: false,
+      cellRenderer: () => <Icon name="chev_right" size={14} />,
+    },
+  ];
 
   return (
     <div className="page page-wide">
@@ -78,59 +165,11 @@ const StudiesPage = ({ data: D, openStudy }) => {
           </div>
 
           <div className="card">
-            <table className="tbl">
-              <thead>
-                <tr>
-                  <th>Study ID</th>
-                  <th>Type</th>
-                  <th>Site</th>
-                  <th>Scorer</th>
-                  <th>Reporting physician</th>
-                  <th>Status</th>
-                  <th>SLA · 10 days</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map(s => (
-                  <tr key={s.id} className="row-clickable" onClick={() => openStudy(s.id)}>
-                    <td>
-                      <div className="mono" style={{ fontWeight: 500 }}>{s.id}</div>
-                      <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{s.patient}</div>
-                    </td>
-                    <td>{s.type}</td>
-                    <td><span className="pill outline">{s.siteCode}</span></td>
-                    <td><div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Avatar name={s.scorer} size={20} idx={s.scorer.charCodeAt(0) % 9} />{s.scorer}</div></td>
-                    <td>{s.physician}</td>
-                    <td>
-                      <Pill kind={studyStatusKind(s.status)}>{s.status}</Pill>
-                    </td>
-                    <td>
-                      <div className="sla">
-                        <div className="sla-bar" style={{ width: 80 }}>
-                          <div className="sla-bar-fill" style={{
-                            width: s.status === 'Final'
-                              ? '100%'
-                              : `${Math.min(100, ((10 - s.due) / 10) * 100)}%`,
-                            background: s.sla === 'bad' ? 'var(--bad)' : s.sla === 'warn' ? 'var(--warn)' : 'var(--good)',
-                          }} />
-                        </div>
-                        <span style={{
-                          color: s.status === 'Final' ? 'var(--ink-3)' : s.sla === 'bad' ? 'var(--bad)' : s.sla === 'warn' ? 'var(--warn)' : 'var(--ink-3)',
-                          fontSize: 12,
-                        }}>
-                          {s.status === 'Final'
-                            ? `${s.signedDays}d ✓`
-                            : s.due === 0 ? 'Due today'
-                            : s.due > 0 ? `${s.due}d left` : `${Math.abs(s.due)}d over`}
-                        </span>
-                      </div>
-                    </td>
-                    <td><Icon name="chev_right" size={14} /></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <NexusGrid
+              rowData={filtered}
+              columnDefs={studyColumnDefs}
+              onRowClicked={p => openStudy(p.data.id)}
+            />
           </div>
         </>
       )}
@@ -141,14 +180,22 @@ const StudiesPage = ({ data: D, openStudy }) => {
           <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 14 }}>
             Cohen's κ across 5% blind re-score sample · cl. 5.6.6 / 5.5.6.6
           </div>
-          <table className="tbl">
-            <thead><tr><th>Scorer A</th><th>Scorer B</th><th>Studies</th><th>κ (overall)</th><th>Sleep stage</th><th>Resp events</th></tr></thead>
-            <tbody>
-              <tr><td>M. Chen</td><td>A. Singh</td><td>14</td><td><Pill kind="good">0.84</Pill></td><td>0.81</td><td>0.87</td></tr>
-              <tr><td>M. Chen</td><td>J. Owusu</td><td>11</td><td><Pill kind="good">0.79</Pill></td><td>0.77</td><td>0.82</td></tr>
-              <tr><td>A. Singh</td><td>J. Owusu</td><td>9</td><td><Pill kind="warn">0.74</Pill></td><td>0.71</td><td>0.78</td></tr>
-            </tbody>
-          </table>
+          <NexusGrid
+            rowData={[
+              { scorerA: 'M. Chen',  scorerB: 'A. Singh', studies: 14, kappa: '0.84', kappaKind: 'good', sleepStage: '0.81', respEvents: '0.87' },
+              { scorerA: 'M. Chen',  scorerB: 'J. Owusu', studies: 11, kappa: '0.79', kappaKind: 'good', sleepStage: '0.77', respEvents: '0.82' },
+              { scorerA: 'A. Singh', scorerB: 'J. Owusu', studies:  9, kappa: '0.74', kappaKind: 'warn', sleepStage: '0.71', respEvents: '0.78' },
+            ]}
+            columnDefs={[
+              { headerName: 'Scorer A',    field: 'scorerA',    flex: 1 },
+              { headerName: 'Scorer B',    field: 'scorerB',    flex: 1 },
+              { headerName: 'Studies',     field: 'studies',    width: 90 },
+              { headerName: 'κ (overall)', field: 'kappa',      width: 120,
+                cellRenderer: p => <Pill kind={p.data.kappaKind}>{p.value}</Pill> },
+              { headerName: 'Sleep stage', field: 'sleepStage', width: 120 },
+              { headerName: 'Resp events', field: 'respEvents', width: 120 },
+            ]}
+          />
         </div>
       )}
 

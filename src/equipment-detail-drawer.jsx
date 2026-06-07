@@ -3,6 +3,7 @@ import Icon from './icons';
 import { Pill } from './components';
 import { useAuth } from './AuthContext';
 import { useTaskContext } from './TaskContext';
+import NexusGrid from './nexus-grid';
 
 const STATUS_KIND = { 'In service': 'good', 'Quarantined': 'bad', 'Loan / out': 'warn', 'Decommissioned': 'outline' };
 const RESULT_KIND = { Pass: 'good', 'Conditional pass': 'warn', Fail: 'bad' };
@@ -81,30 +82,54 @@ function deriveOverallResult(channels) {
 
 // ── Channel history table (collapsed in history cards) ────────────────────────
 
+const channelHistoryColDefs = [
+  {
+    headerName: 'Channel',
+    field: 'label',
+    flex: 2,
+    cellRenderer: p => (
+      <span style={{ fontWeight: 500 }}>{p.value}</span>
+    ),
+  },
+  {
+    headerName: 'Expected',
+    field: 'expected',
+    flex: 2,
+    cellRenderer: p => (
+      <span style={{ color: 'var(--ink-3)' }}>{p.value}</span>
+    ),
+  },
+  {
+    headerName: 'Measured',
+    field: 'measured',
+    flex: 2,
+    cellRenderer: p => {
+      const c = p.data;
+      return <span>{c.measured || '—'}{c.measured && c.unit ? ` ${c.unit}` : ''}</span>;
+    },
+  },
+  {
+    headerName: 'Result',
+    field: 'pass',
+    flex: 1,
+    cellRenderer: p => (
+      <span style={{
+        color: p.value === 'Fail' ? 'var(--bad)' : p.value === 'Conditional pass' ? 'var(--warn)' : 'var(--good)',
+        fontWeight: 600,
+      }}>
+        {p.value === 'Conditional pass' ? 'Cond.' : p.value}
+      </span>
+    ),
+  },
+];
+
 const ChannelTable = ({ channels }) => (
-  <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 8, fontSize: 10 }}>
-    <thead>
-      <tr style={{ borderBottom: '1px solid var(--border)' }}>
-        {['Channel', 'Expected', 'Measured', 'Result'].map(h => (
-          <th key={h} style={{ textAlign: 'left', padding: '3px 6px', color: 'var(--ink-3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
-        ))}
-      </tr>
-    </thead>
-    <tbody>
-      {channels.map((c, i) => (
-        <tr key={i} style={{ borderBottom: '1px solid var(--border-faint, var(--border))' }}>
-          <td style={{ padding: '3px 6px', fontWeight: 500 }}>{c.label}</td>
-          <td style={{ padding: '3px 6px', color: 'var(--ink-3)' }}>{c.expected}</td>
-          <td style={{ padding: '3px 6px' }}>{c.measured || '—'}{c.measured && c.unit ? ` ${c.unit}` : ''}</td>
-          <td style={{ padding: '3px 6px' }}>
-            <span style={{ color: c.pass === 'Fail' ? 'var(--bad)' : c.pass === 'Conditional pass' ? 'var(--warn)' : 'var(--good)', fontWeight: 600 }}>
-              {c.pass === 'Conditional pass' ? 'Cond.' : c.pass}
-            </span>
-          </td>
-        </tr>
-      ))}
-    </tbody>
-  </table>
+  <div style={{ marginTop: 8, fontSize: 10 }}>
+    <NexusGrid
+      rowData={channels}
+      columnDefs={channelHistoryColDefs}
+    />
+  </div>
 );
 
 // ── History card ──────────────────────────────────────────────────────────────
@@ -219,6 +244,68 @@ const EquipmentDetailDrawer = ({ eq, onUpdate, onClose, onOpenHstDispatch, onOpe
   const overdueBy = diffDays < 0 ? Math.abs(diffDays) : 0;
   const hasChannels = record.channels.length > 0;
   const needsNcRef  = record.result === 'Fail' || record.result === 'Conditional pass';
+
+  const channelFormColDefs = [
+    {
+      headerName: 'Channel',
+      field: 'label',
+      flex: 2,
+      cellRenderer: p => (
+        <div>
+          <div style={{ fontWeight: 500 }}>{p.value}</div>
+          <div style={{ fontSize: 10, color: 'var(--ink-3)', marginTop: 1 }}>{p.data.method}</div>
+        </div>
+      ),
+    },
+    {
+      headerName: 'Expected',
+      field: 'expected',
+      flex: 2,
+      cellRenderer: p => (
+        <span style={{ color: 'var(--ink-3)' }}>{p.value}</span>
+      ),
+    },
+    {
+      headerName: 'Measured',
+      field: 'measured',
+      flex: 2,
+      cellRenderer: p => {
+        const idx = record.channels.findIndex(c => c.id === p.data.id);
+        return (
+          <input
+            className="form-input"
+            value={p.data.measured}
+            onChange={e => setChannel(idx, 'measured', e.target.value)}
+            placeholder={p.data.unit || '—'}
+            style={{ fontSize: 11, padding: '4px 7px', margin: 0 }}
+          />
+        );
+      },
+    },
+    {
+      headerName: 'Result',
+      field: 'pass',
+      flex: 2,
+      cellRenderer: p => {
+        const idx = record.channels.findIndex(c => c.id === p.data.id);
+        return (
+          <select
+            className="form-input"
+            value={p.data.pass}
+            onChange={e => setChannel(idx, 'pass', e.target.value)}
+            style={{
+              fontSize: 11, padding: '4px 7px', margin: 0,
+              color: p.data.pass === 'Fail' ? 'var(--bad)' : p.data.pass === 'Conditional pass' ? 'var(--warn)' : 'var(--good)',
+              fontWeight: 600,
+            }}>
+            <option value="Pass">Pass</option>
+            <option value="Conditional pass">Conditional pass</option>
+            <option value="Fail">Fail</option>
+          </select>
+        );
+      },
+    },
+  ];
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -388,58 +475,17 @@ const EquipmentDetailDrawer = ({ eq, onUpdate, onClose, onOpenHstDispatch, onOpe
               </div>
             </div>
 
-            {/* Channel checks table (FRM-005) */}
+            {/* Channel checks grid (FRM-005) */}
             {hasChannels && (
               <div style={{ marginBottom: 12 }}>
                 <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink-2)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   Channel checks (FRM-005)
                 </div>
                 <div style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
-                    <thead>
-                      <tr style={{ background: 'var(--surface-3)' }}>
-                        <th style={{ textAlign: 'left', padding: '6px 10px', fontWeight: 600, color: 'var(--ink-2)', width: '28%' }}>Channel</th>
-                        <th style={{ textAlign: 'left', padding: '6px 10px', fontWeight: 600, color: 'var(--ink-2)', width: '22%' }}>Expected</th>
-                        <th style={{ textAlign: 'left', padding: '6px 10px', fontWeight: 600, color: 'var(--ink-2)', width: '22%' }}>Measured</th>
-                        <th style={{ textAlign: 'left', padding: '6px 10px', fontWeight: 600, color: 'var(--ink-2)', width: '28%' }}>Result</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {record.channels.map((ch, i) => (
-                        <tr key={ch.id} style={{ borderTop: '1px solid var(--border)', background: i % 2 === 0 ? 'var(--surface)' : 'var(--surface-2)' }}>
-                          <td style={{ padding: '6px 10px', fontWeight: 500 }}>
-                            {ch.label}
-                            <div style={{ fontSize: 10, color: 'var(--ink-3)', marginTop: 1 }}>{ch.method}</div>
-                          </td>
-                          <td style={{ padding: '6px 10px', color: 'var(--ink-3)' }}>{ch.expected}</td>
-                          <td style={{ padding: '4px 6px' }}>
-                            <input
-                              className="form-input"
-                              value={ch.measured}
-                              onChange={e => setChannel(i, 'measured', e.target.value)}
-                              placeholder={ch.unit || '—'}
-                              style={{ fontSize: 11, padding: '4px 7px', margin: 0 }}
-                            />
-                          </td>
-                          <td style={{ padding: '4px 6px' }}>
-                            <select
-                              className="form-input"
-                              value={ch.pass}
-                              onChange={e => setChannel(i, 'pass', e.target.value)}
-                              style={{
-                                fontSize: 11, padding: '4px 7px', margin: 0,
-                                color: ch.pass === 'Fail' ? 'var(--bad)' : ch.pass === 'Conditional pass' ? 'var(--warn)' : 'var(--good)',
-                                fontWeight: 600,
-                              }}>
-                              <option value="Pass">Pass</option>
-                              <option value="Conditional pass">Conditional pass</option>
-                              <option value="Fail">Fail</option>
-                            </select>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  <NexusGrid
+                    rowData={record.channels}
+                    columnDefs={channelFormColDefs}
+                  />
                 </div>
                 <div style={{ fontSize: 10, color: 'var(--ink-3)', marginTop: 4 }}>
                   Overall result is derived automatically from channel results.

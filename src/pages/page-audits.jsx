@@ -3,6 +3,7 @@ import Icon from '../icons';
 import { PageHeader, Pill, Avatar, Tabs, Drawer } from '../components';
 import { useTaskContext } from '../TaskContext';
 import AuditDetailDrawer from '../audit-detail-drawer';
+import NexusGrid from '../nexus-grid';
 
 // ─── seed data ────────────────────────────────────────────────────────────────
 
@@ -246,6 +247,75 @@ const AuditsPage = () => {
   const inProgCount = mgmtInputs.filter(i => i.status === 'in-progress').length;
   const pendCount = mgmtInputs.filter(i => i.status === 'pending').length;
 
+  // ─── column definitions ──────────────────────────────────────────────────
+
+  const auditColDefs = [
+    { headerName: 'Audit ID', field: 'id', width: 150,
+      cellRenderer: p => <span className="mono" style={{ fontWeight: 500 }}>{p.value}</span> },
+    { headerName: 'Area', field: 'area', flex: 2 },
+    { headerName: 'Auditor', field: 'auditor', flex: 1 },
+    { headerName: 'Date', field: 'date', width: 130,
+      cellRenderer: p => <span className="muted">{p.value}</span> },
+    { headerName: 'Scope', field: 'scope', width: 160,
+      cellRenderer: p => <span className="muted">{p.value}</span> },
+    { headerName: 'Findings', field: 'findings', width: 130,
+      cellRenderer: p => p.value > 0
+        ? <Pill kind="warn">{p.value} finding{p.value !== 1 ? 's' : ''}</Pill>
+        : <Pill kind="good">0 findings</Pill> },
+    { headerName: 'Status', field: 'status', width: 130,
+      cellRenderer: p => <Pill kind={p.value === 'Closed' ? 'good' : p.value === 'Scheduled' ? 'outline' : 'info'}>{p.value}</Pill> },
+  ];
+
+  const pastReviewColDefs = [
+    { headerName: 'Review ID', field: 'id', width: 140,
+      cellRenderer: p => <span className="mono" style={{ fontWeight: 500 }}>{p.value}</span> },
+    { headerName: 'Date', field: 'date', width: 130 },
+    { headerName: 'Chair', field: 'chair', flex: 1 },
+    { headerName: 'Inputs', field: 'inputs', width: 140,
+      cellRenderer: p => {
+        const r = p.data;
+        return r.inputs
+          ? `${r.inputs.filter(i => i.status === 'complete').length}/${r.inputs.length} ready`
+          : '—';
+      }},
+    { headerName: 'Outputs', field: 'outputs', width: 130,
+      cellRenderer: p => {
+        const r = p.data;
+        const count = r.outputs ? (Array.isArray(r.outputs) ? r.outputs.length : r.outputs) : '—';
+        return `${count} decisions`;
+      }},
+    { headerName: 'Minutes', field: 'minutes', width: 120,
+      cellRenderer: p => p.value
+        ? <Pill kind="good"><Icon name="check" size={10} /> Saved</Pill>
+        : <Pill kind="outline">None</Pill> },
+    { headerName: 'Status', field: 'id', width: 110, sortable: false,
+      cellRenderer: () => <Pill kind="good">Complete</Pill> },
+  ];
+
+  const riskColDefs = [
+    { headerName: 'Risk', field: 'risk', flex: 2,
+      cellRenderer: p => <span style={{ fontSize: 12 }}>{p.value}</span> },
+    { headerName: 'Domain', field: 'domain', width: 110,
+      cellRenderer: p => <span className="muted">{p.value}</span> },
+    { headerName: 'L', field: 'likelihood', width: 60 },
+    { headerName: 'I', field: 'impact', width: 60 },
+    { headerName: 'Score', field: 'id', width: 90, sortable: false,
+      cellRenderer: p => {
+        const score = p.data.likelihood * p.data.impact;
+        return <Pill kind={riskKind(score)}>{score}</Pill>;
+      }},
+    { headerName: 'Owner', field: 'owner', width: 130,
+      cellRenderer: p => <span className="muted">{p.value}</span> },
+    { headerName: 'Review', field: 'reviewDate', width: 120,
+      cellRenderer: p => <span className="muted">{p.value}</span> },
+    { headerName: '', field: 'id', width: 52, sortable: false,
+      cellRenderer: p => (
+        <button className="btn-icon" style={{ opacity: 0.4 }} title="Remove" onClick={e => { e.stopPropagation(); deleteRisk(p.data.id); }}>
+          <Icon name="x" size={13} />
+        </button>
+      )},
+  ];
+
   return (
     <div className="page page-wide">
       <PageHeader
@@ -375,24 +445,11 @@ const AuditsPage = () => {
 
           {/* Audit table */}
           <div className="card">
-            <table className="tbl">
-              <thead>
-                <tr><th>Audit ID</th><th>Area</th><th>Auditor</th><th>Date</th><th>Scope</th><th>Findings</th><th>Status</th></tr>
-              </thead>
-              <tbody>
-                {audits.map(a => (
-                  <tr key={a.id} className="row-clickable" onClick={() => setDetailAuditId(a.id)}>
-                    <td className="mono" style={{ fontWeight: 500 }}>{a.id}</td>
-                    <td>{a.area}</td>
-                    <td>{a.auditor}</td>
-                    <td className="muted">{a.date}</td>
-                    <td className="muted">{a.scope}</td>
-                    <td>{a.findings > 0 ? <Pill kind="warn">{a.findings} finding{a.findings !== 1 ? 's' : ''}</Pill> : <Pill kind="good">0 findings</Pill>}</td>
-                    <td><Pill kind={a.status === 'Closed' ? 'good' : a.status === 'Scheduled' ? 'outline' : 'info'}>{a.status}</Pill></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <NexusGrid
+              rowData={audits}
+              columnDefs={auditColDefs}
+              onRowClicked={p => setDetailAuditId(p.data.id)}
+            />
           </div>
         </>
       )}
@@ -419,27 +476,11 @@ const AuditsPage = () => {
                 <div className="topbar-spacer" />
                 <button className="btn-icon" onClick={() => { setPastOpen(false); setSelectedPastReview(null); }}><Icon name="x" size={14} /></button>
               </div>
-              <table className="tbl">
-                <thead><tr><th>Review ID</th><th>Date</th><th>Chair</th><th>Inputs</th><th>Outputs</th><th>Minutes</th><th>Status</th></tr></thead>
-                <tbody>
-                  {savedReviews.map(r => (
-                    <tr key={r.id} className="row-clickable"
-                      style={{ background: selectedPastReview?.id === r.id ? 'var(--surface-2)' : undefined }}
-                      onClick={() => setSelectedPastReview(s => s?.id === r.id ? null : r)}>
-                      <td className="mono" style={{ fontWeight: 500 }}>{r.id}</td>
-                      <td>{r.date}</td>
-                      <td>{r.chair}</td>
-                      <td>{r.inputs ? `${r.inputs.filter(i => i.status === 'complete').length}/${r.inputs.length} ready` : (r.outputs != null ? '—' : '—')}</td>
-                      <td>{r.outputs ? (Array.isArray(r.outputs) ? r.outputs.length : r.outputs) : '—'} {Array.isArray(r.outputs) ? 'decisions' : 'decisions'}</td>
-                      <td>{r.minutes ? <Pill kind="good"><Icon name="check" size={10} /> Saved</Pill> : <Pill kind="outline">None</Pill>}</td>
-                      <td><Pill kind="good">Complete</Pill></td>
-                    </tr>
-                  ))}
-                  {savedReviews.length === 0 && (
-                    <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--ink-3)', fontSize: 12, padding: '14px 0' }}>No saved reviews yet.</td></tr>
-                  )}
-                </tbody>
-              </table>
+              <NexusGrid
+                rowData={savedReviews}
+                columnDefs={pastReviewColDefs}
+                onRowClicked={p => setSelectedPastReview(s => s?.id === p.data.id ? null : p.data)}
+              />
 
               {/* Selected review detail */}
               {selectedPastReview && (
@@ -759,35 +800,10 @@ const AuditsPage = () => {
                 </div>
               )}
 
-              <table className="tbl">
-                <thead>
-                  <tr><th>Risk</th><th>Domain</th><th>L</th><th>I</th><th>Score</th><th>Owner</th><th>Review</th><th></th></tr>
-                </thead>
-                <tbody>
-                  {filteredRisks.map(r => {
-                    const score = r.likelihood * r.impact;
-                    return (
-                      <tr key={r.id}>
-                        <td style={{ fontSize: 12 }}>{r.risk}</td>
-                        <td className="muted">{r.domain}</td>
-                        <td>{r.likelihood}</td>
-                        <td>{r.impact}</td>
-                        <td><Pill kind={riskKind(score)}>{score}</Pill></td>
-                        <td className="muted">{r.owner}</td>
-                        <td className="muted">{r.reviewDate}</td>
-                        <td>
-                          <button className="btn-icon" style={{ opacity: 0.4 }} title="Remove" onClick={() => deleteRisk(r.id)}>
-                            <Icon name="x" size={13} />
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                  {filteredRisks.length === 0 && (
-                    <tr><td colSpan={8} style={{ textAlign: 'center', color: 'var(--ink-3)', fontSize: 12, padding: '14px 0' }}>No risks match filter.</td></tr>
-                  )}
-                </tbody>
-              </table>
+              <NexusGrid
+                rowData={filteredRisks}
+                columnDefs={riskColDefs}
+              />
             </div>
 
             {/* Heat map */}
