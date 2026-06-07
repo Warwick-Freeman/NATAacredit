@@ -1,0 +1,205 @@
+﻿<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>POL-CLI-008 - Emergency Equipment Policy</title>
+<style>
+@page { size: A4; margin: 18mm 16mm 22mm 16mm; }
+body { font-family: "Segoe UI", Arial, sans-serif; font-size: 11pt; color: #1f2933; line-height: 1.45; margin: 0; padding: 24px; background: #f5f7fa; }
+.page { max-width: 920px; margin: 0 auto; background: #ffffff; padding: 32px 40px; border: 1px solid #d6dde6; border-radius: 6px; box-shadow: 0 2px 6px rgba(0,0,0,0.04); }
+.doc-header { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 18px; border-bottom: 3px solid #14406b; padding-bottom: 10px; margin-bottom: 18px; }
+.doc-header .kind { grid-column: 1 / span 2; font-size: 9.5pt; color: #506478; text-transform: uppercase; letter-spacing: 1.5px; }
+.doc-header .title { grid-column: 1 / span 2; font-size: 18pt; font-weight: 700; color: #14406b; margin: 0 0 4px 0; }
+.doc-header .subtitle { grid-column: 1 / span 2; font-size: 10.5pt; color: #506478; margin-bottom: 6px; }
+.doc-header .field { font-size: 9.5pt; color: #1f2933; border-bottom: 1px dotted #ccd4dc; padding-bottom: 3px; }
+.doc-header .field strong { display: inline-block; width: 130px; color: #506478; font-weight: 600; }
+h2 { font-size: 12.5pt; color: #14406b; margin-top: 22px; margin-bottom: 8px; border-left: 4px solid #14406b; padding: 2px 0 2px 8px; background: #eef3f9; }
+h3 { font-size: 11pt; color: #1f2933; margin-top: 16px; margin-bottom: 4px; }
+p, li { font-size: 10.5pt; }
+ul, ol { margin: 4px 0 8px 22px; padding: 0; }
+table { width: 100%; border-collapse: collapse; margin: 8px 0 12px 0; font-size: 10pt; }
+th, td { border: 1px solid #c5cfdb; padding: 6px 8px; text-align: left; vertical-align: top; }
+th { background: #eef3f9; color: #14406b; font-weight: 600; }
+.callout { background: #fff7e0; border: 1px solid #f0d27e; border-left: 4px solid #d49b1c; padding: 8px 12px; margin: 10px 0; font-size: 10pt; }
+.cat1-notice { background: #fff0f0; border: 1px solid #f0a0a0; border-left: 4px solid #c0392b; padding: 8px 12px; margin: 10px 0; font-size: 10pt; font-weight: 600; color: #c0392b; }
+.signoff { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 14px; }
+.sign-cell { border: 1px solid #c5cfdb; padding: 8px; min-height: 60px; font-size: 9.5pt; color: #506478; }
+.sign-cell strong { color: #1f2933; }
+.footer { border-top: 1px solid #c5cfdb; margin-top: 24px; padding-top: 8px; font-size: 9pt; color: #506478; text-align: center; }
+.clause-tag { display: inline-block; background: #14406b; color: #fff; font-size: 8.5pt; padding: 1px 6px; border-radius: 3px; margin-left: 4px; vertical-align: middle; }
+.clause-tag.c1 { background: #c0392b; }
+.fill { display: inline-block; min-width: 180px; border-bottom: 1px solid #1f2933; height: 14px; }
+.fill-sm { display: inline-block; min-width: 80px; border-bottom: 1px solid #1f2933; height: 14px; }
+@media print { body { background: #ffffff; padding: 0; } .page { box-shadow: none; border: none; padding: 0; } }
+</style><style>
+  *, *::before, *::after { box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    font-size: 10.5pt; color: #1e2d3d; line-height: 1.65;
+    padding: 28px 36px; max-width: 860px; margin: 0 auto;
+    background: #fff;
+  }
+  .doc-header {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px 18px;
+    border-bottom: 3px solid #14406b; padding-bottom: 10px; margin-bottom: 20px;
+  }
+  .doc-header .kind {
+    grid-column: 1/-1; font-size: 8.5pt; text-transform: uppercase;
+    letter-spacing: 0.1em; color: #14406b; font-weight: 700;
+  }
+  .doc-header .title {
+    grid-column: 1/-1; font-size: 15pt; font-weight: 700;
+    color: #14406b; margin: 4px 0;
+  }
+  .doc-header .field { font-size: 9pt; color: #3d5166; padding: 3px 0; }
+  h1 { font-size: 13pt; color: #14406b; margin: 16px 0 6px; }
+  h2 {
+    font-size: 11pt; color: #14406b; margin: 14px 0 5px;
+    border-bottom: 1px solid #d1dde8; padding-bottom: 2px;
+  }
+  h3 { font-size: 10pt; color: #14406b; margin: 10px 0 4px; }
+  p { margin: 6px 0; }
+  ul, ol { margin: 6px 0 6px 22px; }
+  li { margin: 3px 0; }
+  hr { border: none; border-top: 1px solid #c5cfdb; margin: 16px 0; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+  th, td { border: 1px solid #c5cfdb; padding: 5px 9px; text-align: left; font-size: 9.5pt; }
+  th { background: #e8f0f7; font-weight: 600; }
+  .signoff {
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;
+    margin-top: 24px; border-top: 1px solid #c5cfdb; padding-top: 12px;
+  }
+  .sign-cell {
+    border: 1px solid #c5cfdb; padding: 8px;
+    min-height: 60px; font-size: 9.5pt; color: #506478;
+  }
+
+  /* ── Editor-only chrome (stripped from saved HTML) ── */
+  .editor-locked {
+    pointer-events: none; user-select: none;
+    background: #f8fafc; border-radius: 4px;
+    border: 1.5px dashed #cbd5e1; padding: 8px;
+    margin-bottom: 4px; opacity: 0.8;
+  }
+  .editor-lock-badge {
+    grid-column: 1/-1; display: flex; align-items: center; gap: 5px;
+    font-size: 8pt; padding: 3px 8px; margin-top: 6px;
+    background: #e2e8f0; border: 1px dashed #94a3b8; border-radius: 8px;
+    color: #64748b; width: fit-content;
+  }
+
+  /* ── Editable content area ── */
+  .doc-content { min-height: 320px; outline: none; padding: 2px 0; }
+  .doc-content:focus { outline: none; }
+</style><style>
+  *, *::before, *::after { box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    font-size: 10.5pt; color: #1e2d3d; line-height: 1.65;
+    padding: 28px 36px; max-width: 860px; margin: 0 auto;
+    background: #fff;
+  }
+  .doc-header {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px 18px;
+    border-bottom: 3px solid #14406b; padding-bottom: 10px; margin-bottom: 20px;
+  }
+  .doc-header .kind {
+    grid-column: 1/-1; font-size: 8.5pt; text-transform: uppercase;
+    letter-spacing: 0.1em; color: #14406b; font-weight: 700;
+  }
+  .doc-header .title {
+    grid-column: 1/-1; font-size: 15pt; font-weight: 700;
+    color: #14406b; margin: 4px 0;
+  }
+  .doc-header .field { font-size: 9pt; color: #3d5166; padding: 3px 0; }
+  h1 { font-size: 13pt; color: #14406b; margin: 16px 0 6px; }
+  h2 {
+    font-size: 11pt; color: #14406b; margin: 14px 0 5px;
+    border-bottom: 1px solid #d1dde8; padding-bottom: 2px;
+  }
+  h3 { font-size: 10pt; color: #14406b; margin: 10px 0 4px; }
+  p { margin: 6px 0; }
+  ul, ol { margin: 6px 0 6px 22px; }
+  li { margin: 3px 0; }
+  hr { border: none; border-top: 1px solid #c5cfdb; margin: 16px 0; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+  th, td { border: 1px solid #c5cfdb; padding: 5px 9px; text-align: left; font-size: 9.5pt; }
+  th { background: #e8f0f7; font-weight: 600; }
+  .signoff {
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;
+    margin-top: 24px; border-top: 1px solid #c5cfdb; padding-top: 12px;
+  }
+  .sign-cell {
+    border: 1px solid #c5cfdb; padding: 8px;
+    min-height: 60px; font-size: 9.5pt; color: #506478;
+  }
+
+  /* ── Editor-only chrome (stripped from saved HTML) ── */
+  .editor-locked {
+    pointer-events: none; user-select: none;
+    background: #f8fafc; border-radius: 4px;
+    border: 1.5px dashed #cbd5e1; padding: 8px;
+    margin-bottom: 4px; opacity: 0.8;
+  }
+  .editor-lock-badge {
+    grid-column: 1/-1; display: flex; align-items: center; gap: 5px;
+    font-size: 8pt; padding: 3px 8px; margin-top: 6px;
+    background: #e2e8f0; border: 1px dashed #94a3b8; border-radius: 8px;
+    color: #64748b; width: fit-content;
+  }
+
+  /* ── Editable content area ── */
+  .doc-content { min-height: 320px; outline: none; padding: 2px 0; }
+  .doc-content:focus { outline: none; }
+</style></head>
+<body><div class="page">
+  <header class="doc-header">
+    <div class="kind">Policy · AASM Standards for Accreditation</div>
+    <div class="title">Emergency Equipment Policy</div>
+    <div class="subtitle">AASM Standards for Accreditation <span class="clause-tag">AASM S-7</span></div>
+    <div class="field"><strong>Document ID:</strong> POL-CLI-008</div>
+    <div class="field"><strong>Revision:</strong> 1.0</div>
+    <div class="field"><strong>Effective date:</strong> <span class="fill-sm"></span></div>
+    <div class="field"><strong>Review date:</strong> <span class="fill-sm"></span></div>
+    <div class="field"><strong>Authorised by:</strong> Site Director</div>
+    <div class="field"><strong>Standard:</strong> AASM S-7</div>
+  </header>
+<h2>1. Purpose</h2><p>To ensure the Sleep Clinic has appropriate emergency equipment, properly maintained and staff trained in its use.</p>
+<h2>2. Policy</h2><p>The Sleep Clinic must have immediate access to either an AED on-site or an on-site medical emergency response team. All emergency equipment must be maintained per manufacturer recommendations and staff trained in its use.</p>
+<h2>3. Procedure</h2>
+<h3>Required Equipment</h3>
+<ol>
+  <li>Immediate access to AED on-site, or an on-site medical emergency response team.</li>
+  <li>AED location is clearly communicated to all staff.</li>
+  <li>Emergency equipment is accessible at all times when services are provided.</li>
+</ol>
+<h3>Equipment Maintenance</h3>
+<ol>
+  <li>Emergency equipment maintained and documented per manufacturer recommendations.</li>
+  <li>AED battery and pad expiration checked and documented at least monthly.</li>
+  <li>Deficiencies corrected immediately and documented.</li>
+</ol>
+<h3>Staff Training</h3>
+<ol>
+  <li>All patient-care staff maintain current BLS/CPR certification including manikin skills training.</li>
+  <li>Training on all emergency equipment documented for each staff member in the training section of Nexus 360.</li>
+  <li>New staff trained before working independently with patients; refresher training annually.</li>
+</ol>
+
+  <div class="signoff">
+    <div class="sign-cell"><strong>Prepared by</strong><br><br><span class="fill"></span><br>Name / Date</div>
+    <div class="sign-cell"><strong>Reviewed by</strong><br><br><span class="fill"></span><br>Name / Date</div>
+    <div class="sign-cell"><strong>Approved by</strong><br><br><span class="fill"></span><br>Site Director / Date</div>
+  </div>
+  <div class="footer">POL-CLI-008 v1.0 · AASM Standards for Accreditation · Nexus 360 Accreditation · Uncontrolled if printed</div>
+</div><script>(function(){
+  window.addEventListener('message',function(e){
+    if(!e.data)return;
+    var c=document.querySelector('.doc-content')||document.body;
+    if(e.data.type==='exec'){try{document.execCommand(e.data.cmd,false,e.data.val!=null?e.data.val:null);}catch(ex){}if(c)c.focus();return;}
+    if(e.data.type==='getHtml'){
+      var clone=document.documentElement.cloneNode(true);
+      clone.querySelectorAll('.editor-locked').forEach(function(el){el.classList.remove('editor-locked');});
+      clone.querySelectorAll('.editor-lock-badge').forEach(function(el){el.remove();});
+      clone.querySelectorAll('[contenteditable]').forEach(function(el){el.removeAttribute('contenteditable');});
+      parent.postMessage({type:'editorHtml',html:'<!DOCTYPE html>\n'+clone.outerHTML},'*');
+    }
+  });
+})();</script></body><chatgpt-sidebar data-gpts-theme="light"></chatgpt-sidebar></html>

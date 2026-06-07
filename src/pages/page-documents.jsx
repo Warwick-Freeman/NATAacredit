@@ -17,15 +17,13 @@ function mkWorkflow(steps) {
   }));
 }
 
-function defaultWorkflow(owner, activeStandard) {
-  const approver = activeStandard === 'aasm' ? 'Site Director' : 'Dr. R. Okafor';
-  const issuer   = activeStandard === 'aasm' ? 'Quality Manager' : 'K. Patel';
+function defaultWorkflow(owner) {
   return mkWorkflow([
-    { step: 'Draft',           who: owner || 'Author', date: 'today', done: true,  active: false },
-    { step: 'Peer review',     who: '—',                               done: false, active: true  },
-    { step: 'Approval',        who: approver,                          done: false, active: false },
-    { step: 'Issue',           who: issuer,                            done: false, active: false },
-    { step: 'Periodic review', who: '+24 mo',                         done: false, active: false },
+    { step: 'Draft',           who: owner || 'Author', date: '—', done: false, active: true  },
+    { step: 'Peer review',     who: '—',                           done: false, active: false },
+    { step: 'Approval',        who: '—',                           done: false, active: false },
+    { step: 'Issue',           who: owner || '—',                  done: false, active: false },
+    { step: 'Periodic review', who: '+24 mo',                      done: false, active: false },
   ]);
 }
 
@@ -225,7 +223,7 @@ const STEP_PERM = [null, 'canPeerReviewDoc', 'canApproveDoc', 'canIssueDoc'];
 
 // --- Component ---------------------------------------------------------------
 const DocumentsPage = () => {
-  const { hasPerm } = useAuth();
+  const { hasPerm, user } = useAuth();
   const { activeStandard } = useNexusData();
   const [contentResults, setContentResults] = React.useState(null); // null=idle, []=no results, [...]
   const [contentSearching, setContentSearching] = React.useState(false);
@@ -326,6 +324,35 @@ const DocumentsPage = () => {
     }).catch(() => {});
   };
 
+  const handleCancelDraft = async (doc) => {
+    const tok = localStorage.getItem('nexus_token');
+    if (doc.revisionOf) {
+      // Revision draft: hit /revision endpoint which restores the parent issued doc
+      const res = await fetch(`${BASE_API}/api/documents/${encodeURIComponent(doc.id)}/revision`, {
+        method: 'DELETE',
+        headers: tok ? { Authorization: `Bearer ${tok}` } : {},
+      });
+      if (!res.ok) return;
+      const { restoredId } = await res.json();
+      setDetailDocId(null);
+      setStatusFilter('all');
+      setFolder('all');
+      await loadDocs();
+      if (restoredId) setDetailDocId(restoredId);
+    } else {
+      // New document draft: delete it entirely
+      const res = await fetch(`${BASE_API}/api/documents/${encodeURIComponent(doc.id)}`, {
+        method: 'DELETE',
+        headers: tok ? { Authorization: `Bearer ${tok}` } : {},
+      });
+      if (!res.ok) return;
+      setDetailDocId(null);
+      setStatusFilter('all');
+      setFolder('all');
+      await loadDocs();
+    }
+  };
+
   const openUpload = (prefill) => { setUploadPrefill(prefill ?? null); setUploadOpen(true); };
   const closeUpload = () => setUploadOpen(false);
 
@@ -359,7 +386,7 @@ const DocumentsPage = () => {
       fd.append('owner',     saved.owner || '');
       fd.append('clauses',   (saved.clauses || []).join(','));
       fd.append('reviewDue', saved.reviewDue || '—');
-      fd.append('workflow',  JSON.stringify(defaultWorkflow(saved.owner, activeStandard)));
+      fd.append('workflow',  JSON.stringify(defaultWorkflow(saved.owner)));
       if (saved.rawFile) fd.append('file', saved.rawFile);
 
       const tok3 = localStorage.getItem('nexus_token');
@@ -367,6 +394,8 @@ const DocumentsPage = () => {
       if (res.ok) {
         const created = normaliseDocument(await res.json());
         setDocs(prev => [created, ...prev]);
+        setStatusFilter('all');
+        setFolder('all');
         setDetailDocId(created.id);
       }
     }
@@ -605,8 +634,16 @@ const DocumentsPage = () => {
             onUpdate={handleUpdateDoc}
             onClose={() => setDetailDocId(null)}
             onView={() => { setDetailDocId(null); setAutoEdit(false); setViewingDoc(detailDoc); }}
-            onEdit={() => { setDetailDocId(null); openUpload(detailDoc); }}
+            onEdit={() => {
+              setDetailDocId(null);
+              // For draft revisions, ensure the owner reflects whoever created this revision
+              const pf = (detailDoc.status === 'Draft' && detailDoc.revisionOf && user?.name)
+                ? { ...detailDoc, owner: user.name }
+                : detailDoc;
+              openUpload(pf);
+            }}
             onEditHtml={() => { setDetailDocId(null); setAutoEdit(true); setViewingDoc(detailDoc); }}
+            onCancelDraft={handleCancelDraft}
           />
         )}
       </Drawer>
@@ -621,6 +658,8 @@ const DocumentsPage = () => {
           onFormSaved={handleFormSaved}
           onDocUpdated={() => loadDocs()}
           onRevisionCreated={async (newDocId) => {
+            setStatusFilter('all');
+            setFolder('all');
             loadDocs();
             const tok = localStorage.getItem('nexus_token');
             const res = await fetch(`${BASE_API}/api/documents/${encodeURIComponent(newDocId)}`, {
@@ -643,6 +682,7 @@ const DocumentsPage = () => {
       <Drawer open={uploadOpen} onClose={closeUpload}>
         <DocUploadDrawer
           prefill={uploadPrefill}
+          docs={docs}
           onSave={handleSaveDoc}
           onClose={closeUpload}
         />

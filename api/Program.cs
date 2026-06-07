@@ -691,6 +691,25 @@ app.MapPut("/api/documents/{id}/html", async (string id, HttpRequest req, NexusD
     return Results.Ok(ToDto(doc));
 }).RequireAuthorization();
 
+app.MapDelete("/api/documents/{id}", async (string id, NexusDbContext db, ClaimsPrincipal principal) =>
+{
+    var doc = await db.Documents.FirstOrDefaultAsync(d => d.DocId == id);
+    if (doc == null) return Results.NotFound();
+    if (doc.Status != "Draft") return Results.BadRequest("Only Draft documents can be deleted.");
+    if (doc.RevisionOf != null) return Results.BadRequest("Use the /revision endpoint to cancel a revision draft.");
+
+    if (!string.IsNullOrEmpty(doc.StoredFileName))
+    {
+        var fp = Path.Combine(dataDir, doc.StoredFileName);
+        if (File.Exists(fp)) File.Delete(fp);
+    }
+
+    db.Documents.Remove(doc);
+    db.Activity.Add(MakeActivity(ActorName(principal), "deleted draft", doc.DocId, "delete", "documents", $"Draft {doc.DocId} deleted."));
+    await db.SaveChangesAsync();
+    return Results.Ok();
+}).RequireAuthorization();
+
 app.MapPost("/api/documents/{id}/revise", async (string id, NexusDbContext db, ClaimsPrincipal principal) =>
 {
     var doc = await db.Documents.FirstOrDefaultAsync(d => d.DocId == id);
@@ -730,32 +749,24 @@ app.MapPost("/api/documents/{id}/revise", async (string id, NexusDbContext db, C
     }
 
     var now = DateTime.Now.ToString("dd MMM yyyy");
+    var revisionOwner  = ActorName(principal); // person creating this revision becomes the new owner
+    var originalFolder = doc.Folder;           // capture before mutating the parent
 
     // Mark original as Superseded and move to obsolete folder
     doc.Status = "Superseded";
     doc.Folder = "obsolete";
     doc.Updated = now;
 
-    // Create the new revision as Draft
-    // Build a fresh Draft workflow — preserving the approver/issuer names from
-    // the parent but resetting all completion state.
-    string freshWorkflow;
-    try
+    // Fresh Draft workflow — revision creator is owner and default issuer;
+    // peer review / approval slots are cleared so the new owner routes them on submit.
+    var freshWorkflow = JsonSerializer.Serialize(new object[]
     {
-        var parentSteps = JsonSerializer.Deserialize<JsonElement[]>(doc.Workflow ?? "[]");
-        string Who(int i, string def) =>
-            parentSteps != null && i < parentSteps.Length &&
-            parentSteps[i].TryGetProperty("who", out var v) ? (v.GetString() ?? def) : def;
-        freshWorkflow = JsonSerializer.Serialize(new object[]
-        {
-            new { step = "Draft",           who = doc.Owner,      date = now,  done = true,  active = false, rejected = false, comment = "" },
-            new { step = "Peer review",     who = Who(1, "—"),    date = "—",  done = false, active = true,  rejected = false, comment = "" },
-            new { step = "Approval",        who = Who(2, "—"),    date = "—",  done = false, active = false, rejected = false, comment = "" },
-            new { step = "Issue",           who = Who(3, "—"),    date = "—",  done = false, active = false, rejected = false, comment = "" },
-            new { step = "Periodic review", who = "+24 mo",       date = "—",  done = false, active = false, rejected = false, comment = "" },
-        });
-    }
-    catch { freshWorkflow = "[]"; }
+        new { step = "Draft",           who = revisionOwner, date = "—", done = false, active = true,  rejected = false, comment = "" },
+        new { step = "Peer review",     who = "—",           date = "—", done = false, active = false, rejected = false, comment = "" },
+        new { step = "Approval",        who = "—",           date = "—", done = false, active = false, rejected = false, comment = "" },
+        new { step = "Issue",           who = revisionOwner, date = "—", done = false, active = false, rejected = false, comment = "" },
+        new { step = "Periodic review", who = "+24 mo",      date = "—", done = false, active = false, rejected = false, comment = "" },
+    });
 
     var newDoc = new Document
     {
@@ -763,8 +774,8 @@ app.MapPost("/api/documents/{id}/revise", async (string id, NexusDbContext db, C
         Title          = doc.Title,
         Version        = newVersion,
         Status         = "Draft",
-        Folder         = doc.Folder == "obsolete" ? (doc.RevisionOf != null ? family.FirstOrDefault(d => d.DocId == rootId)?.Folder ?? "sops" : "sops") : doc.Folder,
-        Owner          = doc.Owner,
+        Folder         = originalFolder,
+        Owner          = revisionOwner,
         Clauses        = doc.Clauses,
         ReviewDue      = doc.ReviewDue,
         Updated        = now,
@@ -779,6 +790,37 @@ app.MapPost("/api/documents/{id}/revise", async (string id, NexusDbContext db, C
     db.Activity.Add(MakeActivity(ActorName(principal), "created revision", $"{newDocId} from {id}", "revision", "documents", $"New revision {newDocId} (v{newVersion}) created from {id}."));
     await db.SaveChangesAsync();
     return Results.Ok(ToDto(newDoc));
+}).RequireAuthorization();
+
+app.MapDelete("/api/documents/{id}/revision", async (string id, NexusDbContext db, ClaimsPrincipal principal) =>
+{
+    var doc = await db.Documents.FirstOrDefaultAsync(d => d.DocId == id);
+    if (doc == null) return Results.NotFound();
+    if (doc.Status != "Draft") return Results.BadRequest("Only Draft revisions can be cancelled.");
+    if (doc.RevisionOf == null) return Results.BadRequest("This document is not a revision.");
+
+    // Restore the parent: it was moved to Superseded/obsolete when the revision was created
+    var parent = await db.Documents.FirstOrDefaultAsync(d => d.DocId == doc.RevisionOf);
+    if (parent != null && parent.Status == "Superseded")
+    {
+        parent.Status   = "Issued";
+        parent.Folder   = doc.Folder;  // revision inherited the original folder
+        parent.Updated  = DateTime.Now.ToString("dd MMM yyyy");
+    }
+
+    // Delete the copied HTML file
+    if (!string.IsNullOrEmpty(doc.StoredFileName))
+    {
+        var fp = Path.Combine(dataDir, doc.StoredFileName);
+        if (File.Exists(fp)) File.Delete(fp);
+    }
+
+    var parentId = doc.RevisionOf;
+    db.Documents.Remove(doc);
+    db.Activity.Add(MakeActivity(ActorName(principal), "cancelled revision", doc.DocId, "delete", "documents",
+        $"Draft revision {doc.DocId} cancelled. {parentId} restored to Issued."));
+    await db.SaveChangesAsync();
+    return Results.Ok(new { restoredId = parentId });
 }).RequireAuthorization();
 
 app.MapGet("/api/documents/{id}/revisions", async (string id, NexusDbContext db) =>

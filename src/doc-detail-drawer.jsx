@@ -10,8 +10,8 @@ const STATUS_KIND = { Issued: 'good', Draft: 'outline', 'Under review': 'warn', 
 const STEP_PERM = [null, 'canPeerReviewDoc', 'canApproveDoc', 'canIssueDoc'];
 const PERM_ROLE_ASA  = { canPeerReviewDoc: 'Senior Technologist or above', canApproveDoc: 'Reporting Physician or above', canIssueDoc: 'Quality Manager or above' };
 const PERM_ROLE_AASM = { canPeerReviewDoc: 'Lead Technologist (RPSGT) or above', canApproveDoc: 'Site Director or above', canIssueDoc: 'Site Director or above' };
-const ADVANCE_LABEL = ['Submit for peer review', 'Approve peer review', 'Approve document', 'Issue document'];
-const STEP_STATUS   = ['Under review', 'Under review', 'Issued', 'Issued'];
+const ADVANCE_LABEL = ['Submit for peer review', 'Complete peer review', 'Approve document', 'Issue document'];
+const STEP_STATUS   = ['Under review', 'Under review', 'Under review', 'Issued'];
 
 function addMonths(n) {
   const d = new Date();
@@ -53,7 +53,7 @@ const StepCircle = ({ index, step, isLast }) => {
 
 const BASE = import.meta.env.VITE_API_URL ?? '';
 
-const DocDetailDrawer = ({ doc, onUpdate, onClose, onView, onEdit, onEditHtml }) => {
+const DocDetailDrawer = ({ doc, onUpdate, onClose, onView, onEdit, onEditHtml, onCancelDraft }) => {
   const { hasPerm, user, users } = useAuth();
   const { refreshData, activeStandard } = useNexusData();
   const PERM_ROLE = activeStandard === 'aasm' ? PERM_ROLE_AASM : PERM_ROLE_ASA;
@@ -61,17 +61,23 @@ const DocDetailDrawer = ({ doc, onUpdate, onClose, onView, onEdit, onEditHtml })
   const wf = doc.workflow || [];
   const activeIdx = wf.findIndex(s => s.active && !s.done);
 
+  // For Draft revisions, the logged-in user with canCreateDoc is treated as the current author.
+  // This covers revisions created before the server stored the correct owner.
+  const isDraftRevision = doc.status === 'Draft' && !!(doc.revisionOf);
+  const effectiveOwner  = isDraftRevision && hasPerm('canCreateDoc') && user?.name
+    ? user.name
+    : doc.owner;
+
   // Filter users by the permission required for each workflow step
   const usersWithPerm = (perm) =>
     (users || []).filter(u => !!(ROLE_PERMISSIONS[u.role]?.[perm]));
 
   const [pendingAction, setPendingAction] = useState(null); // null | 'advance' | 'reject'
+  const [pendingCancel, setPendingCancel] = useState(false);
   const [comment,       setComment]       = useState('');
-  const [reviewer,      setReviewer]      = useState(
-    wf[1]?.who !== '—' ? wf[1]?.who : ''
-  );
-  const [approver, setApprover] = useState(wf[2]?.who !== '—' ? wf[2]?.who : '');
-  const [issuer,   setIssuer]   = useState(wf[3]?.who !== '—' ? wf[3]?.who : '');
+  const [reviewer, setReviewer] = useState(wf[1]?.who && wf[1]?.who !== '—' ? wf[1]?.who : '');
+  const [approver, setApprover] = useState(wf[2]?.who && wf[2]?.who !== '—' ? wf[2]?.who : '');
+  const [issuer,   setIssuer]   = useState(wf[3]?.who && wf[3]?.who !== '—' ? wf[3]?.who : (doc.owner || ''));
 
   useEffect(() => {
     setPendingAction(null);
@@ -81,23 +87,35 @@ const DocDetailDrawer = ({ doc, onUpdate, onClose, onView, onEdit, onEditHtml })
   const handleAdvance = () => {
     if (activeIdx < 0) return;
     const t = today();
-    // Pick the who for the next step from the appropriate dropdown
-    const nextWho = activeIdx === 0 ? reviewer : activeIdx === 1 ? approver : activeIdx === 2 ? issuer : null;
-    const wfNext = wf.map((s, i) => {
-      if (i === activeIdx) return { ...s, done: true, active: false, date: t, comment, who: user.name };
-      if (i === activeIdx + 1) {
-        const who = nextWho || s.who;
-        return { ...s, active: true, who };
-      }
-      return s;
-    });
+    let wfNext;
+    if (activeIdx === 0) {
+      // Creator submits: stamp all routing at once, using effectiveOwner to correct any stale owner
+      wfNext = wf.map((s, i) => {
+        if (i === 0) return { ...s, done: true, active: false, date: t, comment, who: effectiveOwner || s.who };
+        if (i === 1) return { ...s, active: true,  done: false, rejected: false, date: '—', who: reviewer || s.who };
+        if (i === 2) return { ...s, active: false, done: false, rejected: false, date: '—', who: approver || s.who };
+        if (i === 3) return { ...s, active: false, done: false, rejected: false, date: '—', who: issuer   || s.who };
+        return s;
+      });
+    } else {
+      wfNext = wf.map((s, i) => {
+        if (i === activeIdx) return { ...s, done: true, active: false, date: t, comment, who: user?.name || s.who };
+        if (i === activeIdx + 1) return { ...s, active: true };
+        return s;
+      });
+    }
     const allCoreDone = wfNext.slice(0, 4).every(s => s.done);
     const newStatus   = allCoreDone ? 'Issued' : STEP_STATUS[activeIdx] || doc.status;
     const newReviewDue = allCoreDone ? addMonths(24) : doc.reviewDue;
-    onUpdate({ ...doc, workflow: wfNext, status: newStatus, reviewDue: newReviewDue, updated: 'today' });
+    // Self-heal: if effectiveOwner differs from stored owner (stale revision data), correct it now
+    const ownerUpdate = (activeIdx === 0 && effectiveOwner !== doc.owner) ? { owner: effectiveOwner } : {};
+    onUpdate({ ...doc, ...ownerUpdate, workflow: wfNext, status: newStatus, reviewDue: newReviewDue, updated: 'today' });
     refreshData();
-    // Create a task for the person assigned to the next step
-    if (nextWho && activeIdx < 3) {
+    // Create a task for the next step's assigned person
+    const nextWho = activeIdx === 0 ? reviewer :
+                    activeIdx === 1 ? wf[2]?.who :
+                    activeIdx === 2 ? wf[3]?.who : null;
+    if (nextWho && nextWho !== '—' && activeIdx < 3) {
       const stepNames = ['Peer review', 'Approval', 'Issue'];
       const tok = localStorage.getItem('nexus_token');
       fetch(`${BASE}/api/tasks`, {
@@ -119,20 +137,50 @@ const DocDetailDrawer = ({ doc, onUpdate, onClose, onView, onEdit, onEditHtml })
   const handleReject = () => {
     if (activeIdx < 0) return;
     const t = today();
+    // Step 2 rejection returns to step 1 (peer review); everything else returns to step 0 (draft)
+    const returnToIdx = activeIdx === 2 ? 1 : 0;
     const wfNext = wf.map((s, i) => {
-      if (i === activeIdx) return { ...s, done: false, active: false, rejected: true, date: t, comment, who: user.name };
-      if (i === 0) return { ...s, done: false, active: true, date: t };
-      return { ...s, done: false, active: false, rejected: false };
+      if (i === activeIdx) return { ...s, done: false, active: false, rejected: true, date: t, comment, who: user?.name || s.who };
+      if (i === returnToIdx) return { ...s, done: false, active: true, date: '—', rejected: false };
+      if (i > returnToIdx && i < activeIdx) return { ...s, done: false, active: false, rejected: false };
+      return s;
     });
-    onUpdate({ ...doc, workflow: wfNext, status: 'Draft', updated: 'today' });
+    const newStatus = returnToIdx === 0 ? 'Draft' : 'Under review';
+    onUpdate({ ...doc, workflow: wfNext, status: newStatus, updated: 'today' });
     refreshData();
     setPendingAction(null);
     setComment('');
   };
 
-  const canAdvance = activeIdx >= 0 && (STEP_PERM[activeIdx] ? hasPerm(STEP_PERM[activeIdx]) : true);
+  const handleResetWorkflow = () => {
+    const freshWf = [
+      { step: 'Draft',           who: doc.owner || '—',   date: '—', done: false, active: true,  rejected: false, comment: '' },
+      { step: 'Peer review',     who: wf[1]?.who || '—', date: '—', done: false, active: false, rejected: false, comment: '' },
+      { step: 'Approval',        who: wf[2]?.who || '—', date: '—', done: false, active: false, rejected: false, comment: '' },
+      { step: 'Issue',           who: wf[3]?.who || '—', date: '—', done: false, active: false, rejected: false, comment: '' },
+      { step: 'Periodic review', who: '+24 mo',           date: '—', done: false, active: false, rejected: false, comment: '' },
+    ];
+    onUpdate({ ...doc, workflow: freshWf, status: 'Draft' });
+  };
+
+  // canAdvance: step 0 = effective owner (or any canCreateDoc user for revisions); steps 1–3 = assigned user with required role
+  // For step 0 of a draft revision, use effectiveOwner (the stored wf[0].who may be stale pre-fix data)
+  const rawAssignedWho = activeIdx >= 0 ? wf[activeIdx]?.who : null;
+  const assignedWho = (activeIdx === 0 && isDraftRevision) ? effectiveOwner : rawAssignedWho;
+  const isAssignedOrUnset = !assignedWho || assignedWho === '—' || user?.name === assignedWho;
+  const canAdvance = activeIdx >= 0 && (() => {
+    if (activeIdx === 0) return !effectiveOwner || user?.name === effectiveOwner;
+    return isAssignedOrUnset && (STEP_PERM[activeIdx] ? hasPerm(STEP_PERM[activeIdx]) : true);
+  })();
+
   const advanceLabel = ADVANCE_LABEL[activeIdx] || 'Advance';
   const rejectLabel  = activeIdx === 1 ? 'Return to draft' : activeIdx === 2 ? 'Return to peer review' : 'Return to draft';
+
+  const cannotAdvanceReason = !canAdvance ? (
+    activeIdx === 0 ? `Only the document owner (${effectiveOwner}) can submit this draft` :
+    !isAssignedOrUnset ? `This step requires action from ${assignedWho}` :
+    STEP_PERM[activeIdx] ? `Requires role: ${PERM_ROLE[STEP_PERM[activeIdx]]}` : undefined
+  ) : undefined;
 
   const isIssued = doc.status === 'Issued' || doc.status === 'Live form';
   const hasWf    = wf.length > 0;
@@ -164,8 +212,8 @@ const DocDetailDrawer = ({ doc, onUpdate, onClose, onView, onEdit, onEditHtml })
           <div>
             <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 3 }}>Owner</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <Avatar name={doc.owner} size={20} />
-              <span style={{ fontSize: 13 }}>{doc.owner}</span>
+              <Avatar name={effectiveOwner} size={20} />
+              <span style={{ fontSize: 13 }}>{effectiveOwner}</span>
             </div>
           </div>
           <div>
@@ -191,9 +239,14 @@ const DocDetailDrawer = ({ doc, onUpdate, onClose, onView, onEdit, onEditHtml })
           <>
             <div style={{ fontSize: 11, color: 'var(--ink-3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 14 }}>Approval workflow</div>
             <div style={{ display: 'flex', alignItems: 'flex-start', marginBottom: 18 }}>
-              {wf.map((s, i) => (
+              {wf.map((s, i) => {
+                // For draft revisions, show the effective owner in the Draft step
+                const displayStep = (i === 0 && isDraftRevision && effectiveOwner !== s.who)
+                  ? { ...s, who: effectiveOwner }
+                  : s;
+                return (
                 <React.Fragment key={i}>
-                  <StepCircle index={i} step={s} isLast={i === wf.length - 1} />
+                  <StepCircle index={i} step={displayStep} isLast={i === wf.length - 1} />
                   {i < wf.length - 1 && (
                     <div style={{
                       height: 2, width: 24, flexShrink: 0, marginTop: 14,
@@ -201,7 +254,8 @@ const DocDetailDrawer = ({ doc, onUpdate, onClose, onView, onEdit, onEditHtml })
                     }} />
                   )}
                 </React.Fragment>
-              ))}
+                );
+              })}
             </div>
 
             {/* Step comments history */}
@@ -219,6 +273,19 @@ const DocDetailDrawer = ({ doc, onUpdate, onClose, onView, onEdit, onEditHtml })
               </div>
             )}
 
+            {/* Recovery panel: Draft doc with no active workflow step (broken revision state) */}
+            {doc.status === 'Draft' && activeIdx < 0 && (
+              <div style={{ padding: 14, border: '1px solid var(--warn)', borderRadius: 8, marginBottom: 18, background: 'var(--warn-soft, #fef9ec)' }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--warn)', marginBottom: 4 }}>Workflow reset required</div>
+                <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 12, lineHeight: 1.5 }}>
+                  This document is in Draft status but the workflow shows no active step. Click below to restore the correct draft workflow so it can proceed through approval.
+                </div>
+                <button className="btn" onClick={handleResetWorkflow}>
+                  <Icon name="edit" size={13} /> Reset to draft workflow
+                </button>
+              </div>
+            )}
+
             {/* Active step action panel */}
             {activeIdx >= 0 && !isIssued && (
               <div style={{ padding: 14, border: '1px solid var(--border)', borderRadius: 8, marginBottom: 18 }}>
@@ -226,37 +293,46 @@ const DocDetailDrawer = ({ doc, onUpdate, onClose, onView, onEdit, onEditHtml })
                   Awaiting: <span style={{ color: 'var(--accent-ink)' }}>{wf[activeIdx].step}</span>
                 </div>
 
-                {/* Assignee selection — filtered to roles with the required permission */}
+                {/* Step 0: creator specifies routing for all future steps upfront */}
                 {activeIdx === 0 && (
-                  <div className="form-field" style={{ marginBottom: 10 }}>
-                    <label className="form-label">Assign peer reviewer</label>
-                    <select className="form-input" value={reviewer} onChange={e => setReviewer(e.target.value)}>
-                      <option value="">— select reviewer —</option>
-                      {usersWithPerm('canPeerReviewDoc').map(u => <option key={u.id} value={u.name}>{u.name} · {u.role}</option>)}
-                    </select>
-                  </div>
+                  <>
+                    <div className="form-field" style={{ marginBottom: 10 }}>
+                      <label className="form-label">Peer reviewer</label>
+                      <select className="form-input" value={reviewer} onChange={e => setReviewer(e.target.value)}>
+                        <option value="">— select reviewer —</option>
+                        {usersWithPerm('canPeerReviewDoc').map(u => <option key={u.id} value={u.name}>{u.name} · {u.role}</option>)}
+                      </select>
+                    </div>
+                    <div className="form-field" style={{ marginBottom: 10 }}>
+                      <label className="form-label">Approver</label>
+                      <select className="form-input" value={approver} onChange={e => setApprover(e.target.value)}>
+                        <option value="">— select approver —</option>
+                        {usersWithPerm('canApproveDoc').map(u => <option key={u.id} value={u.name}>{u.name} · {u.role}</option>)}
+                      </select>
+                    </div>
+                    <div className="form-field" style={{ marginBottom: 10 }}>
+                      <label className="form-label">Issuer</label>
+                      <select className="form-input" value={issuer} onChange={e => setIssuer(e.target.value)}>
+                        <option value="">— select issuer —</option>
+                        {usersWithPerm('canIssueDoc').map(u => <option key={u.id} value={u.name}>{u.name} · {u.role}</option>)}
+                      </select>
+                    </div>
+                  </>
                 )}
-                {activeIdx === 1 && (
-                  <div className="form-field" style={{ marginBottom: 10 }}>
-                    <label className="form-label">Assign approver</label>
-                    <select className="form-input" value={approver} onChange={e => setApprover(e.target.value)}>
-                      <option value="">— select approver —</option>
-                      {usersWithPerm('canApproveDoc').map(u => <option key={u.id} value={u.name}>{u.name} · {u.role}</option>)}
-                    </select>
-                  </div>
-                )}
-                {activeIdx === 2 && (
-                  <div className="form-field" style={{ marginBottom: 10 }}>
-                    <label className="form-label">Assign issuer</label>
-                    <select className="form-input" value={issuer} onChange={e => setIssuer(e.target.value)}>
-                      <option value="">— select issuer —</option>
-                      {usersWithPerm('canIssueDoc').map(u => <option key={u.id} value={u.name}>{u.name} · {u.role}</option>)}
-                    </select>
+
+                {/* Show waiting message whenever current user is not the assigned person */}
+                {!isAssignedOrUnset && (
+                  <div style={{ padding: '10px 12px', background: 'var(--surface-2)', borderRadius: 6, fontSize: 12, color: 'var(--ink-3)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Icon name="clock" size={13} style={{ flexShrink: 0 }} />
+                    <span>
+                      {activeIdx === 0 ? 'Awaiting submission by' : 'Awaiting action from'}{' '}
+                      <strong style={{ color: 'var(--ink-2)' }}>{assignedWho}</strong>
+                    </span>
                   </div>
                 )}
 
                 {/* Comment field */}
-                {pendingAction && (
+                {pendingAction && isAssignedOrUnset && (
                   <div className="form-field" style={{ marginBottom: 10 }}>
                     <label className="form-label">
                       {pendingAction === 'reject' ? 'Reason for requesting changes' : 'Comment'}{' '}
@@ -276,12 +352,12 @@ const DocDetailDrawer = ({ doc, onUpdate, onClose, onView, onEdit, onEditHtml })
                   </div>
                 )}
 
-                {pendingAction ? (
+                {isAssignedOrUnset && (pendingAction ? (
                   <div style={{ display: 'flex', gap: 8 }}>
                     {pendingAction === 'advance' ? (
                       <button className="btn btn-primary" style={{ flex: 1 }}
                         onClick={handleAdvance}
-                        title={!canAdvance ? `Requires: ${PERM_ROLE[STEP_PERM[activeIdx]]}` : undefined}
+                        title={cannotAdvanceReason}
                         disabled={!canAdvance}>
                         <Icon name="check" size={14} />{advanceLabel}
                       </button>
@@ -300,7 +376,7 @@ const DocDetailDrawer = ({ doc, onUpdate, onClose, onView, onEdit, onEditHtml })
                       className="btn btn-primary"
                       style={{ flex: 1, opacity: canAdvance ? 1 : 0.45 }}
                       disabled={!canAdvance}
-                      title={!canAdvance ? `Requires: ${PERM_ROLE[STEP_PERM[activeIdx]]}` : undefined}
+                      title={cannotAdvanceReason}
                       onClick={() => setPendingAction('advance')}>
                       <Icon name="check" size={14} />{advanceLabel}
                     </button>
@@ -311,12 +387,12 @@ const DocDetailDrawer = ({ doc, onUpdate, onClose, onView, onEdit, onEditHtml })
                       </button>
                     )}
                   </div>
-                )}
+                ))}
 
-                {!canAdvance && STEP_PERM[activeIdx] && (
+                {cannotAdvanceReason && isAssignedOrUnset && (
                   <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 8 }}>
                     <Icon name="info" size={11} style={{ verticalAlign: 'middle', marginRight: 4 }} />
-                    Requires role: <strong>{PERM_ROLE[STEP_PERM[activeIdx]]}</strong>
+                    {cannotAdvanceReason}
                   </div>
                 )}
               </div>
@@ -370,6 +446,40 @@ const DocDetailDrawer = ({ doc, onUpdate, onClose, onView, onEdit, onEditHtml })
             </button>
           )}
         </div>
+
+        {/* Cancel draft / revision — visible to the effective owner of any Draft document */}
+        {doc.status === 'Draft' && user?.name === effectiveOwner && onCancelDraft && (
+          <div style={{ marginTop: 10 }}>
+            {pendingCancel ? (
+              <div style={{ padding: '10px 12px', background: 'var(--bad-soft)', borderRadius: 8, border: '1px solid var(--bad)' }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--bad)', marginBottom: 8 }}>
+                  {doc.revisionOf ? 'Cancel this revision?' : 'Delete this draft?'}
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 10 }}>
+                  {doc.revisionOf
+                    ? 'The revision draft will be removed and the previous issued version will be restored.'
+                    : 'This draft will be permanently deleted and cannot be recovered.'}
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button className="btn" style={{ flex: 1, color: 'var(--bad)', borderColor: 'var(--bad)' }}
+                    onClick={() => { setPendingCancel(false); onCancelDraft(doc); }}>
+                    <Icon name="x" size={14} />{doc.revisionOf ? 'Yes, cancel revision' : 'Yes, delete draft'}
+                  </button>
+                  <button className="btn" onClick={() => setPendingCancel(false)}>Keep</button>
+                </div>
+              </div>
+            ) : (
+              <button
+                className="btn"
+                style={{ width: '100%', color: 'var(--bad)', borderColor: 'var(--bad-soft)', justifyContent: 'center' }}
+                onClick={() => setPendingCancel(true)}
+              >
+                <Icon name="x" size={14} />
+                {doc.revisionOf ? 'Cancel revision — restore previous version' : 'Cancel draft'}
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Icon from './icons';
 import WysiwygEditor from './wysiwyg-editor';
 
@@ -19,6 +19,18 @@ function guessFolder(id = '') {
   return 'sops';
 }
 
+function generateId(folder, docs = []) {
+  const prefix = { sops: 'SOP', policies: 'POL', forms: 'FRM', manual: 'MAN', records: 'REC' }[folder] || 'DOC';
+  let max = 0;
+  docs.forEach(d => {
+    if (!d.id?.startsWith(prefix + '-')) return;
+    const baseId = d.id.replace(/-r\d+$/i, '');
+    const nums = baseId.match(/\d+/g);
+    if (nums) nums.forEach(n => { const v = parseInt(n, 10); if (v > max) max = v; });
+  });
+  return `${prefix}-${String(max + 1).padStart(3, '0')}`;
+}
+
 function initForm(prefill) {
   return {
     id:        prefill?.id        || '',
@@ -34,14 +46,23 @@ function initForm(prefill) {
 
 const fmtSize = (b) => b < 1048576 ? `${(b / 1024).toFixed(0)} KB` : `${(b / 1048576).toFixed(1)} MB`;
 
-const DocUploadDrawer = ({ prefill, onSave, onClose }) => {
+const DocUploadDrawer = ({ prefill, docs = [], onSave, onClose }) => {
   const isAttach = !!(prefill?.id);
   const [form, setForm]       = useState(() => initForm(prefill));
   const [file, setFile]       = useState(null);   // { name, size, type:'pdf'|'html', rawFile, fromEditor? }
   const [dragging, setDragging] = useState(false);
   const [errors, setErrors]   = useState({});
   const [editorOpen, setEditorOpen] = useState(false);
+  const [idTouched, setIdTouched] = useState(false);
   const inputRef = useRef();
+
+  // Pre-fill Doc ID for new documents on mount
+  useEffect(() => {
+    if (!isAttach && !form.id) {
+      setForm(f => ({ ...f, id: generateId(f.folder, docs) }));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -225,7 +246,8 @@ const DocUploadDrawer = ({ prefill, onSave, onClose }) => {
           <div className="form-field" style={{ flex: 1 }}>
             <label className="form-label">Doc ID {errors.id && <span className="form-err-inline">{errors.id}</span>}</label>
             <input className={`form-input${errors.id ? ' is-error' : ''}`}
-              value={form.id} onChange={e => set('id', e.target.value)}
+              value={form.id}
+              onChange={e => { set('id', e.target.value); setIdTouched(true); }}
               placeholder="SOP-PSG-032" readOnly={isAttach} />
           </div>
           <div className="form-field" style={{ width: 80 }}>
@@ -245,7 +267,14 @@ const DocUploadDrawer = ({ prefill, onSave, onClose }) => {
         <div className="form-row">
           <div className="form-field" style={{ flex: 1 }}>
             <label className="form-label">Folder</label>
-            <select className="form-input" value={form.folder} onChange={e => set('folder', e.target.value)}>
+            <select className="form-input" value={form.folder} onChange={e => {
+              const newFolder = e.target.value;
+              setForm(f => ({
+                ...f,
+                folder: newFolder,
+                ...(!isAttach && !idTouched ? { id: generateId(newFolder, docs) } : {}),
+              }));
+            }}>
               {FOLDERS.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
             </select>
           </div>

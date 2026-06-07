@@ -443,7 +443,9 @@ const INC_KIND       = { Investigation: 'warn', Resolved: 'info', Closed: 'good'
 
 // ─── Component ───────────────────────────────────────────────────────────────
 const EquipmentPage = () => {
-  const [equipment,   setEquipment]   = useState(SEED_EQUIPMENT);
+  const [equipment,   setEquipment]   = useState(() =>
+    SEED_EQUIPMENT.map(e => ({ ...e, verifyStatus: verifyStatus(e.nextVerify) }))
+  );
   const [incidents,   setIncidents]   = useState(SEED_INCIDENTS);
   const [tab,         setTab]         = useState('register');
   const [filter,      setFilter]      = useState('all');
@@ -484,19 +486,20 @@ const EquipmentPage = () => {
   const allSites = useMemo(() => ['all', ...new Set(equipment.map(e => e.site))], [equipment]);
   const allTypes = useMemo(() => ['all', ...new Set(equipment.map(e => e.type))], [equipment]);
 
-  const filtered = useMemo(() => {
-    const q = search.toLowerCase();
-    return equipment.filter(e => {
-      if (filter === 'overdue')    return e.verifyStatus === 'bad';
-      if (filter === 'soon')       return e.verifyStatus === 'warn';
-      if (filter === 'quarantine') return e.status === 'Quarantined';
-      return true;
-    }).filter(e =>
-      (siteFilter === 'all' || e.site === siteFilter) &&
-      (typeFilter === 'all' || e.type === typeFilter) &&
-      (!q || e.id.toLowerCase().includes(q) || e.name.toLowerCase().includes(q) || e.serial.toLowerCase().includes(q))
-    );
-  }, [equipment, filter, siteFilter, typeFilter, search]);
+  // Inline filter (no memo) — always reflects current state on every render.
+  const _q = search.toLowerCase();
+  const preFiltered = equipment.filter(e => {
+    if (siteFilter !== 'all' && e.site !== siteFilter) return false;
+    if (typeFilter !== 'all' && e.type !== typeFilter) return false;
+    if (_q && !e.id.toLowerCase().includes(_q) && !e.name.toLowerCase().includes(_q) && !e.serial.toLowerCase().includes(_q)) return false;
+    return true;
+  });
+  const filtered = preFiltered.filter(e => {
+    if (filter === 'overdue')    return e.verifyStatus === 'bad';
+    if (filter === 'soon')       return e.verifyStatus === 'warn';
+    if (filter === 'quarantine') return e.status === 'Quarantined';
+    return true;
+  });
 
   // Verification schedule: sort all by nextVerify ISO date
   const scheduleItems = useMemo(() =>
@@ -521,6 +524,13 @@ const EquipmentPage = () => {
   };
 
   const handleUpdateEquipment = (updated) => {
+    // If the current chip filter would now hide this item, reset to 'all' so
+    // the user can see the item with its updated status rather than a disappearing row.
+    const wouldHide =
+      (filter === 'quarantine' && updated.status !== 'Quarantined') ||
+      (filter === 'overdue'    && updated.verifyStatus !== 'bad') ||
+      (filter === 'soon'       && updated.verifyStatus !== 'warn');
+    if (wouldHide) setFilter('all');
     setEquipment(prev => prev.map(e => e.id === updated.id ? updated : e));
   };
 
@@ -630,10 +640,10 @@ const EquipmentPage = () => {
 
       <Tabs value={tab} onChange={setTab} tabs={[
         { id: 'register',     label: 'Register',              count: equipment.length },
-        { id: 'hst',          label: 'Home sleep testing',    count: hstDispatched || undefined },
-        { id: 'schedule',     label: 'Verification schedule', count: overdueCount + soonCount || undefined },
-        { id: 'incidents',    label: 'Adverse incidents',     count: incidents.filter(i => i.status === 'Investigation').length || undefined },
-        { id: 'consumables',  label: 'Consumables',           count: critStock || undefined },
+        { id: 'hst',          label: 'Home sleep testing',    count: hstDevices.length || undefined },
+        { id: 'schedule',     label: 'Verification schedule', count: scheduleItems.length || undefined },
+        { id: 'incidents',    label: 'Adverse incidents',     count: incidents.length || undefined },
+        { id: 'consumables',  label: 'Consumables',           count: consumables.length || undefined },
       ]} />
 
       {/* ── REGISTER TAB ── */}
@@ -641,10 +651,10 @@ const EquipmentPage = () => {
         <>
           <div className="filter-bar">
             {[
-              { key: 'all',        label: `All (${equipment.length})` },
-              { key: 'overdue',    label: `Overdue (${overdueCount})` },
-              { key: 'soon',       label: `Due soon (${soonCount})` },
-              { key: 'quarantine', label: `Quarantined (${quarCount})` },
+              { key: 'all',        label: `All (${preFiltered.length})` },
+              { key: 'overdue',    label: `Overdue (${preFiltered.filter(e => e.verifyStatus === 'bad').length})` },
+              { key: 'soon',       label: `Due soon (${preFiltered.filter(e => e.verifyStatus === 'warn').length})` },
+              { key: 'quarantine', label: `Quarantined (${preFiltered.filter(e => e.status === 'Quarantined').length})` },
             ].map(f => (
               <button key={f.key} className={`chip-btn ${filter === f.key ? 'active' : ''}`}
                 onClick={() => setFilter(f.key)}>{f.label}</button>

@@ -180,8 +180,13 @@ const EquipmentDetailDrawer = ({ eq, onUpdate, onClose, onOpenHstDispatch, onOpe
     const newStatus  = record.result === 'Fail' ? 'Quarantined'
                      : eq.status === 'Quarantined' ? 'In service'
                      : eq.status;
+    const hstUpdate = eq.hstEnabled ? {
+      hstStatus: newStatus === 'Quarantined' ? 'Quarantined'
+               : (eq.hstStatus === 'Quarantined' ? 'Available' : eq.hstStatus),
+    } : {};
     onUpdate({
       ...eq,
+      ...hstUpdate,
       lastVerify:          record.date,
       nextVerify,
       verifyStatus:        record.result === 'Fail' ? 'bad' : verifyStatus(nextVerify),
@@ -201,7 +206,13 @@ const EquipmentDetailDrawer = ({ eq, onUpdate, onClose, onOpenHstDispatch, onOpe
 
   const toggleQuarantine = () => {
     const next = eq.status === 'Quarantined' ? 'In service' : 'Quarantined';
-    onUpdate({ ...eq, status: next, verifyStatus: next === 'Quarantined' ? 'bad' : verifyStatus(eq.nextVerify) });
+    const update = { ...eq, status: next, verifyStatus: next === 'Quarantined' ? 'bad' : verifyStatus(eq.nextVerify) };
+    if (eq.hstEnabled) {
+      // Keep hstStatus in sync with the quarantine toggle
+      if (next === 'Quarantined') update.hstStatus = 'Quarantined';
+      else if (eq.hstStatus === 'Quarantined') update.hstStatus = 'Available';
+    }
+    onUpdate(update);
   };
 
   const diffDays = Math.round((new Date(eq.nextVerify) - new Date()) / 86400000);
@@ -291,7 +302,11 @@ const EquipmentDetailDrawer = ({ eq, onUpdate, onClose, onOpenHstDispatch, onOpe
 
         {/* HST workflow section */}
         {eq.hstEnabled && (() => {
-          const activeDispatch = eq.hstStatus === 'Dispatched'
+          // Derive consistent HST status from both fields — eq.status is authoritative for quarantine
+          const hstStatus = eq.status === 'Quarantined'
+            ? 'Quarantined'
+            : eq.hstStatus === 'Quarantined' ? 'Available' : (eq.hstStatus ?? 'Available');
+          const activeDispatch = hstStatus === 'Dispatched'
             ? (eq.hstHistory ?? []).find(h => h.type === 'dispatch')
             : null;
           return (
@@ -299,7 +314,7 @@ const EquipmentDetailDrawer = ({ eq, onUpdate, onClose, onOpenHstDispatch, onOpe
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
                 <Icon name="truck" size={13} style={{ color: 'var(--ink-3)' }} />
                 <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink-2)' }}>Home sleep testing</span>
-                <Pill kind={HST_STATUS_KIND[eq.hstStatus] ?? 'outline'} dot>{eq.hstStatus ?? 'Available'}</Pill>
+                <Pill kind={HST_STATUS_KIND[hstStatus] ?? 'outline'} dot>{hstStatus}</Pill>
               </div>
               {activeDispatch ? (
                 <div style={{ fontSize: 12, marginBottom: 10 }}>
@@ -319,16 +334,16 @@ const EquipmentDetailDrawer = ({ eq, onUpdate, onClose, onOpenHstDispatch, onOpe
                 </div>
               ) : (
                 <div style={{ fontSize: 12, color: 'var(--ink-3)', marginBottom: 10 }}>
-                  {eq.hstStatus === 'Available' ? 'Ready to dispatch to a patient.' : 'Not available for dispatch.'}
+                  {hstStatus === 'Available' ? 'Ready to dispatch to a patient.' : 'Not available for dispatch.'}
                 </div>
               )}
               <div style={{ display: 'flex', gap: 8 }}>
-                {eq.hstStatus === 'Available' && eq.status !== 'Quarantined' && onOpenHstDispatch && (
+                {hstStatus === 'Available' && onOpenHstDispatch && (
                   <button className="btn btn-primary" style={{ flex: 1, fontSize: 11 }} onClick={onOpenHstDispatch}>
                     <Icon name="send" size={11} />Dispatch to patient
                   </button>
                 )}
-                {eq.hstStatus === 'Dispatched' && onOpenHstReturn && (
+                {hstStatus === 'Dispatched' && onOpenHstReturn && (
                   <button className="btn" style={{ flex: 1, fontSize: 11 }} onClick={onOpenHstReturn}>
                     <Icon name="rotate_ccw" size={11} />Record return
                   </button>
