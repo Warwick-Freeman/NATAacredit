@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Icon from '../icons';
 import { PageHeader, Pill, Avatar, Tabs, Drawer } from '../components';
-import { useAuth, ROLE_LEVEL, ROLE_PERMISSIONS, ASA_ROLES, AASM_ROLES } from '../AuthContext';
+import { useAuth, ROLE_LEVEL, ROLE_PERMISSIONS, ASA_ROLES, AASM_ROLES, ALL_SITES } from '../AuthContext';
 import UserFormDrawer from '../user-form-drawer';
 import { useNexusData } from '../NexusDataContext';
 import { getStdCfg } from '../standardConfig';
@@ -304,7 +304,24 @@ const SettingsPage = () => {
         ? <Pill kind="good"><Icon name="check" size={10} /> TOTP</Pill>
         : <Pill kind="bad">Off</Pill>,
     },
-    { headerName: 'Auth', field: 'auth', flex: 1 },
+    { headerName: 'Auth', field: 'auth', width: 80 },
+    {
+      headerName: 'Sites',
+      field: 'sites',
+      flex: 2,
+      cellRenderer: p => {
+        const s = p.value;
+        if (!s || s.length === 0) return <Pill kind="outline">All sites</Pill>;
+        return (
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+            {s.map(name => {
+              const site = ALL_SITES.find(x => x.name === name);
+              return <Pill key={name} kind="accent">{site?.code ?? name}</Pill>;
+            })}
+          </div>
+        );
+      },
+    },
     { headerName: 'Last sign-in', field: 'lastSeen', flex: 1 },
   ];
 

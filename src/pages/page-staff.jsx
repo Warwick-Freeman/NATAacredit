@@ -4,6 +4,7 @@ import { PageHeader, Pill, Avatar, Tabs, Drawer } from '../components';
 import StaffFormDrawer from '../staff-form-drawer';
 import { useTaskContext } from '../TaskContext';
 import NexusGrid from '../nexus-grid';
+import { useAuth, ALL_SITES } from '../AuthContext';
 
 const INITIAL_STAFF = [
   { name: "Dr. R. Okafor",  role: "Medical Director",           site: "All",              bls: { ok: true,  expires: "Aug 2026"   }, eqa: "—",                training: 100 },
@@ -22,8 +23,13 @@ const INITIAL_STAFF = [
 
 const StaffPage = () => {
   const { openCreateTask } = useTaskContext();
+  const { userSites } = useAuth();
   const [tab, setTab]         = useState("staff");
-  const [staff, setStaff]     = useState(INITIAL_STAFF);
+  const [staff, setStaff]     = useState(() => {
+    if (userSites.length === 0) return INITIAL_STAFF;
+    const allowedAbbrs = new Set(ALL_SITES.filter(s => userSites.includes(s.name)).map(s => s.abbr));
+    return INITIAL_STAFF.filter(p => p.site === 'All' || allowedAbbrs.has(p.site));
+  });
   // null = closed, {} = add new, {...} = edit existing
   const [formTarget, setFormTarget] = useState(null);
 

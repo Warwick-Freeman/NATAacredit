@@ -316,12 +316,16 @@ app.MapPost("/api/auth/login", async (LoginDto dto, NexusDbContext db) =>
     db.Activity.Add(MakeActivity(user.Name, "signed in", "Nexus 360", "login", "login", $"Role: {user.Role}"));
     await db.SaveChangesAsync();
 
+    var userSites = string.IsNullOrEmpty(user.Sites) ? Array.Empty<string>()
+        : System.Text.Json.JsonSerializer.Deserialize<string[]>(user.Sites) ?? Array.Empty<string>();
+
     var claims = new[]
     {
         new Claim(JwtRegisteredClaimNames.Sub,   user.Id.ToString()),
         new Claim(JwtRegisteredClaimNames.Email, user.Email),
         new Claim("name",                         user.Name),
         new Claim("role",                         user.Role),
+        new Claim("sites",                        user.Sites ?? "[]"),
     };
 
     var token = new JwtSecurityToken(
@@ -341,6 +345,7 @@ app.MapPost("/api/auth/login", async (LoginDto dto, NexusDbContext db) =>
             role     = user.Role,
             email    = user.Email,
             initials = Initials(user.Name),
+            sites    = userSites,
         },
     });
 });
@@ -355,8 +360,25 @@ app.MapGet("/api/users", async (NexusDbContext db) =>
         mfa      = u.Mfa,
         auth     = u.Auth,
         lastSeen = u.LastSeen,
+        sites    = string.IsNullOrEmpty(u.Sites) ? Array.Empty<string>()
+                   : System.Text.Json.JsonSerializer.Deserialize<string[]>(u.Sites) ?? Array.Empty<string>(),
     })
 ).RequireAuthorization();
+
+app.MapPut("/api/users/{id:int}", async (int id, UserUpdateDto dto, NexusDbContext db) =>
+{
+    var user = await db.Users.FindAsync(id);
+    if (user == null) return Results.NotFound();
+    if (dto.Name  != null) user.Name  = dto.Name;
+    if (dto.Role  != null) user.Role  = dto.Role;
+    if (dto.Mfa.HasValue)  user.Mfa   = dto.Mfa.Value;
+    if (dto.Auth  != null) user.Auth  = dto.Auth;
+    if (dto.Sites != null) user.Sites = System.Text.Json.JsonSerializer.Serialize(dto.Sites);
+    await db.SaveChangesAsync();
+    return Results.Ok(new { id = user.Id, name = user.Name, role = user.Role,
+        email = user.Email, mfa = user.Mfa, auth = user.Auth, lastSeen = user.LastSeen,
+        sites = System.Text.Json.JsonSerializer.Deserialize<string[]>(user.Sites) ?? Array.Empty<string>() });
+}).RequireAuthorization();
 
 // ── Studies ───────────────────────────────────────────────────────────────────
 
@@ -1408,6 +1430,7 @@ ActivityEntry MakeActivity(string who, string action, string target, string kind
 // ── DTOs ──────────────────────────────────────────────────────────────────────
 
 record LoginDto(string Email, string Password);
+record UserUpdateDto(string? Name, string? Role, bool? Mfa, string? Auth, string[]? Sites);
 record StudyStatusDto(string Status, int? SignedDays);
 record ClauseUpdateDto(string? Status, int? Evidence, string? Owner, string? LastReviewed);
 

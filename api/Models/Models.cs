@@ -176,6 +176,8 @@ public class AppUser
     public bool Mfa { get; set; }
     public string Auth { get; set; } = "Local";
     public string LastSeen { get; set; } = "—";
+    // JSON array of full site names. Empty array = unrestricted (sees all sites).
+    public string Sites { get; set; } = "[]";
 }
 
 public class Appointment

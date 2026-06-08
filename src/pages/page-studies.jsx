@@ -3,14 +3,24 @@ import Icon from '../icons';
 import { PageHeader, Pill, Avatar, Tabs } from '../components';
 import { studyStatusKind } from './page-patients';
 import NexusGrid from '../nexus-grid';
+import { useAuth, ALL_SITES } from '../AuthContext';
 
 const StudiesPage = ({ data: D, openStudy }) => {
+  const { userSites } = useAuth();
   const [tab, setTab] = useState("queue");
   const [filter, setFilter] = useState("all");
 
-  const baseStudies = tab === 'queue'
-    ? D.studies.filter(s => s.status !== 'Final')
+  const allowedCodes = userSites.length === 0
+    ? null
+    : new Set(ALL_SITES.filter(s => userSites.includes(s.name)).map(s => s.code));
+
+  const siteStudies = allowedCodes
+    ? D.studies.filter(s => allowedCodes.has(s.siteCode))
     : D.studies;
+
+  const baseStudies = tab === 'queue'
+    ? siteStudies.filter(s => s.status !== 'Final')
+    : siteStudies;
 
   const filtered = baseStudies.filter(s => {
     if (filter === 'all') return true;

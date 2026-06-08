@@ -29,13 +29,13 @@ public static class SeedData
 
         var seedUsers = new[]
         {
-            new AppUser { Email = "kavya.patel@nexus360.com",   Name = "K. Patel",                  Role = "Quality Manager",           Mfa = true, Auth = "Local" },
-            new AppUser { Email = "rafael.okafor@nexus360.com", Name = "Dr. R. Okafor",              Role = "Medical Director",           Mfa = true, Auth = "Local" },
-            new AppUser { Email = "lily.hartono@nexus360.com",  Name = "Dr. L. Hartono",             Role = "Paediatric Sleep Physician", Mfa = true, Auth = "Local" },
-            new AppUser { Email = "meilin.chen@nexus360.com",   Name = "M. Chen",                    Role = "Senior Technologist",        Mfa = true, Auth = "Local" },
-            new AppUser { Email = "arjun.singh@nexus360.com",   Name = "A. Singh",                   Role = "Scoring Technologist",       Mfa = true, Auth = "Local" },
-            new AppUser { Email = "j.roy@nexus360.com",         Name = "J. Roy",                     Role = "External Auditor",           Mfa = true, Auth = "Local" },
-            new AppUser { Email = "assessor@nata.gov.au",       Name = "NATA Assessor (time-boxed)", Role = "External Assessor",          Mfa = true, Auth = "Local" },
+            new AppUser { Email = "kavya.patel@nexus360.com",   Name = "K. Patel",                  Role = "Quality Manager",           Mfa = true, Auth = "Local", Sites = "[]" },
+            new AppUser { Email = "rafael.okafor@nexus360.com", Name = "Dr. R. Okafor",              Role = "Medical Director",           Mfa = true, Auth = "Local", Sites = "[]" },
+            new AppUser { Email = "lily.hartono@nexus360.com",  Name = "Dr. L. Hartono",             Role = "Paediatric Sleep Physician", Mfa = true, Auth = "Local", Sites = "[\"Eastside Paediatric Lab\"]" },
+            new AppUser { Email = "meilin.chen@nexus360.com",   Name = "M. Chen",                    Role = "Senior Technologist",        Mfa = true, Auth = "Local", Sites = "[\"Riverside Main Lab\"]" },
+            new AppUser { Email = "arjun.singh@nexus360.com",   Name = "A. Singh",                   Role = "Scoring Technologist",       Mfa = true, Auth = "Local", Sites = "[\"Riverside Main Lab\",\"Eastside Paediatric Lab\"]" },
+            new AppUser { Email = "j.roy@nexus360.com",         Name = "J. Roy",                     Role = "External Auditor",           Mfa = true, Auth = "Local", Sites = "[]" },
+            new AppUser { Email = "assessor@nata.gov.au",       Name = "NATA Assessor (time-boxed)", Role = "External Assessor",          Mfa = true, Auth = "Local", Sites = "[]" },
         };
 
         foreach (var u in seedUsers)

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import Icon from './icons';
-import { ROLE_LEVEL, ASA_ROLES, AASM_ROLES } from './AuthContext';
+import { ROLE_LEVEL, ASA_ROLES, AASM_ROLES, ALL_SITES } from './AuthContext';
 import { useNexusData } from './NexusDataContext';
 
 const AUTH_METHODS = ['Okta', 'Local', 'Magic link', 'SAML'];
@@ -12,6 +12,7 @@ function initForm(userData) {
     role:     userData?.role     || '',
     auth:     userData?.auth     || 'Okta',
     mfa:      userData?.mfa      ?? true,
+    sites:    Array.isArray(userData?.sites) ? userData.sites : [],
     tempPass: '',
   };
 }
@@ -46,6 +47,20 @@ const UserFormDrawer = ({ userData, currentUserRole, onSave, onClose }) => {
     return e;
   };
 
+  const toggleSite = (siteName) => {
+    const allNames = ALL_SITES.map(s => s.name);
+    if (form.sites.length === 0) {
+      // Currently unrestricted — unchecking one site creates an explicit list of the rest
+      set('sites', allNames.filter(n => n !== siteName));
+    } else if (form.sites.includes(siteName)) {
+      set('sites', form.sites.filter(n => n !== siteName));
+    } else {
+      const next = [...form.sites, siteName];
+      // If all sites are now checked, revert to unrestricted
+      set('sites', next.length === allNames.length ? [] : next);
+    }
+  };
+
   const handleSave = () => {
     const e = validate();
     if (Object.keys(e).length) { setErrors(e); return; }
@@ -56,6 +71,7 @@ const UserFormDrawer = ({ userData, currentUserRole, onSave, onClose }) => {
       role:     form.role,
       auth:     form.auth,
       mfa:      form.mfa,
+      sites:    form.sites,
       initials: initials(form.name.trim()),
       ...((!isEdit && form.tempPass) ? { password: form.tempPass } : {}),
     });
@@ -120,6 +136,26 @@ const UserFormDrawer = ({ userData, currentUserRole, onSave, onClose }) => {
               <input type="checkbox" checked={form.mfa} onChange={e => set('mfa', e.target.checked)} />
               Require MFA
             </label>
+          </div>
+        </div>
+
+        <div className="form-field">
+          <label className="form-label">Site access</label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 }}>
+            {ALL_SITES.map(site => (
+              <label key={site.name}
+                style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+                <input type="checkbox"
+                  checked={form.sites.length === 0 || form.sites.includes(site.name)}
+                  onChange={() => toggleSite(site.name)} />
+                {site.name}
+              </label>
+            ))}
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 6 }}>
+            {form.sites.length === 0
+              ? 'Unrestricted — all sites visible'
+              : `Restricted to ${form.sites.length} of ${ALL_SITES.length} sites`}
           </div>
         </div>
 

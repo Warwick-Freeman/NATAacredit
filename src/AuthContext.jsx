@@ -64,6 +64,13 @@ export function can(role, permission) {
   return !!(ROLE_PERMISSIONS[role]?.[permission]);
 }
 
+// Canonical site list used across the app
+export const ALL_SITES = [
+  { code: 'RML', name: 'Riverside Main Lab',      abbr: 'Riverside Main'  },
+  { code: 'EPL', name: 'Eastside Paediatric Lab', abbr: 'Eastside Paed.'  },
+  { code: 'HSN', name: 'Home Service – North',    abbr: 'Home Service N.' },
+];
+
 const BASE = import.meta.env.VITE_API_URL ?? '';
 
 function getToken() {
@@ -124,9 +131,11 @@ export function AuthProvider({ children }) {
     });
     if (!res.ok) return false;
     const { token, user: u } = await res.json();
+    // Ensure sites is always an array on the stored session object
+    const session = { ...u, sites: Array.isArray(u.sites) ? u.sites : [] };
     localStorage.setItem('nexus_token', token);
-    localStorage.setItem('nexus_user', JSON.stringify(u));
-    setUser(u);
+    localStorage.setItem('nexus_user', JSON.stringify(session));
+    setUser(session);
     window.dispatchEvent(new CustomEvent('nexus:signIn'));
     return true;
   }
@@ -153,14 +162,18 @@ export function AuthProvider({ children }) {
     syncUsers(next);
     if (user?.id === id) {
       const updated = next.find(u => u.id === id);
-      const session = { id: updated.id, name: updated.name, role: updated.role, email: updated.email };
+      const session = { id: updated.id, name: updated.name, role: updated.role, email: updated.email, sites: updated.sites ?? [] };
       setUser(session);
       localStorage.setItem('nexus_user', JSON.stringify(session));
     }
   }
 
+  // Convenience: sites the logged-in user is allowed to see.
+  // Empty array = unrestricted (sees all sites).
+  const userSites = user?.sites ?? [];
+
   return (
-    <AuthContext.Provider value={{ user, users, signIn, signOut, hasPerm, addUser, updateUser }}>
+    <AuthContext.Provider value={{ user, users, userSites, signIn, signOut, hasPerm, addUser, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

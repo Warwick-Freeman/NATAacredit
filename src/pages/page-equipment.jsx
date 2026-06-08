@@ -8,6 +8,7 @@ import { SEED_PATIENTS } from './page-patients';
 import { COURIERS } from '../courier-api';
 import { ConsumableFormDrawer, StockReceiveDrawer, StockUseDrawer, PlaceOrderDrawer } from '../consumables-drawers';
 import NexusGrid from '../nexus-grid';
+import { useAuth, ALL_SITES } from '../AuthContext';
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 const fmtDate = (iso) => {
@@ -472,8 +473,15 @@ const REGISTER_COL_DEFS = [
 
 // ─── Component ───────────────────────────────────────────────────────────────
 const EquipmentPage = () => {
+  const { userSites } = useAuth();
+  // Derive which sites this user may access (empty = unrestricted)
+  const allowedSites = userSites.length > 0 ? userSites : ALL_SITES.map(s => s.name);
+  const siteRestricted = userSites.length > 0; // hide dropdown / lock filter when true
+
   const [equipment,   setEquipment]   = useState(() =>
-    SEED_EQUIPMENT.map(e => ({ ...e, verifyStatus: verifyStatus(e.nextVerify) }))
+    SEED_EQUIPMENT
+      .map(e => ({ ...e, verifyStatus: verifyStatus(e.nextVerify) }))
+      .filter(e => userSites.length === 0 || userSites.includes(e.site))
   );
   const [incidents,   setIncidents]   = useState(SEED_INCIDENTS);
   const [tab,         setTab]         = useState('register');
@@ -512,7 +520,8 @@ const EquipmentPage = () => {
   const hstDispatched  = useMemo(() => hstDevices.filter(e => e.hstStatus === 'Dispatched').length, [hstDevices]);
   const critStock      = consumables.filter(c => c.stockStatus !== 'ok').length;
 
-  const allSites = useMemo(() => ['all', ...new Set(equipment.map(e => e.site))], [equipment]);
+  // Site options in the dropdown: only sites this user is permitted to access
+  const allSites = useMemo(() => ['all', ...allowedSites], [allowedSites]);
   const allTypes = useMemo(() => ['all', ...new Set(equipment.map(e => e.type))], [equipment]);
 
   // ── Register filter ────────────────────────────────────────────────────────
@@ -940,11 +949,16 @@ const EquipmentPage = () => {
                 onClick={() => setFilter(f.key)}>{f.label}</button>
             ))}
             <div style={{ flex: 1 }} />
-            <select className="form-input" style={{ fontSize: 12, width: 180, height: 32 }}
-              value={siteFilter} onChange={e => setSiteFilter(e.target.value)}>
-              <option value="all">All sites</option>
-              {allSites.filter(s => s !== 'all').map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
+            {allowedSites.length > 1 && (
+              <select className="form-input" style={{ fontSize: 12, width: 180, height: 32 }}
+                value={siteFilter} onChange={e => setSiteFilter(e.target.value)}>
+                <option value="all">All sites</option>
+                {allSites.filter(s => s !== 'all').map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            )}
+            {allowedSites.length === 1 && (
+              <span className="pill accent" style={{ fontSize: 11 }}>{allowedSites[0]}</span>
+            )}
             <select className="form-input" style={{ fontSize: 12, width: 160, height: 32 }}
               value={typeFilter} onChange={e => setTypeFilter(e.target.value)}>
               <option value="all">All types</option>

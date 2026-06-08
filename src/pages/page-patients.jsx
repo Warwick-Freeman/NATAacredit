@@ -1062,10 +1062,14 @@ const PatientsPage = ({ openStudy }) => {
   const [tab, setTab] = useState('patients');
   const { site } = useLocation();
   const { openCreateTask } = useTaskContext();
+  const { userSites } = useAuth();
   const { user } = useAuth();
   const { data } = useNexusData();
 
-  const [patients, setPatients] = useState(SEED_PATIENTS);
+  const [patients, setPatients] = useState(() =>
+    userSites.length === 0 ? SEED_PATIENTS
+      : SEED_PATIENTS.filter(p => userSites.includes(p.site))
+  );
   const [selectedId, setSelectedId] = useState(null);
   const [dmePatient, setDmePatient] = useState(null);
   const [filter, setFilter] = useState('all');
