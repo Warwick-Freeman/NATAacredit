@@ -4,6 +4,7 @@ import { Pill } from './components';
 import FormFiller, { RecordViewer } from './form-filler';
 import WysiwygEditor from './wysiwyg-editor';
 import SurveyFormFiller from './survey-form-filler';
+import SurveyFormPreview from './survey-form-preview';
 
 const STATUS_KIND = { Issued: 'good', Draft: 'outline', 'Under review': 'warn', 'Live form': 'info', Obsolete: 'bad', Superseded: 'outline' };
 
@@ -35,7 +36,7 @@ const DocViewer = ({ doc, autoEdit, onDesign, onClose, onAttach, onFormSaved, on
   const isSurveyForm  = doc?.folder === 'forms' && doc?.hasSurveyJson;
   const isForm        = isHtmlForm || isSurveyForm;
   const canEdit       = doc?.status === 'Draft' && doc?.fileType === 'html';
-  const canRevise     = (doc?.status === 'Issued' || doc?.status === 'Live form') && doc?.fileType === 'html';
+  const canRevise     = (doc?.status === 'Issued' || doc?.status === 'Live form') && doc?.fileType === 'html' && doc?.folder !== 'records';
   const hasRevisionHistory = !!(doc?.revisionOf) || canRevise;
 
   useEffect(() => {
@@ -221,7 +222,7 @@ const DocViewer = ({ doc, autoEdit, onDesign, onClose, onAttach, onFormSaved, on
             doc={doc}
             surveyJson={surveyJson}
             onCancel={() => setFillMode(false)}
-            onSaved={() => { loadRecords(); setShowRecords(true); onFormSaved?.(); }}
+            onSaved={() => { setFillMode(false); loadRecords(); setShowRecords(true); onFormSaved?.(); }}
           />
         </div>
       </div>
@@ -272,8 +273,8 @@ const DocViewer = ({ doc, autoEdit, onDesign, onClose, onAttach, onFormSaved, on
           </div>
 
           <div style={{ display: 'flex', gap: 8, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-            {/* Design form button — for survey forms */}
-            {isSurveyForm && (
+            {/* Design form button — draft survey forms only */}
+            {isSurveyForm && doc?.status === 'Draft' && (
               <button className="btn" onClick={() => onDesign?.(doc)}>
                 <Icon name="edit" size={14} />Design form
               </button>
@@ -308,31 +309,6 @@ const DocViewer = ({ doc, autoEdit, onDesign, onClose, onAttach, onFormSaved, on
               </button>
             )}
 
-            {/* Fill form — survey forms */}
-            {isSurveyForm && (
-              <button className="btn btn-primary" onClick={() => setFillMode(true)} disabled={!surveyJson}>
-                <Icon name="edit" size={14} />Fill form
-              </button>
-            )}
-
-            {/* Fill form — legacy HTML forms */}
-            {isHtmlForm && htmlContent && (
-              <button className="btn btn-primary" onClick={() => setFillMode(true)}>
-                <Icon name="edit" size={14} />Fill form
-              </button>
-            )}
-
-            {/* Records button — any form type */}
-            {isForm && (
-              <button className="btn" onClick={() => { if (!records) loadRecords(); setShowRecords(v => !v); }}>
-                <Icon name="paper" size={14} />Records
-                {records?.length > 0 && (
-                  <span style={{ marginLeft: 4, background: 'var(--accent)', color: '#fff', borderRadius: 8, padding: '0 5px', fontSize: 10, fontWeight: 700 }}>
-                    {records.length}
-                  </span>
-                )}
-              </button>
-            )}
 
             {hasFile && isPdf && (
               <a href={doc.fileUrl} download={doc.fileName || `${doc.id}.pdf`}
@@ -388,31 +364,33 @@ const DocViewer = ({ doc, autoEdit, onDesign, onClose, onAttach, onFormSaved, on
           )}
         </div>
 
+        {/* Survey form action toolbar — sits between metadata bar and body */}
+        {isSurveyForm && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 18px', borderBottom: '1px solid var(--border)', background: 'var(--surface-2)', flexShrink: 0 }}>
+            <button className="btn btn-primary" onClick={() => setFillMode(true)} disabled={!surveyJson}>
+              <Icon name="edit" size={14} />Fill form
+            </button>
+            <button className="btn" onClick={() => { loadRecords(); setShowRecords(v => !v); }}>
+              <Icon name="paper" size={14} />Records
+              {records?.length > 0 && (
+                <span style={{ marginLeft: 4, background: 'var(--accent)', color: '#fff', borderRadius: 8, padding: '0 5px', fontSize: 10, fontWeight: 700 }}>
+                  {records.length}
+                </span>
+              )}
+            </button>
+          </div>
+        )}
+
         {/* Content */}
         <div className="doc-viewer-body">
           {isSurveyForm ? (
-            /* Survey form preview — show structure summary, not the fill UI */
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 16, color: 'var(--ink-3)' }}>
-              <div style={{ width: 56, height: 56, borderRadius: 14, background: 'var(--accent-soft)', color: 'var(--accent-ink)', display: 'grid', placeItems: 'center' }}>
-                <Icon name="clipboard" size={28} />
+            surveyJson ? (
+              <SurveyFormPreview surveyJson={surveyJson} />
+            ) : (
+              <div style={{ display: 'grid', placeItems: 'center', height: '100%', color: 'var(--ink-3)', fontSize: 13 }}>
+                Loading form definition…
               </div>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink-2)', marginBottom: 4 }}>SurveyJS form</div>
-                <div style={{ fontSize: 13 }}>
-                  {surveyJson
-                    ? `${surveyJson.pages?.length ?? 1} page${(surveyJson.pages?.length ?? 1) !== 1 ? 's' : ''} · ${countQuestions(surveyJson)} question${countQuestions(surveyJson) !== 1 ? 's' : ''}`
-                    : 'Loading form definition…'}
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button className="btn btn-primary" onClick={() => setFillMode(true)} disabled={!surveyJson}>
-                  <Icon name="edit" size={14} />Fill form
-                </button>
-                <button className="btn" onClick={() => onDesign?.(doc)}>
-                  <Icon name="edit" size={14} />Design form
-                </button>
-              </div>
-            </div>
+            )
           ) : hasFile ? (
             isPdf ? (
               pdfLoading ? (

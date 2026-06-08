@@ -240,6 +240,7 @@ using (var scope = app.Services.CreateScope())
 
     var sopDir = Path.Combine(app.Environment.ContentRootPath, "..", "sop");
     SeedData.ImportSopDirectory(db, sopDir, dataDir);
+    SeedData.SeedFormSurveyJson(db);
 
     // Backfill ContentText for any HTML documents that haven't been indexed yet
     var unindexed = await db.Documents

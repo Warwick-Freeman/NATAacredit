@@ -9,6 +9,28 @@ initSurveyJS();
 
 const BASE = import.meta.env.VITE_API_URL ?? '';
 
+function buildSnapshotHtml(sender, docTitle, period) {
+  const completedDate = new Date().toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' });
+  const rows = sender.getAllQuestions().map(q => {
+    let val = q.value;
+    if (val === null || val === undefined) {
+      val = '<em style="color:#999">—</em>';
+    } else if (typeof val === 'boolean') {
+      val = val ? 'Yes' : 'No';
+    } else if (Array.isArray(val)) {
+      val = val.map(item => (typeof item === 'object' ? JSON.stringify(item) : String(item))).join(', ');
+    } else if (typeof val === 'object') {
+      val = JSON.stringify(val);
+    } else {
+      val = String(val).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+    const label = (q.title || q.name).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return `<tr><td style="padding:8px 12px;border:1px solid #e2e8f0;font-weight:600;background:#f8fafc;vertical-align:top;width:40%">${label}</td><td style="padding:8px 12px;border:1px solid #e2e8f0;vertical-align:top">${val}</td></tr>`;
+  }).join('');
+  const title = docTitle.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>${title}</title><style>body{font-family:system-ui,-apple-system,sans-serif;margin:0;padding:24px;color:#1a202c}h2{margin:0 0 4px;font-size:18px;color:#2d3748}p{margin:0 0 16px;color:#718096;font-size:13px}table{border-collapse:collapse;width:100%;font-size:14px}</style></head><body><h2>${title}</h2><p>Period: ${period} · Completed: ${completedDate}</p><table><tbody>${rows}</tbody></table></body></html>`;
+}
+
 const SurveyFormFiller = ({ doc, surveyJson, onCancel, onSaved }) => {
   const [phase, setPhase] = useState('filling'); // filling | saving | done | error
   const savedDataRef = useRef(null);
@@ -36,11 +58,11 @@ const SurveyFormFiller = ({ doc, surveyJson, onCancel, onSaved }) => {
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
           body: JSON.stringify({
-            formId:      doc.id,
-            formTitle:   doc.title,
+            formId:       doc.id,
+            formTitle:    doc.title,
             period,
-            formData:    JSON.stringify(sender.data),
-            snapshotHtml: null,
+            formData:     JSON.stringify(sender.data),
+            snapshotHtml: buildSnapshotHtml(sender, doc.title, period),
           }),
         });
         setPhase(res.ok ? 'done' : 'error');
