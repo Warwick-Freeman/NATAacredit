@@ -227,4 +227,5 @@ public class Document
     public string Workflow { get; set; } = "[]";
     public string ContentText { get; set; } = "";
     public string? RevisionOf { get; set; }
+    public string? SurveyJson { get; set; }
 }

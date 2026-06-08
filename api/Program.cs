@@ -119,7 +119,9 @@ using (var scope = app.Services.CreateScope())
         "ALTER TABLE ComplianceSections ADD COLUMN Standard TEXT NOT NULL DEFAULT 'asa'",
         "ALTER TABLE Documents ADD COLUMN ContentText TEXT NOT NULL DEFAULT ''",
         "ALTER TABLE Documents ADD COLUMN RevisionOf TEXT",
+        "ALTER TABLE Documents ADD COLUMN SurveyJson TEXT",
         "ALTER TABLE Tasks ADD COLUMN AssignedTo TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE Users ADD COLUMN Sites TEXT NOT NULL DEFAULT '[]'",
     })
     {
         try { db.Database.ExecuteSqlRaw(col); } catch { /* column already exists */ }
@@ -550,7 +552,8 @@ app.MapGet("/api/activity", async (NexusDbContext db) =>
 DocumentDto ToDto(Document d) => new(
     d.DocId, d.Title, d.Version, d.Status, d.Folder,
     d.Owner, d.Clauses, d.ReviewDue, d.Updated,
-    d.FileType, d.FileName, d.StoredFileName != null, d.Workflow, d.RevisionOf);
+    d.FileType, d.FileName, d.StoredFileName != null, d.Workflow, d.RevisionOf,
+    !string.IsNullOrEmpty(d.SurveyJson));
 
 app.MapGet("/api/documents/search", async (string q, NexusDbContext db) =>
 {
@@ -573,6 +576,34 @@ app.MapGet("/api/documents", async (NexusDbContext db) =>
 app.MapGet("/api/documents/{id}", async (string id, NexusDbContext db) =>
     await db.Documents.FirstOrDefaultAsync(d => d.DocId == id) is { } doc
         ? Results.Ok(ToDto(doc)) : Results.NotFound()).RequireAuthorization();
+
+app.MapGet("/api/documents/{id}/survey", async (string id, NexusDbContext db) =>
+{
+    var doc = await db.Documents.FirstOrDefaultAsync(d => d.DocId == id);
+    if (doc == null) return Results.NotFound();
+    if (string.IsNullOrEmpty(doc.SurveyJson)) return Results.NoContent();
+    return Results.Text(doc.SurveyJson, "application/json");
+}).RequireAuthorization();
+
+app.MapPut("/api/documents/{id}/survey", async (string id, HttpRequest req, NexusDbContext db, ClaimsPrincipal principal) =>
+{
+    var doc = await db.Documents.FirstOrDefaultAsync(d => d.DocId == id);
+    if (doc == null) return Results.NotFound();
+    if (doc.Folder != "forms") return Results.BadRequest("Only form documents support SurveyJS definitions.");
+
+    using var reader = new StreamReader(req.Body);
+    var json = await reader.ReadToEndAsync();
+
+    // Validate it's parseable JSON
+    try { System.Text.Json.JsonDocument.Parse(json); }
+    catch { return Results.BadRequest("Invalid JSON."); }
+
+    doc.SurveyJson = json;
+    doc.Updated = DateTime.Now.ToString("dd MMM yyyy");
+    db.Activity.Add(MakeActivity(ActorName(principal), "updated survey form", $"{doc.DocId} — {doc.Title}", "update", "documents", "SurveyJS form definition saved."));
+    await db.SaveChangesAsync();
+    return Results.Ok(new { doc.DocId, saved = true });
+}).RequireAuthorization();
 
 app.MapPost("/api/documents", async (HttpRequest req, NexusDbContext db, ClaimsPrincipal principal) =>
 {
@@ -1410,7 +1441,7 @@ string ActorName(ClaimsPrincipal p) =>
     p.FindFirstValue("name") ?? p.FindFirstValue(ClaimTypes.Name) ?? "Unknown";
 
 string ActorRole(ClaimsPrincipal p) =>
-    p.FindFirstValue("role") ?? "";
+    p.FindFirstValue("role") ?? p.FindFirstValue(ClaimTypes.Role) ?? "";
 
 ActivityEntry MakeActivity(string who, string action, string target, string kind, string module, string detail = "")
 {
@@ -1437,7 +1468,8 @@ record ClauseUpdateDto(string? Status, int? Evidence, string? Owner, string? Las
 record DocumentDto(
     string DocId, string Title, string Version, string Status, string Folder,
     string Owner, string Clauses, string ReviewDue, string Updated,
-    string? FileType, string? FileName, bool HasFile, string Workflow, string? RevisionOf);
+    string? FileType, string? FileName, bool HasFile, string Workflow, string? RevisionOf,
+    bool HasSurveyJson);
 
 record DocumentUpdateDto(
     string Title, string Version, string Status, string Folder,

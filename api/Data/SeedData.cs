@@ -267,7 +267,88 @@ public static class SeedData
                 DocId = "FRM-CoI-2026", Title = "Conflict of interest declaration 2026",
                 Version = "—", Status = "Live form", Folder = "forms", ReviewDue = "Annual",
                 Owner = "K. Patel", Clauses = "4.1.5", Updated = "01 Jan 2026",
-                Workflow = "[]"
+                Workflow = "[]",
+                SurveyJson = """
+{
+  "title": "Conflict of Interest Declaration 2026",
+  "description": "Annual staff declaration for Nexus 360 Sleep Disorders Service. Complete and submit before 31 January 2026.",
+  "pages": [
+    {
+      "name": "declaration",
+      "title": "Staff declaration",
+      "elements": [
+        {
+          "type": "text",
+          "name": "staff_name",
+          "title": "Full name",
+          "isRequired": true
+        },
+        {
+          "type": "text",
+          "name": "role",
+          "title": "Role / position",
+          "isRequired": true
+        },
+        {
+          "type": "boolean",
+          "name": "no_conflicts",
+          "title": "I have no conflicts of interest to declare for the period 1 January – 31 December 2026",
+          "defaultValue": false
+        },
+        {
+          "type": "paneldynamic",
+          "name": "interests",
+          "title": "Declared interests",
+          "description": "Add all interests below. If you have none to declare, check the box above instead.",
+          "visibleIf": "{no_conflicts} <> true",
+          "addPanelText": "Add interest",
+          "templateTitle": "Interest #{panelIndex}",
+          "minPanelCount": 0,
+          "templateElements": [
+            {
+              "type": "comment",
+              "name": "interest_description",
+              "title": "Nature of interest",
+              "rows": 2,
+              "isRequired": true
+            },
+            {
+              "type": "dropdown",
+              "name": "interest_type",
+              "title": "Type",
+              "choices": ["Financial", "Personal relationship", "Professional / employment", "Other"],
+              "isRequired": true
+            },
+            {
+              "type": "text",
+              "name": "value_extent",
+              "title": "Value / extent",
+              "placeholder": "e.g. $5,000 annual consultancy fee"
+            },
+            {
+              "type": "comment",
+              "name": "management_plan",
+              "title": "Management / mitigation plan",
+              "rows": 2,
+              "isRequired": true
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "name": "declaration_date",
+          "title": "Date of declaration",
+          "inputType": "date",
+          "isRequired": true
+        }
+      ]
+    }
+  ],
+  "showQuestionNumbers": "off",
+  "widthMode": "responsive",
+  "completeText": "Submit declaration"
+}
+"""
             },
             new Document
             {

@@ -3,6 +3,7 @@ import Icon from '../icons';
 import { PageHeader, Pill, Avatar, Drawer } from '../components';
 import DocViewer from '../doc-viewer';
 import DocUploadDrawer from '../doc-upload-drawer';
+import SurveyFormCreator from '../survey-form-creator';
 import DocDetailDrawer from '../doc-detail-drawer';
 import { useAuth } from '../AuthContext';
 import { useNexusData } from '../NexusDataContext';
@@ -187,11 +188,12 @@ function normaliseDocument(d) {
     clauses:    d.clauses ? d.clauses.split(',').map(c => c.trim()).filter(Boolean) : [],
     reviewDue:  d.reviewDue,
     updated:    d.updated,
-    fileType:   d.fileType   ?? null,
-    fileName:   d.fileName   ?? null,
-    fileUrl:    d.hasFile    ? `${BASE_API}/api/documents/${encodeURIComponent(d.docId)}/file` : null,
-    revisionOf: d.revisionOf ?? null,
-    htmlContent: null,
+    fileType:     d.fileType     ?? null,
+    fileName:     d.fileName     ?? null,
+    fileUrl:      d.hasFile      ? `${BASE_API}/api/documents/${encodeURIComponent(d.docId)}/file` : null,
+    hasSurveyJson: d.hasSurveyJson ?? false,
+    revisionOf:   d.revisionOf  ?? null,
+    htmlContent:  null,
     workflow,
   };
 }
@@ -235,8 +237,10 @@ const DocumentsPage = () => {
   const [detailDocId, setDetailDocId] = useState(null);
   const [viewingDoc,  setViewingDoc]  = useState(null);
   const [autoEdit,    setAutoEdit]    = useState(false);
+  const [designingDoc, setDesigningDoc] = useState(null);
   const [uploadPrefill, setUploadPrefill] = useState(null);
   const [uploadOpen,    setUploadOpen]    = useState(false);
+  const [uploadError,   setUploadError]   = useState(null);
 
   // Load from server; fall back to SEED_DOCS if API is unavailable
   const loadDocs = useCallback(() => {
@@ -354,8 +358,8 @@ const DocumentsPage = () => {
     }
   };
 
-  const openUpload = (prefill) => { setUploadPrefill(prefill ?? null); setUploadOpen(true); };
-  const closeUpload = () => setUploadOpen(false);
+  const openUpload = (prefill) => { setUploadPrefill(prefill ?? null); setUploadOpen(true); setUploadError(null); };
+  const closeUpload = () => { setUploadOpen(false); setUploadError(null); };
 
   const handleSaveDoc = async (saved) => {
     const isAttach = !!(uploadPrefill?.id);
@@ -392,16 +396,25 @@ const DocumentsPage = () => {
 
       const tok3 = localStorage.getItem('nexus_token');
       const res = await fetch(`${BASE_API}/api/documents`, { method: 'POST', body: fd, headers: tok3 ? { Authorization: `Bearer ${tok3}` } : {} });
-      if (res.ok) {
-        const created = normaliseDocument(await res.json());
-        setDocs(prev => [created, ...prev]);
-        setStatusFilter('all');
-        setFolder('all');
+      if (!res.ok) {
+        setUploadError(
+          res.status === 403
+            ? 'Permission denied — your account role cannot create documents. Log out and back in as Quality Manager, Medical Director, Paediatric Sleep Physician, Reporting Physician, or Senior Technologist.'
+            : `Server error ${res.status} — please try again.`
+        );
+        return;
+      }
+      const created = normaliseDocument(await res.json());
+      setDocs(prev => [created, ...prev]);
+      setStatusFilter('all');
+      setFolder('all');
+      closeUpload();
+      if (saved.openDesigner) {
+        setDesigningDoc(created);
+      } else {
         setDetailDocId(created.id);
       }
     }
-
-    closeUpload();
   };
 
   // Determine active step for a doc (for showing in the grid)
@@ -674,6 +687,7 @@ const DocumentsPage = () => {
             }}
             onEditHtml={() => { setDetailDocId(null); setAutoEdit(true); setViewingDoc(detailDoc); }}
             onCancelDraft={handleCancelDraft}
+            onDesignForm={(doc) => { setDetailDocId(null); setDesigningDoc(doc); }}
           />
         )}
       </Drawer>
@@ -683,6 +697,7 @@ const DocumentsPage = () => {
         <DocViewer
           doc={viewingDoc}
           autoEdit={autoEdit}
+          onDesign={(doc) => { setViewingDoc(null); setDesigningDoc(doc); }}
           onClose={() => { setViewingDoc(null); setAutoEdit(false); }}
           onAttach={(doc) => { setViewingDoc(null); openUpload(doc); }}
           onFormSaved={handleFormSaved}
@@ -708,6 +723,16 @@ const DocumentsPage = () => {
         />
       )}
 
+      {/* SurveyJS form designer — full-screen overlay */}
+      {designingDoc && (
+        <SurveyFormCreator
+          docId={designingDoc.id}
+          docTitle={designingDoc.title}
+          onClose={() => setDesigningDoc(null)}
+          onSaved={() => { loadDocs(); setDesigningDoc(null); }}
+        />
+      )}
+
       {/* Upload / attach drawer */}
       <Drawer open={uploadOpen} onClose={closeUpload}>
         <DocUploadDrawer
@@ -715,6 +740,7 @@ const DocumentsPage = () => {
           docs={docs}
           onSave={handleSaveDoc}
           onClose={closeUpload}
+          saveError={uploadError}
         />
       </Drawer>
     </div>

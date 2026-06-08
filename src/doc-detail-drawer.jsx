@@ -53,7 +53,7 @@ const StepCircle = ({ index, step, isLast }) => {
 
 const BASE = import.meta.env.VITE_API_URL ?? '';
 
-const DocDetailDrawer = ({ doc, onUpdate, onClose, onView, onEdit, onEditHtml, onCancelDraft }) => {
+const DocDetailDrawer = ({ doc, onUpdate, onClose, onView, onEdit, onEditHtml, onCancelDraft, onDesignForm }) => {
   const { hasPerm, user, users } = useAuth();
   const { refreshData, activeStandard } = useNexusData();
   const PERM_ROLE = activeStandard === 'aasm' ? PERM_ROLE_AASM : PERM_ROLE_ASA;
@@ -432,9 +432,19 @@ const DocDetailDrawer = ({ doc, onUpdate, onClose, onView, onEdit, onEditHtml, o
 
         {/* Bottom actions */}
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button className="btn" style={{ flex: 1 }} onClick={onView}>
-            <Icon name="eye" size={14} />{doc.fileType ? 'View document' : 'Attach file'}
-          </button>
+          {doc.folder === 'forms' && doc.status === 'Draft' && !doc.fileType ? (
+            <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => onDesignForm?.(doc)}>
+              <Icon name="edit" size={14} />Edit form
+            </button>
+          ) : doc.folder === 'forms' && doc.hasSurveyJson ? (
+            <button className="btn" style={{ flex: 1 }} onClick={onView}>
+              <Icon name="eye" size={14} />View form
+            </button>
+          ) : (
+            <button className="btn" style={{ flex: 1 }} onClick={onView}>
+              <Icon name="eye" size={14} />{doc.fileType ? 'View document' : 'Attach file'}
+            </button>
+          )}
           {doc.status === 'Draft' && doc.fileType === 'html' && onEditHtml && (
             <button className="btn btn-primary" onClick={onEditHtml}>
               <Icon name="edit" size={14} />Edit draft

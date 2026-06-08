@@ -46,7 +46,7 @@ function initForm(prefill) {
 
 const fmtSize = (b) => b < 1048576 ? `${(b / 1024).toFixed(0)} KB` : `${(b / 1048576).toFixed(1)} MB`;
 
-const DocUploadDrawer = ({ prefill, docs = [], onSave, onClose }) => {
+const DocUploadDrawer = ({ prefill, docs = [], onSave, onClose, saveError }) => {
   const isAttach = !!(prefill?.id);
   const [form, setForm]       = useState(() => initForm(prefill));
   const [file, setFile]       = useState(null);   // { name, size, type:'pdf'|'html', rawFile, fromEditor? }
@@ -54,6 +54,7 @@ const DocUploadDrawer = ({ prefill, docs = [], onSave, onClose }) => {
   const [errors, setErrors]   = useState({});
   const [editorOpen, setEditorOpen] = useState(false);
   const [idTouched, setIdTouched] = useState(false);
+  const [surveyMode, setSurveyMode] = useState(false);
   const inputRef = useRef();
 
   // Pre-fill Doc ID for new documents on mount
@@ -89,30 +90,31 @@ const DocUploadDrawer = ({ prefill, docs = [], onSave, onClose }) => {
 
   const validate = () => {
     const e = {};
-    if (!isAttach && !file)          e.file  = 'Please select a file to upload.';
+    if (!isAttach && !file && !surveyMode) e.file = 'Please select a file to upload.';
     if (!form.id.trim())             e.id    = 'Required';
     if (!form.title.trim())          e.title = 'Required';
     if (!form.owner.trim())          e.owner = 'Required';
     return e;
   };
 
-  const handleSave = () => {
+  const handleSave = (designAfter = false) => {
     const e = validate();
     if (Object.keys(e).length) { setErrors(e); return; }
     const clauses = form.clauses.split(',').map(c => c.trim()).filter(Boolean);
     onSave({
-      id:          form.id.trim(),
-      title:       form.title.trim(),
-      v:           form.version.trim() || '1.0',
-      status:      form.status,
-      folder:      form.folder,
-      owner:       form.owner.trim(),
+      id:           form.id.trim(),
+      title:        form.title.trim(),
+      v:            form.version.trim() || '1.0',
+      status:       form.status,
+      folder:       form.folder,
+      owner:        form.owner.trim(),
       clauses,
-      reviewDue:   form.reviewDue || '—',
-      updated:     'just now',
-      fileType: file?.type    ?? null,
-      rawFile:  file?.rawFile ?? null,
-      fileName: file?.name    ?? null,
+      reviewDue:    form.reviewDue || '—',
+      updated:      'just now',
+      fileType:     file?.type    ?? null,
+      rawFile:      file?.rawFile ?? null,
+      fileName:     file?.name    ?? null,
+      openDesigner: designAfter,
     });
   };
 
@@ -176,7 +178,7 @@ const DocUploadDrawer = ({ prefill, docs = [], onSave, onClose }) => {
             </div>
             {errors.file && <div className="form-error" style={{ marginTop: 8 }}>{errors.file}</div>}
 
-            {/* WYSIWYG editor option — only shown when no file is selected */}
+            {/* Editor options — only shown when no file is selected */}
             {!file && (
               <>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '10px 0 8px' }}>
@@ -184,14 +186,31 @@ const DocUploadDrawer = ({ prefill, docs = [], onSave, onClose }) => {
                   <span style={{ fontSize: 11, color: 'var(--ink-3)', flexShrink: 0 }}>or</span>
                   <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
                 </div>
-                <button
-                  className="btn"
-                  style={{ width: '100%', justifyContent: 'center' }}
-                  onClick={() => setEditorOpen(true)}
-                >
-                  <Icon name="edit" size={13} />
-                  Create with WYSIWYG editor
-                </button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <button
+                    className="btn"
+                    style={{ width: '100%', justifyContent: 'center' }}
+                    onClick={() => { setSurveyMode(false); setEditorOpen(true); }}
+                  >
+                    <Icon name="edit" size={13} />
+                    Create with WYSIWYG editor
+                  </button>
+                  {form.folder === 'forms' && (
+                    <button
+                      className={`btn${surveyMode ? ' btn-primary' : ''}`}
+                      style={{ width: '100%', justifyContent: 'center' }}
+                      onClick={() => setSurveyMode(v => !v)}
+                    >
+                      <Icon name="clipboard" size={13} />
+                      {surveyMode ? '✓ Design with SurveyJS (selected)' : 'Design with SurveyJS'}
+                    </button>
+                  )}
+                </div>
+                {surveyMode && (
+                  <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 6, padding: '6px 10px', background: 'var(--accent-soft)', borderRadius: 6 }}>
+                    The form creator will open after you click Create form. No file upload needed.
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -269,6 +288,7 @@ const DocUploadDrawer = ({ prefill, docs = [], onSave, onClose }) => {
             <label className="form-label">Folder</label>
             <select className="form-input" value={form.folder} onChange={e => {
               const newFolder = e.target.value;
+              if (newFolder !== 'forms') setSurveyMode(false);
               setForm(f => ({
                 ...f,
                 folder: newFolder,
@@ -310,10 +330,15 @@ const DocUploadDrawer = ({ prefill, docs = [], onSave, onClose }) => {
             onChange={e => set('clauses', e.target.value)} placeholder="e.g. 5.3.4, 5.5.2" />
         </div>
 
+        {saveError && (
+          <div style={{ marginBottom: 12, padding: '10px 12px', borderRadius: 6, background: 'var(--bad-soft)', color: 'var(--bad)', fontSize: 12, lineHeight: 1.5 }}>
+            {saveError}
+          </div>
+        )}
         <div style={{ display: 'flex', gap: 8, marginTop: 8, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
-          <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleSave}>
-            <Icon name="upload" size={14} />
-            {isAttach ? 'Attach file' : file?.fromEditor ? 'Create document' : 'Upload document'}
+          <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => handleSave(surveyMode)}>
+            <Icon name={surveyMode ? 'clipboard' : 'upload'} size={14} />
+            {isAttach ? 'Attach file' : surveyMode ? 'Create form & open designer' : file?.fromEditor ? 'Create document' : 'Upload document'}
           </button>
           <button className="btn" onClick={onClose}>Cancel</button>
         </div>

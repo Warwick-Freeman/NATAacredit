@@ -218,15 +218,16 @@ export async function searchDocumentContent(q) {
 export async function fetchDocuments() {
   const list = await get('/api/documents');
   return (list ?? []).map(d => ({
-    id:       d.docId,
-    title:    d.title,
-    version:  d.version,
-    status:   d.status,
-    folder:   d.folder,
-    owner:    d.owner,
-    updated:  d.updated,
-    fileType: d.fileType ?? null,
-    hasFile:  d.hasFile ?? false,
+    id:           d.docId,
+    title:        d.title,
+    version:      d.version,
+    status:       d.status,
+    folder:       d.folder,
+    owner:        d.owner,
+    updated:      d.updated,
+    fileType:     d.fileType ?? null,
+    hasFile:      d.hasFile ?? false,
+    hasSurveyJson: d.hasSurveyJson ?? false,
   }));
 }
 

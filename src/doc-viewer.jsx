@@ -3,12 +3,13 @@ import Icon from './icons';
 import { Pill } from './components';
 import FormFiller, { RecordViewer } from './form-filler';
 import WysiwygEditor from './wysiwyg-editor';
+import SurveyFormFiller from './survey-form-filler';
 
 const STATUS_KIND = { Issued: 'good', Draft: 'outline', 'Under review': 'warn', 'Live form': 'info', Obsolete: 'bad', Superseded: 'outline' };
 
 const BASE = import.meta.env.VITE_API_URL ?? '';
 
-const DocViewer = ({ doc, autoEdit, onClose, onAttach, onFormSaved, onDocUpdated, onRevisionCreated, onOpenRevision }) => {
+const DocViewer = ({ doc, autoEdit, onDesign, onClose, onAttach, onFormSaved, onDocUpdated, onRevisionCreated, onOpenRevision }) => {
   const [htmlContent, setHtmlContent]   = useState(null);
   const [htmlLoading, setHtmlLoading]   = useState(false);
   const [pdfBlobUrl,  setPdfBlobUrl]    = useState(null);
@@ -27,9 +28,14 @@ const DocViewer = ({ doc, autoEdit, onClose, onAttach, onFormSaved, onDocUpdated
   const [refreshKey,   setRefreshKey]   = useState(0);
   const [revising,     setRevising]     = useState(false);
 
-  const isForm    = doc?.folder === 'forms' && doc?.fileType === 'html';
-  const canEdit   = doc?.status === 'Draft' && doc?.fileType === 'html';
-  const canRevise = (doc?.status === 'Issued' || doc?.status === 'Live form') && doc?.fileType === 'html';
+  // SurveyJS state
+  const [surveyJson, setSurveyJson] = useState(null);
+
+  const isHtmlForm    = doc?.folder === 'forms' && doc?.fileType === 'html';
+  const isSurveyForm  = doc?.folder === 'forms' && doc?.hasSurveyJson;
+  const isForm        = isHtmlForm || isSurveyForm;
+  const canEdit       = doc?.status === 'Draft' && doc?.fileType === 'html';
+  const canRevise     = (doc?.status === 'Issued' || doc?.status === 'Live form') && doc?.fileType === 'html';
   const hasRevisionHistory = !!(doc?.revisionOf) || canRevise;
 
   useEffect(() => {
@@ -41,6 +47,7 @@ const DocViewer = ({ doc, autoEdit, onClose, onAttach, onFormSaved, onDocUpdated
   // Reset state when document changes
   useEffect(() => {
     setFillMode(false);
+    setSurveyJson(null);
     setRecords(null);
     setShowRecords(false);
     setViewingRecord(null);
@@ -51,6 +58,18 @@ const DocViewer = ({ doc, autoEdit, onClose, onAttach, onFormSaved, onDocUpdated
     setRefreshKey(0);
     setPdfBlobUrl(prev => { if (prev) URL.revokeObjectURL(prev); return null; });
   }, [doc?.id]);
+
+  // Fetch SurveyJS JSON when viewing a survey form
+  useEffect(() => {
+    if (!isSurveyForm || !doc?.id) return;
+    const tok = localStorage.getItem('nexus_token');
+    fetch(`${BASE}/api/documents/${encodeURIComponent(doc.id)}/survey`, {
+      headers: tok ? { Authorization: `Bearer ${tok}` } : {},
+    })
+      .then(r => (r.ok && r.status !== 204) ? r.json() : null)
+      .then(json => setSurveyJson(json))
+      .catch(() => setSurveyJson(null));
+  }, [doc?.id, isSurveyForm]);
 
   // Fetch PDF as blob
   useEffect(() => {
@@ -126,6 +145,7 @@ const DocViewer = ({ doc, autoEdit, onClose, onAttach, onFormSaved, onDocUpdated
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoEdit, doc?.id]);
 
+
   const handleSaveEdit = useCallback(async (file) => {
     const tok = localStorage.getItem('nexus_token');
     const html = await file.text();
@@ -167,7 +187,7 @@ const DocViewer = ({ doc, autoEdit, onClose, onAttach, onFormSaved, onDocUpdated
   const hasFile = !!doc.fileUrl;
   const isPdf   = doc.fileType === 'pdf';
 
-  // Render: WYSIWYG edit mode (full-screen overlay)
+  // Render: WYSIWYG edit mode for HTML documents
   if (editMode && editRawHtml) {
     return (
       <WysiwygEditor
@@ -192,8 +212,24 @@ const DocViewer = ({ doc, autoEdit, onClose, onAttach, onFormSaved, onDocUpdated
     );
   }
 
-  // Render: fill mode
-  if (fillMode && htmlContent) {
+  // Render: SurveyJS fill mode
+  if (fillMode && isSurveyForm && surveyJson) {
+    return (
+      <div className="doc-viewer-overlay" onClick={onClose}>
+        <div className="doc-viewer" onClick={e => e.stopPropagation()}>
+          <SurveyFormFiller
+            doc={doc}
+            surveyJson={surveyJson}
+            onCancel={() => setFillMode(false)}
+            onSaved={() => { loadRecords(); setShowRecords(true); onFormSaved?.(); }}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // Render: HTML fill mode
+  if (fillMode && isHtmlForm && htmlContent) {
     return (
       <div className="doc-viewer-overlay" onClick={onClose}>
         <div className="doc-viewer" onClick={e => e.stopPropagation()}>
@@ -215,13 +251,14 @@ const DocViewer = ({ doc, autoEdit, onClose, onAttach, onFormSaved, onDocUpdated
         {/* Header */}
         <div className="doc-viewer-head">
           <div style={{ width: 36, height: 36, borderRadius: 8, background: 'var(--accent-soft)', color: 'var(--accent-ink)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-            <Icon name={isPdf ? 'paper' : 'file'} size={18} />
+            <Icon name={isPdf ? 'paper' : isSurveyForm ? 'clipboard' : 'file'} size={18} />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
               <span className="mono" style={{ fontWeight: 600, fontSize: 13 }}>{doc.id}</span>
               <span className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>v{doc.v}</span>
               <Pill kind={STATUS_KIND[doc.status] || 'outline'} dot>{doc.status}</Pill>
+              {isSurveyForm && <Pill kind="accent">SurveyJS</Pill>}
               {doc.fileName && <span style={{ fontSize: 11, color: 'var(--ink-4)' }}>{doc.fileName}</span>}
               {doc.revisionOf && (
                 <span style={{ fontSize: 10, padding: '1px 6px', background: 'var(--surface-3)', borderRadius: 8, color: 'var(--ink-3)' }}>
@@ -235,7 +272,14 @@ const DocViewer = ({ doc, autoEdit, onClose, onAttach, onFormSaved, onDocUpdated
           </div>
 
           <div style={{ display: 'flex', gap: 8, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-            {/* Edit Draft button */}
+            {/* Design form button — for survey forms */}
+            {isSurveyForm && (
+              <button className="btn" onClick={() => onDesign?.(doc)}>
+                <Icon name="edit" size={14} />Design form
+              </button>
+            )}
+
+            {/* Edit Draft button — for HTML draft docs */}
             {canEdit && (
               <button className="btn" onClick={handleOpenEditor} disabled={loadingEdit || !hasFile}>
                 <Icon name="edit" size={14} />
@@ -264,11 +308,21 @@ const DocViewer = ({ doc, autoEdit, onClose, onAttach, onFormSaved, onDocUpdated
               </button>
             )}
 
-            {isForm && htmlContent && (
+            {/* Fill form — survey forms */}
+            {isSurveyForm && (
+              <button className="btn btn-primary" onClick={() => setFillMode(true)} disabled={!surveyJson}>
+                <Icon name="edit" size={14} />Fill form
+              </button>
+            )}
+
+            {/* Fill form — legacy HTML forms */}
+            {isHtmlForm && htmlContent && (
               <button className="btn btn-primary" onClick={() => setFillMode(true)}>
                 <Icon name="edit" size={14} />Fill form
               </button>
             )}
+
+            {/* Records button — any form type */}
             {isForm && (
               <button className="btn" onClick={() => { if (!records) loadRecords(); setShowRecords(v => !v); }}>
                 <Icon name="paper" size={14} />Records
@@ -279,6 +333,7 @@ const DocViewer = ({ doc, autoEdit, onClose, onAttach, onFormSaved, onDocUpdated
                 )}
               </button>
             )}
+
             {hasFile && isPdf && (
               <a href={doc.fileUrl} download={doc.fileName || `${doc.id}.pdf`}
                 className="btn" style={{ textDecoration: 'none' }}>
@@ -297,7 +352,7 @@ const DocViewer = ({ doc, autoEdit, onClose, onAttach, onFormSaved, onDocUpdated
                 <Icon name="arrow_up_right" size={14} />Open in tab
               </button>
             )}
-            {!hasFile && (
+            {!hasFile && !isSurveyForm && (
               <button className="btn btn-primary" onClick={() => onAttach(doc)}>
                 <Icon name="upload" size={14} />Attach file
               </button>
@@ -335,7 +390,30 @@ const DocViewer = ({ doc, autoEdit, onClose, onAttach, onFormSaved, onDocUpdated
 
         {/* Content */}
         <div className="doc-viewer-body">
-          {hasFile ? (
+          {isSurveyForm ? (
+            /* Survey form preview — show structure summary, not the fill UI */
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 16, color: 'var(--ink-3)' }}>
+              <div style={{ width: 56, height: 56, borderRadius: 14, background: 'var(--accent-soft)', color: 'var(--accent-ink)', display: 'grid', placeItems: 'center' }}>
+                <Icon name="clipboard" size={28} />
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink-2)', marginBottom: 4 }}>SurveyJS form</div>
+                <div style={{ fontSize: 13 }}>
+                  {surveyJson
+                    ? `${surveyJson.pages?.length ?? 1} page${(surveyJson.pages?.length ?? 1) !== 1 ? 's' : ''} · ${countQuestions(surveyJson)} question${countQuestions(surveyJson) !== 1 ? 's' : ''}`
+                    : 'Loading form definition…'}
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button className="btn btn-primary" onClick={() => setFillMode(true)} disabled={!surveyJson}>
+                  <Icon name="edit" size={14} />Fill form
+                </button>
+                <button className="btn" onClick={() => onDesign?.(doc)}>
+                  <Icon name="edit" size={14} />Design form
+                </button>
+              </div>
+            </div>
+          ) : hasFile ? (
             isPdf ? (
               pdfLoading ? (
                 <div style={{ display: 'grid', placeItems: 'center', height: '100%', color: 'var(--ink-3)', fontSize: 13 }}>
@@ -454,5 +532,10 @@ const DocViewer = ({ doc, autoEdit, onClose, onAttach, onFormSaved, onDocUpdated
     </div>
   );
 };
+
+function countQuestions(surveyJson) {
+  if (!surveyJson?.pages) return 0;
+  return surveyJson.pages.reduce((sum, page) => sum + (page.elements?.length ?? 0), 0);
+}
 
 export default DocViewer;

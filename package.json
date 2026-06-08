@@ -12,7 +12,11 @@
     "ag-grid-community": "^35.3.1",
     "ag-grid-react": "^35.3.1",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "survey-core": "^2.5.27",
+    "survey-creator-core": "^2.5.27",
+    "survey-creator-react": "^2.5.27",
+    "survey-react-ui": "^2.5.27"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",
