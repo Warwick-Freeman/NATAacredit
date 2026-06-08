@@ -364,10 +364,11 @@ const DocViewer = ({ doc, autoEdit, onDesign, onClose, onAttach, onFormSaved, on
           )}
         </div>
 
-        {/* Survey form action toolbar — sits between metadata bar and body */}
-        {isSurveyForm && (
+        {/* Form action toolbar — sits between metadata bar and body, for all form types */}
+        {isForm && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 18px', borderBottom: '1px solid var(--border)', background: 'var(--surface-2)', flexShrink: 0 }}>
-            <button className="btn btn-primary" onClick={() => setFillMode(true)} disabled={!surveyJson}>
+            <button className="btn btn-primary" onClick={() => setFillMode(true)}
+              disabled={isSurveyForm ? !surveyJson : !htmlContent}>
               <Icon name="edit" size={14} />Fill form
             </button>
             <button className="btn" onClick={() => { loadRecords(); setShowRecords(v => !v); }}>
