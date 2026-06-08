@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import Icon from '../icons';
 import { PageHeader, Pill, Tabs, Drawer } from '../components';
 import EquipmentFormDrawer from '../equipment-form-drawer';
@@ -442,6 +442,34 @@ const VSTATUS_KIND   = { good: 'good', warn: 'warn', bad: 'bad' };
 const STOCK_KIND     = { ok: 'good', low: 'warn', critical: 'bad' };
 const INC_KIND       = { Investigation: 'warn', Resolved: 'info', Closed: 'good' };
 
+// Module-level column defs so AG Grid picks up sortable on first mount
+// (useMemo with [] deps doesn't reliably merge defaultColDef in AG Grid 35).
+const REGISTER_COL_DEFS = [
+  { headerName: 'Asset ID', field: 'id', width: 150, sortable: true,
+    cellRenderer: p => <span className="mono" style={{ fontWeight: 500 }}>{p.value}</span> },
+  { headerName: 'Device', field: 'name', flex: 2, sortable: true,
+    cellRenderer: p => (
+      <div>
+        <div style={{ fontWeight: 500 }}>{p.data.name}</div>
+        <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{p.data.manufacturer} · {p.data.model}</div>
+      </div>
+    ) },
+  { headerName: 'Type',   field: 'type',   width: 150, sortable: true, cellStyle: { fontSize: 12 } },
+  { headerName: 'Site',   field: 'site',   flex: 1,    sortable: true, cellClass: 'muted' },
+  { headerName: 'Serial', field: 'serial', width: 130, sortable: true,
+    cellRenderer: p => <span className="mono" style={{ fontSize: 11 }}>{p.value}</span> },
+  { headerName: 'ARTG',   field: 'artg',   width: 100, sortable: true,
+    cellRenderer: p => (
+      <span className="mono" style={{ fontSize: 11, color: p.value === '—' ? 'var(--ink-4)' : 'var(--ink-2)' }}>
+        {p.value}
+      </span>
+    ) },
+  { headerName: 'Status', field: 'status', width: 130, sortable: true,
+    cellRenderer: p => <Pill kind={STATUS_KIND[p.value] || 'outline'} dot>{p.value}</Pill> },
+  { headerName: 'Next verification', field: 'nextVerify', width: 160, sortable: true,
+    cellRenderer: p => <Pill kind={VSTATUS_KIND[p.data.verifyStatus]} dot>{fmtDate(p.value)}</Pill> },
+];
+
 // ─── Component ───────────────────────────────────────────────────────────────
 const EquipmentPage = () => {
   const [equipment,   setEquipment]   = useState(() =>
@@ -487,20 +515,34 @@ const EquipmentPage = () => {
   const allSites = useMemo(() => ['all', ...new Set(equipment.map(e => e.site))], [equipment]);
   const allTypes = useMemo(() => ['all', ...new Set(equipment.map(e => e.type))], [equipment]);
 
-  // Inline filter (no memo) — always reflects current state on every render.
+  // ── Register filter ────────────────────────────────────────────────────────
   const _q = search.toLowerCase();
-  const preFiltered = equipment.filter(e => {
-    if (siteFilter !== 'all' && e.site !== siteFilter) return false;
-    if (typeFilter !== 'all' && e.type !== typeFilter) return false;
-    if (_q && !e.id.toLowerCase().includes(_q) && !e.name.toLowerCase().includes(_q) && !e.serial.toLowerCase().includes(_q)) return false;
-    return true;
-  });
-  const filtered = preFiltered.filter(e => {
-    if (filter === 'overdue')    return e.verifyStatus === 'bad';
-    if (filter === 'soon')       return e.verifyStatus === 'warn';
-    if (filter === 'quarantine') return e.status === 'Quarantined';
-    return true;
-  });
+
+  // preFiltered: drives chip-count labels (site + type + search, ignores chip).
+  const preFiltered = useMemo(() => {
+    const q = search.toLowerCase();
+    return equipment.filter(e => {
+      if (siteFilter !== 'all' && e.site !== siteFilter) return false;
+      if (typeFilter !== 'all' && e.type !== typeFilter) return false;
+      if (q && !e.id.toLowerCase().includes(q) && !e.name.toLowerCase().includes(q) && !e.serial.toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [equipment, siteFilter, typeFilter, search]);
+
+  // filteredEquipment: all four filters applied.
+  const filteredEquipment = useMemo(() => {
+    return preFiltered.filter(e => {
+      if (filter === 'overdue')    return e.verifyStatus === 'bad';
+      if (filter === 'soon')       return e.verifyStatus === 'warn';
+      if (filter === 'quarantine') return e.status === 'Quarantined';
+      return true;
+    });
+  }, [preFiltered, filter]);
+
+  // gridData is a state value (not just a memo) so AG Grid's prop-change
+  // detection sees a genuine state-driven re-render, not just a memo result.
+  const [gridData, setGridData] = useState(filteredEquipment);
+  useEffect(() => { setGridData(filteredEquipment); }, [filteredEquipment]);
 
   // Verification schedule: sort all by nextVerify ISO date
   const scheduleItems = useMemo(() =>
@@ -599,51 +641,7 @@ const EquipmentPage = () => {
     setPlacingOrderCon(null);
   };
 
-  // ─── Column definitions ───────────────────────────────────────────────────
-
-  const registerColDefs = useMemo(() => [
-    {
-      headerName: 'Asset ID', field: 'id', width: 150,
-      cellRenderer: p => (
-        <span className="mono" style={{ fontWeight: 500 }}>{p.value}</span>
-      ),
-    },
-    {
-      headerName: 'Device', field: 'name', flex: 2,
-      cellRenderer: p => (
-        <div>
-          <div style={{ fontWeight: 500 }}>{p.data.name}</div>
-          <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{p.data.manufacturer} · {p.data.model}</div>
-        </div>
-      ),
-    },
-    { headerName: 'Type', field: 'type', width: 150, cellStyle: { fontSize: 12 } },
-    { headerName: 'Site', field: 'site', flex: 1, cellClass: 'muted' },
-    {
-      headerName: 'Serial', field: 'serial', width: 130,
-      cellRenderer: p => (
-        <span className="mono" style={{ fontSize: 11 }}>{p.value}</span>
-      ),
-    },
-    {
-      headerName: 'ARTG', field: 'artg', width: 100,
-      cellRenderer: p => (
-        <span className="mono" style={{ fontSize: 11, color: p.value === '—' ? 'var(--ink-4)' : 'var(--ink-2)' }}>{p.value}</span>
-      ),
-    },
-    {
-      headerName: 'Status', field: 'status', width: 130,
-      cellRenderer: p => (
-        <Pill kind={STATUS_KIND[p.value] || 'outline'} dot>{p.value}</Pill>
-      ),
-    },
-    {
-      headerName: 'Next verification', field: 'nextVerify', width: 160,
-      cellRenderer: p => (
-        <Pill kind={VSTATUS_KIND[p.data.verifyStatus]} dot>{fmtDate(p.value)}</Pill>
-      ),
-    },
-  ], []);
+  // ─── Column definitions (inline in component; sortable explicit on each) ──
 
   const hstFleetColDefs = useMemo(() => [
     {
@@ -958,19 +956,17 @@ const EquipmentPage = () => {
               <input style={{ border: 'none', outline: 'none', background: 'transparent', font: 'inherit', fontSize: 12, color: 'var(--ink)', width: '100%' }}
                 placeholder="Search ID, name, serial…" value={search} onChange={e => setSearch(e.target.value)} />
             </div>
+            <span style={{ fontSize: 11, color: 'var(--ink-3)', whiteSpace: 'nowrap' }}>
+              {gridData.length} device{gridData.length !== 1 ? 's' : ''}
+            </span>
           </div>
 
           <div className="card">
-            {filtered.length === 0
-              ? <div className="empty">No equipment matches your filter.</div>
-              : (
-                <NexusGrid
-                  rowData={filtered}
-                  columnDefs={registerColDefs}
-                  onRowClicked={p => setDetailId(p.data.id)}
-                />
-              )
-            }
+            <NexusGrid
+              rowData={gridData}
+              columnDefs={REGISTER_COL_DEFS}
+              onRowClicked={p => setDetailId(p.data.id)}
+            />
           </div>
         </>
       )}
