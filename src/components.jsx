@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import Icon from './icons';
 import { useLocation } from './LocationContext';
 import { useNexusData } from './NexusDataContext';
+import { useAuth } from './AuthContext';
 
 // === Sparkline ===
 export const Sparkline = ({ data, height = 28, width = 100, color }) => {
@@ -88,7 +89,23 @@ export const Avatar = ({ name, size = 22, idx }) => {
 export const Sidebar = ({ current, setCurrent, badges, user, onSignOut, open, onClose }) => {
   const { siteId, setSiteId, site, SITES } = useLocation();
   const { activeStandard } = useNexusData() ?? {};
+  const { userSites } = useAuth() ?? { userSites: [] };
   const [siteOpen, setSiteOpen] = useState(false);
+
+  // Build the list of sites this user may select.
+  // userSites = [] means unrestricted; otherwise it's an array of full site names.
+  const allowedSites = userSites.length === 0
+    ? SITES                                                           // unrestricted — show all
+    : userSites.length === 1
+      ? SITES.filter(s => userSites.includes(s.name))                // single site — no "All" option
+      : [SITES[0], ...SITES.filter(s => userSites.includes(s.name))]; // multi-site — "All" + theirs
+
+  // If the current siteId is not accessible (e.g. after login switch), snap to the first allowed option.
+  useEffect(() => {
+    if (!allowedSites.find(s => s.id === siteId)) {
+      setSiteId(allowedSites[0]?.id ?? 'all');
+    }
+  }, [userSites.join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const items = [
     { section: "Workspace" },
@@ -125,57 +142,74 @@ export const Sidebar = ({ current, setCurrent, badges, user, onSignOut, open, on
         </div>
       </div>
 
-      {/* Site / location selector */}
-      <div style={{ padding: '0 10px 6px', position: 'relative' }}>
-        <button
-          onClick={() => setSiteOpen(o => !o)}
-          style={{
-            width: '100%', display: 'flex', alignItems: 'center', gap: 7,
-            padding: '6px 8px', borderRadius: 6, border: '1px solid var(--border)',
-            background: siteOpen ? 'var(--surface-2)' : 'var(--surface)',
-            cursor: 'pointer', fontSize: 12, color: 'var(--ink-2)',
-            transition: 'background 0.15s',
-          }}>
-          <Icon name="building" size={13} style={{ color: 'var(--ink-3)', flexShrink: 0 }} />
-          <span style={{ flex: 1, textAlign: 'left', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {site.short}
-          </span>
-          <Icon name="chev_down" size={11} style={{ color: 'var(--ink-4)', flexShrink: 0, transform: siteOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
-        </button>
-
-        {siteOpen && (
-          <>
-            <div
-              style={{ position: 'fixed', inset: 0, zIndex: 49 }}
-              onClick={() => setSiteOpen(false)}
-            />
-            <div style={{
-              position: 'absolute', top: 'calc(100% + 2px)', left: 10, right: 10,
-              zIndex: 50, background: 'var(--surface)', border: '1px solid var(--border)',
-              borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.14)', overflow: 'hidden',
+      {/* Site / location selector — hidden when user has no choice */}
+      {allowedSites.length > 1 && (
+        <div style={{ padding: '0 10px 6px', position: 'relative' }}>
+          <button
+            onClick={() => setSiteOpen(o => !o)}
+            style={{
+              width: '100%', display: 'flex', alignItems: 'center', gap: 7,
+              padding: '6px 8px', borderRadius: 6, border: '1px solid var(--border)',
+              background: siteOpen ? 'var(--surface-2)' : 'var(--surface)',
+              cursor: 'pointer', fontSize: 12, color: 'var(--ink-2)',
+              transition: 'background 0.15s',
             }}>
-              {SITES.map(s => (
-                <div
-                  key={s.id}
-                  onClick={() => { setSiteId(s.id); setSiteOpen(false); }}
-                  style={{
-                    padding: '8px 12px', fontSize: 12, cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', gap: 8,
-                    background: s.id === siteId ? 'var(--accent-soft)' : 'transparent',
-                    color: s.id === siteId ? 'var(--accent-ink)' : 'var(--ink-2)',
-                    fontWeight: s.id === siteId ? 600 : 400,
-                  }}>
-                  {s.id === siteId && (
-                    <Icon name="check" size={11} style={{ flexShrink: 0 }} />
-                  )}
-                  {s.id !== siteId && <span style={{ width: 11, flexShrink: 0 }} />}
-                  <span>{s.name}</span>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-      </div>
+            <Icon name="building" size={13} style={{ color: 'var(--ink-3)', flexShrink: 0 }} />
+            <span style={{ flex: 1, textAlign: 'left', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {site.short}
+            </span>
+            <Icon name="chev_down" size={11} style={{ color: 'var(--ink-4)', flexShrink: 0, transform: siteOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }} />
+          </button>
+
+          {siteOpen && (
+            <>
+              <div
+                style={{ position: 'fixed', inset: 0, zIndex: 49 }}
+                onClick={() => setSiteOpen(false)}
+              />
+              <div style={{
+                position: 'absolute', top: 'calc(100% + 2px)', left: 10, right: 10,
+                zIndex: 50, background: 'var(--surface)', border: '1px solid var(--border)',
+                borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.14)', overflow: 'hidden',
+              }}>
+                {allowedSites.map(s => (
+                  <div
+                    key={s.id}
+                    onClick={() => { setSiteId(s.id); setSiteOpen(false); }}
+                    style={{
+                      padding: '8px 12px', fontSize: 12, cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', gap: 8,
+                      background: s.id === siteId ? 'var(--accent-soft)' : 'transparent',
+                      color: s.id === siteId ? 'var(--accent-ink)' : 'var(--ink-2)',
+                      fontWeight: s.id === siteId ? 600 : 400,
+                    }}>
+                    {s.id === siteId && (
+                      <Icon name="check" size={11} style={{ flexShrink: 0 }} />
+                    )}
+                    {s.id !== siteId && <span style={{ width: 11, flexShrink: 0 }} />}
+                    <span>{s.name}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+      {/* When user is pinned to a single site, show it as a non-interactive label */}
+      {allowedSites.length === 1 && (
+        <div style={{ padding: '0 10px 6px' }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 7,
+            padding: '6px 8px', borderRadius: 6, border: '1px solid var(--border)',
+            background: 'var(--surface)', fontSize: 12, color: 'var(--ink-3)',
+          }}>
+            <Icon name="building" size={13} style={{ color: 'var(--ink-3)', flexShrink: 0 }} />
+            <span style={{ flex: 1, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {allowedSites[0].short}
+            </span>
+          </div>
+        </div>
+      )}
 
       <div className="nav">
         {items.map((it, i) => {

@@ -9,6 +9,7 @@ import { COURIERS } from '../courier-api';
 import { ConsumableFormDrawer, StockReceiveDrawer, StockUseDrawer, PlaceOrderDrawer } from '../consumables-drawers';
 import NexusGrid from '../nexus-grid';
 import { useAuth, ALL_SITES } from '../AuthContext';
+import { useLocation, SITES as LOC_SITES } from '../LocationContext';
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 const fmtDate = (iso) => {
@@ -474,6 +475,7 @@ const REGISTER_COL_DEFS = [
 // ─── Component ───────────────────────────────────────────────────────────────
 const EquipmentPage = () => {
   const { userSites } = useAuth();
+  const { siteId } = useLocation();
   // Derive which sites this user may access (empty = unrestricted)
   const allowedSites = userSites.length > 0 ? userSites : ALL_SITES.map(s => s.name);
   const siteRestricted = userSites.length > 0; // hide dropdown / lock filter when true
@@ -508,6 +510,13 @@ const EquipmentPage = () => {
   const [stockReceiveCon, setStockReceiveCon] = useState(null);
   const [stockUseCon,     setStockUseCon]     = useState(null);
   const [placingOrderCon, setPlacingOrderCon] = useState(null);
+
+  // Sync both site filters when the global sidebar location changes
+  useEffect(() => {
+    const name = siteId === 'all' ? 'all' : (LOC_SITES.find(s => s.id === siteId)?.name ?? 'all');
+    setSiteFilter(name);
+    setConSiteFilter(name);
+  }, [siteId]);
 
   const detailEq  = equipment.find(e => e.id === detailId) || null;
   const isEdit    = !!(formTarget?.id);

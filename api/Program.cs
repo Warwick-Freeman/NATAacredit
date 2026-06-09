@@ -383,6 +383,28 @@ app.MapPut("/api/users/{id:int}", async (int id, UserUpdateDto dto, NexusDbConte
         sites = System.Text.Json.JsonSerializer.Deserialize<string[]>(user.Sites) ?? Array.Empty<string>() });
 }).RequireAuthorization();
 
+app.MapPost("/api/users", async (UserCreateDto dto, NexusDbContext db) =>
+{
+    if (await db.Users.AnyAsync(u => u.Email == dto.Email))
+        return Results.Conflict(new { error = "Email already in use" });
+    var user = new AppUser
+    {
+        Email        = dto.Email,
+        Name         = dto.Name,
+        Role         = dto.Role,
+        Mfa          = dto.Mfa,
+        Auth         = dto.Auth,
+        Sites        = System.Text.Json.JsonSerializer.Serialize(dto.Sites ?? Array.Empty<string>()),
+        PasswordHash = HashPassword(dto.Password),
+        LastSeen     = "—",
+    };
+    db.Users.Add(user);
+    await db.SaveChangesAsync();
+    var sites = dto.Sites ?? Array.Empty<string>();
+    return Results.Ok(new { id = user.Id, name = user.Name, role = user.Role,
+        email = user.Email, mfa = user.Mfa, auth = user.Auth, lastSeen = user.LastSeen, sites });
+}).RequireAuthorization();
+
 // ── Studies ───────────────────────────────────────────────────────────────────
 
 var validStudyStatuses = new HashSet<string>(StringComparer.Ordinal)
@@ -1340,6 +1362,13 @@ string? SaveFile(string docId, IFormFile file, string dataDir)
     return safeName;
 }
 
+string HashPassword(string password)
+{
+    var salt = System.Security.Cryptography.RandomNumberGenerator.GetBytes(16);
+    var hash = Rfc2898DeriveBytes.Pbkdf2(password, salt, 100_000, HashAlgorithmName.SHA256, 32);
+    return $"{Convert.ToBase64String(salt)}.{Convert.ToBase64String(hash)}";
+}
+
 bool VerifyPassword(string password, string stored)
 {
     var parts = stored.Split('.');
@@ -1463,6 +1492,7 @@ ActivityEntry MakeActivity(string who, string action, string target, string kind
 
 record LoginDto(string Email, string Password);
 record UserUpdateDto(string? Name, string? Role, bool? Mfa, string? Auth, string[]? Sites);
+record UserCreateDto(string Name, string Email, string Role, bool Mfa, string Auth, string[]? Sites, string Password);
 record StudyStatusDto(string Status, int? SignedDays);
 record ClauseUpdateDto(string? Status, int? Evidence, string? Owner, string? LastReviewed);
 

@@ -151,18 +151,46 @@ export function AuthProvider({ children }) {
     return can(user?.role, permission);
   }
 
-  // Local-only user management (UI state only — persisted server-side via API in a future iteration)
-  function addUser(data) {
-    const next = [...usersRef.current, { id: Date.now(), mfa: data.mfa ?? false, auth: data.auth || 'Local', lastSeen: '—', ...data }];
-    syncUsers(next);
+  async function addUser(data) {
+    const token = getToken();
+    const dto = {
+      name:     data.name,
+      email:    data.email,
+      role:     data.role,
+      mfa:      data.mfa ?? false,
+      auth:     data.auth || 'Local',
+      sites:    data.sites ?? [],
+      password: data.password || 'demo',
+    };
+    const res = await fetch(`${BASE}/api/users`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body:    JSON.stringify(dto),
+    });
+    const created = res.ok ? await res.json() : null;
+    const newUser = created ?? { id: Date.now(), lastSeen: '—', ...dto, password: undefined };
+    syncUsers([...usersRef.current, newUser]);
   }
 
-  function updateUser(id, changes) {
-    const next = usersRef.current.map(u => u.id === id ? { ...u, ...changes } : u);
-    syncUsers(next);
+  async function updateUser(id, changes) {
+    const token = getToken();
+    const dto = {
+      name:  changes.name,
+      role:  changes.role,
+      mfa:   changes.mfa ?? false,
+      auth:  changes.auth,
+      sites: changes.sites ?? [],
+    };
+    const res = await fetch(`${BASE}/api/users/${id}`, {
+      method:  'PUT',
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body:    JSON.stringify(dto),
+    });
+    const updated = res.ok ? await res.json() : null;
+    const merged = updated ?? { ...usersRef.current.find(u => u.id === id), ...changes };
+    syncUsers(usersRef.current.map(u => u.id === id ? { ...u, ...merged } : u));
     if (user?.id === id) {
-      const updated = next.find(u => u.id === id);
-      const session = { id: updated.id, name: updated.name, role: updated.role, email: updated.email, sites: updated.sites ?? [] };
+      const session = { id: merged.id ?? id, name: merged.name, role: merged.role, email: merged.email, sites: merged.sites ?? [] };
       setUser(session);
       localStorage.setItem('nexus_user', JSON.stringify(session));
     }
