@@ -521,12 +521,7 @@ const AccreditationPage = ({ data: D }) => {
         title="Accreditation workspace"
         subtitle="Every clause mapped to live evidence. Self-assessment status updates in real time."
         actions={
-          <>
-            <button className="btn" onClick={openStandard}><Icon name="book" size={14} />View standard</button>
-            <button className="btn"><Icon name="eye" size={14} />Preview assessor view</button>
-            <button className="btn" onClick={() => exportSelfAssessment(clauses, D, user)}><Icon name="download" size={14} />Self-assessment report</button>
-            <button className="btn btn-primary"><Icon name="link" size={14} />Issue assessor access</button>
-          </>
+          <button className="btn" onClick={openStandard}><Icon name="book" size={14} />View standard</button>
         }
       />
 
@@ -741,9 +736,6 @@ const AccreditationPage = ({ data: D }) => {
                   <div style={{ fontSize: 11, color: 'var(--ink-4)' }}>auto-rebuild on changes</div>
                 </div>
               </div>
-              <button className="btn btn-primary"><Icon name="link" size={14} />Issue new assessor access</button>
-              &nbsp;&nbsp;
-              <button className="btn"><Icon name="download" size={14} />Download evidence pack (.zip)</button>
             </div>
           </div>
         </div>

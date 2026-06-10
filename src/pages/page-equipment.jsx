@@ -904,7 +904,6 @@ const EquipmentPage = () => {
         subtitle="ARTG-listed devices · acceptance · verification · maintenance · retention life + 7 yrs"
         actions={
           <>
-            <button className="btn"><Icon name="download" size={14} />Export register</button>
             <button className="btn btn-primary" onClick={() => setFormTarget({})}>
               <Icon name="plus" size={14} />Add equipment
             </button>

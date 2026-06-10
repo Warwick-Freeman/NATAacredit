@@ -291,10 +291,6 @@ const HomePage = ({ data: D, goTo, openClause }) => {
                 </>
               )}
             </div>
-            <button className="btn" onClick={() => exportEvidencePack(D, site, user)}><Icon name="download" size={14} />Export evidence pack</button>
-            <button className="btn btn-primary" onClick={() => goTo('accreditation')}>
-              <Icon name="shield" size={14} />Open accreditation workspace
-            </button>
           </>
         }
       />
@@ -405,6 +401,7 @@ const HomePage = ({ data: D, goTo, openClause }) => {
               <button className="btn btn-ghost" onClick={() => goTo('studies')}>Open queue<Icon name="arrow_right" size={13} /></button>
             </div>
             <NexusGrid
+              pageSize={0}
               rowData={D.studies.filter(s => s.status !== "Final").slice(0, 5)}
               columnDefs={[
                 {

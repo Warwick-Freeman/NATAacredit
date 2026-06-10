@@ -196,7 +196,6 @@ const StaffPage = () => {
         subtitle="Roles · qualifications · competency · BLS · rostering ratios"
         actions={
           <>
-            <button className="btn"><Icon name="download" size={14} />Training register</button>
             <button className="btn btn-primary" onClick={openAdd}>
               <Icon name="user_plus" size={14} />Add staff member
             </button>

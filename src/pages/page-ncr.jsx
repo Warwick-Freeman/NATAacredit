@@ -338,7 +338,6 @@ const NCRPage = () => {
         subtitle="NC register · root-cause analysis · corrective & preventive actions · effectiveness review"
         actions={
           <>
-            <button className="btn"><Icon name="chart" size={14} />Trend report</button>
             <button className="btn btn-primary" onClick={() => setRaiseOpen(true)}>
               <Icon name="plus" size={14} />Raise NC
             </button>
