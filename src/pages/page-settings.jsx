@@ -5,7 +5,7 @@ import { useAuth, ROLE_LEVEL, ROLE_PERMISSIONS, ASA_ROLES, AASM_ROLES, ALL_SITES
 import UserFormDrawer from '../user-form-drawer';
 import { useNexusData } from '../NexusDataContext';
 import { getStdCfg } from '../standardConfig';
-import { fetchRooms, createRoom, updateRoom, deleteRoom } from '../api';
+import { fetchRooms, createRoom, updateRoom, deleteRoom, fetchConfig, saveConfigKey } from '../api';
 import NexusGrid from '../nexus-grid';
 
 // ─── Toggle switch ─────────────────────────────────────────────────────────────
@@ -38,16 +38,11 @@ const SEED_SITES = [
 
 const SEED_INTEGRATIONS = [
   { id: 1,  name: 'Compumedics ProFusion',      cat: 'PSG software',         on: true,  apiKey: 'cpf_live_sk_4e...a91c', lastSync: '3 min ago',    webhook: 'https://api.nexus360.com/ingest/cpf' },
-  { id: 2,  name: 'Philips Sleepware G3',       cat: 'PSG software',         on: true,  apiKey: 'slw_live_sk_7b...c44d', lastSync: '8 min ago',    webhook: 'https://api.nexus360.com/ingest/slw' },
-  { id: 3,  name: 'Natus SleepWorks',           cat: 'PSG software',         on: false, apiKey: '',                      lastSync: '—',            webhook: '' },
   { id: 4,  name: 'ResMed AirView',             cat: 'CPAP cloud',           on: true,  apiKey: 'rsm_live_sk_9a...f02b', lastSync: '12 min ago',   webhook: '' },
-  { id: 5,  name: 'Philips Care Orchestrator',  cat: 'CPAP cloud',           on: true,  apiKey: 'pco_live_sk_2c...b88e', lastSync: '12 min ago',   webhook: '' },
   { id: 6,  name: 'FHIR R4 endpoint',           cat: 'Interoperability',     on: true,  apiKey: 'fhir_live_sk_5d...311f', lastSync: '1 h ago',     webhook: 'https://api.nexus360.com/fhir/r4' },
   { id: 7,  name: 'HealthLink secure messaging',cat: 'Secure messaging',     on: true,  apiKey: 'hlk_live_sk_3e...aa7c', lastSync: '22 min ago',   webhook: '' },
   { id: 8,  name: 'Argus secure messaging',     cat: 'Secure messaging',     on: false, apiKey: '',                      lastSync: '—',            webhook: '' },
-  { id: 9,  name: 'DocuSign',                   cat: 'e-Signature',          on: true,  apiKey: 'dcs_live_sk_8f...d61a', lastSync: '2 h ago',      webhook: 'https://api.nexus360.com/hook/dcs' },
   { id: 10, name: 'TGA adverse event export',   cat: 'Regulatory',           on: true,  apiKey: 'tga_live_sk_1a...c50b', lastSync: '1 d ago',      webhook: '' },
-  { id: 11, name: 'Okta SSO (OIDC)',            cat: 'Identity',             on: true,  apiKey: 'okta_live_sk_6b...e99d', lastSync: 'live',        webhook: 'https://api.nexus360.com/sso/okta' },
   { id: 12, name: 'Sentry',                     cat: 'Observability',        on: true,  apiKey: 'sentry_live_sk_0c...12af', lastSync: 'live',      webhook: '' },
 ];
 
@@ -134,6 +129,23 @@ const SettingsPage = () => {
   const [expandedInt, setExpandedInt] = useState(null);
   const [pendingOff, setPendingOff] = useState(null);
   const [showKey, setShowKey] = useState({});
+
+  // Nexus 360 server integration
+  const [n360Url,      setN360Url]      = useState('');
+  const [n360Username, setN360Username] = useState('');
+  const [n360Password, setN360Password] = useState('');
+  const [n360Saving,   setN360Saving]   = useState(false);
+  const [n360Testing,  setN360Testing]  = useState(false);
+  const [n360TestResult, setN360TestResult] = useState(null); // null | 'ok' | 'fail'
+  const [showN360Pass, setShowN360Pass] = useState(false);
+
+  useEffect(() => {
+    fetchConfig().then(cfg => {
+      if (cfg['nexus360_url'])      setN360Url(cfg['nexus360_url']);
+      if (cfg['nexus360_username']) setN360Username(cfg['nexus360_username']);
+      if (cfg['nexus360_password']) setN360Password(cfg['nexus360_password']);
+    }).catch(() => {});
+  }, []);
 
   // Retention
   const [retention, setRetention] = useState(SEED_RETENTION);
@@ -235,6 +247,42 @@ const SettingsPage = () => {
     setIntegrations(prev => prev.map(i => i.id === pendingOff ? { ...i, on: false, lastSync: '—' } : i));
     setPendingOff(null);
     if (expandedInt === pendingOff) setExpandedInt(null);
+  }
+
+  // ── Nexus 360 server helpers ──────────────────────────────────────────────────
+
+  async function saveN360Settings() {
+    setN360Saving(true);
+    setN360TestResult(null);
+    try {
+      await Promise.all([
+        saveConfigKey('nexus360_url',      n360Url.trim()),
+        saveConfigKey('nexus360_username', n360Username.trim()),
+        saveConfigKey('nexus360_password', n360Password),
+      ]);
+      showSaved();
+    } catch { /* silent — toast not shown on error */ }
+    finally { setN360Saving(false); }
+  }
+
+  async function testN360Connection() {
+    if (!n360Url.trim() || !n360Username.trim() || !n360Password) return;
+    setN360Testing(true);
+    setN360TestResult(null);
+    try {
+      const token = localStorage.getItem('nexus_token');
+      const res = await fetch(`${import.meta.env.VITE_API_URL ?? ''}/api/config/test-nexus360`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ url: n360Url.trim(), username: n360Username.trim(), password: n360Password }),
+      });
+      const data = res.ok ? await res.json() : null;
+      setN360TestResult(data?.ok ? 'ok' : 'fail');
+    } catch {
+      setN360TestResult('fail');
+    } finally {
+      setN360Testing(false);
+    }
   }
 
   // ── Retention helpers ─────────────────────────────────────────────────────────
@@ -843,6 +891,88 @@ const SettingsPage = () => {
       {/* ── INTEGRATIONS ──────────────────────────────────────────────────────── */}
       {tab === 'integrations' && (
         <>
+          {/* ── Nexus 360 server ──────────────────────────────────────────────── */}
+          <div className="card" style={{ marginBottom: 8, overflow: 'hidden' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px' }}>
+              <div style={{
+                width: 36, height: 36, borderRadius: 8, flexShrink: 0,
+                background: n360Url ? 'var(--good-soft)' : 'var(--surface-2)',
+                color: n360Url ? 'var(--good)' : 'var(--ink-3)',
+                display: 'grid', placeItems: 'center',
+              }}>
+                <Icon name={n360Url ? 'check' : 'link'} size={16} />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 500 }}>Nexus 360 server</div>
+                <div style={{ fontSize: 11, color: 'var(--ink-3)', display: 'flex', gap: 8, marginTop: 2 }}>
+                  <span>PSG data platform</span>
+                  {n360Url && <span>· {n360Url}</span>}
+                </div>
+              </div>
+              {n360TestResult === 'ok'   && <Pill kind="good">Connected</Pill>}
+              {n360TestResult === 'fail' && <Pill kind="bad">Failed</Pill>}
+              <button
+                className="btn"
+                style={{ fontSize: 11, padding: '3px 8px' }}
+                onClick={() => setExpandedInt(expandedInt === 'n360' ? null : 'n360')}
+              >
+                <Icon name="cog" size={11} />Configure
+              </button>
+            </div>
+            {expandedInt === 'n360' && (
+              <div style={{ borderTop: '1px solid var(--border)', padding: '14px 18px', background: 'var(--surface-2)', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div className="form-field" style={{ marginBottom: 0 }}>
+                  <label className="form-label">Server URL</label>
+                  <input
+                    className="form-input"
+                    value={n360Url}
+                    onChange={e => { setN360Url(e.target.value); setN360TestResult(null); }}
+                    placeholder="https://yourserver.nexus360.cloud"
+                  />
+                </div>
+                <div style={{ display: 'flex', gap: 12 }}>
+                  <div className="form-field" style={{ flex: 1, marginBottom: 0 }}>
+                    <label className="form-label">Device key / username</label>
+                    <input
+                      className="form-input"
+                      value={n360Username}
+                      onChange={e => { setN360Username(e.target.value); setN360TestResult(null); }}
+                      placeholder="devicekey"
+                    />
+                  </div>
+                  <div className="form-field" style={{ flex: 1, marginBottom: 0 }}>
+                    <label className="form-label">Password</label>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <input
+                        className="form-input"
+                        type={showN360Pass ? 'text' : 'password'}
+                        value={n360Password}
+                        onChange={e => { setN360Password(e.target.value); setN360TestResult(null); }}
+                        placeholder="••••••••"
+                        style={{ flex: 1 }}
+                      />
+                      <button className="btn" style={{ flexShrink: 0 }} onClick={() => setShowN360Pass(v => !v)}>
+                        <Icon name="eye" size={13} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button className="btn btn-primary" onClick={saveN360Settings} disabled={n360Saving}>
+                    <Icon name="check" size={13} />{n360Saving ? 'Saving…' : 'Save'}
+                  </button>
+                  <button
+                    className="btn"
+                    onClick={testN360Connection}
+                    disabled={n360Testing || !n360Url.trim() || !n360Username.trim() || !n360Password}
+                  >
+                    <Icon name="pulse" size={13} />{n360Testing ? 'Testing…' : 'Test connection'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
           {pendingOff && (
             <div className="banner" style={{ background: 'var(--bad-soft)', border: '1px solid var(--bad)', borderRadius: 8, marginBottom: 18 }}>
               <Icon name="alert" size={18} style={{ color: 'var(--bad)' }} />

@@ -246,6 +246,16 @@ export async function switchStandard(value) {
   return res.json();
 }
 
+export async function saveConfigKey(key, value) {
+  const res = await fetch(`${BASE}/api/config/${encodeURIComponent(key)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ value }),
+  });
+  if (!res.ok) throw new Error(`Failed to save config key: ${key}`);
+  return res.json();
+}
+
 export async function fetchAll() {
   const [studies, equipment, indicators, clauses, compliance, tasks, activity] =
     await Promise.all([

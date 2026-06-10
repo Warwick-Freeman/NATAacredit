@@ -453,6 +453,45 @@ app.MapGet("/api/config", async (NexusDbContext db) =>
     return Results.Ok(entries.ToDictionary(e => e.Key, e => e.Value));
 }).RequireAuthorization();
 
+app.MapPut("/api/config/{key}", async (string key, ConfigValueDto dto, NexusDbContext db) =>
+{
+    var entry = await db.SiteConfig.FindAsync(key);
+    if (entry == null) db.SiteConfig.Add(new NexusApi.Models.SiteConfig { Key = key, Value = dto.Value ?? "" });
+    else entry.Value = dto.Value ?? "";
+    await db.SaveChangesAsync();
+    return Results.Ok(new { key, value = dto.Value ?? "" });
+}).RequireAuthorization();
+
+app.MapPost("/api/config/test-nexus360", async (Nexus360TestDto dto) =>
+{
+    if (string.IsNullOrWhiteSpace(dto.Url) || string.IsNullOrWhiteSpace(dto.Username) || string.IsNullOrWhiteSpace(dto.Password))
+        return Results.BadRequest("url, username and password are required");
+
+    var baseUrl = dto.Url.TrimEnd('/');
+    try
+    {
+        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+        var body = new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["grant_type"] = "password",
+            ["username"]   = dto.Username,
+            ["password"]   = dto.Password,
+        });
+        var res = await http.GetAsync($"{baseUrl}/token?grant_type=password&username={Uri.EscapeDataString(dto.Username)}&password={Uri.EscapeDataString(dto.Password)}");
+        if (res.IsSuccessStatusCode)
+            return Results.Ok(new { ok = true });
+        // Some servers use POST for token
+        var res2 = await http.PostAsync($"{baseUrl}/token", body);
+        return res2.IsSuccessStatusCode
+            ? Results.Ok(new { ok = true })
+            : Results.Ok(new { ok = false, status = (int)res2.StatusCode });
+    }
+    catch (Exception ex)
+    {
+        return Results.Ok(new { ok = false, error = ex.Message });
+    }
+}).RequireAuthorization();
+
 app.MapPost("/api/config/standard", async (StandardSwitchDto dto, NexusDbContext db, IWebHostEnvironment env) =>
 {
     if (dto.Value != "asa" && dto.Value != "aasm") return Results.BadRequest("Unknown standard");
@@ -1517,6 +1556,8 @@ record AppointmentDto(
     string? Notes, string? Status);
 
 record StandardSwitchDto(string Value);
+record ConfigValueDto(string? Value);
+record Nexus360TestDto(string Url, string Username, string Password);
 record FormRecordDto(string FormId, string? FormTitle, string? Period, string? Notes, string? FormData, string? SnapshotHtml);
 record IsrDto(string Quarter, string? Scorer, string? Reviewer, string? ReviewerRole,
     string? StudyIds, string? Results, string? Thresholds, string? Notes, string? Status,

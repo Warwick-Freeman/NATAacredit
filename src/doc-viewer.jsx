@@ -316,7 +316,7 @@ const DocViewer = ({ doc, autoEdit, onDesign, onClose, onAttach, onFormSaved, on
                 <Icon name="download" size={14} />Download
               </a>
             )}
-            {hasFile && (
+            {hasFile && !isSurveyForm && (
               <button className="btn" onClick={() => {
                 if (isPdf && pdfBlobUrl) {
                   window.open(pdfBlobUrl);
