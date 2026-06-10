@@ -52,7 +52,7 @@ if ($pdfs) {
     tar -czf standards.tar.gz $pdfs.Name
     scp -i $KeyPath standards.tar.gz "${server}:/tmp/nexus-standards.tar.gz"
     Remove-Item standards.tar.gz
-    ssh -i $KeyPath $server "tar -xzf /tmp/nexus-standards.tar.gz -C /opt && rm /tmp/nexus-standards.tar.gz"
+    ssh -i $KeyPath $server "sudo tar -xzf /tmp/nexus-standards.tar.gz -C /opt && rm /tmp/nexus-standards.tar.gz"
 }
 
 Write-Host "==> Installing systemd service..."
@@ -68,8 +68,36 @@ if ($Reseed) {
 
 ssh -i $KeyPath $server "sudo systemctl restart nexus-api"
 
-Write-Host "==> Ensuring TLS certificate exists..."
-ssh -i $KeyPath $server 'if [ ! -f /etc/ssl/certs/nexus.crt ]; then sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /tmp/nexus.key -out /tmp/nexus.crt -subj "/CN=18.221.101.26/O=Nexus360/C=AU" && sudo mv /tmp/nexus.key /etc/ssl/private/nexus.key && sudo mv /tmp/nexus.crt /etc/ssl/certs/nexus.crt && sudo chmod 600 /etc/ssl/private/nexus.key; fi'
+Write-Host "==> Uploading TLS certificate..."
+# Note: Get-ChildItem -Include requires the path to end with \* to filter correctly
+$allCerts   = Get-ChildItem cert\* -Include *.crt,*.pem,*.cer -File -ErrorAction SilentlyContinue
+$certFile   = $allCerts | Where-Object { $_.Name -notmatch 'bundle|chain|intermediate|^gd_' } | Select-Object -First 1
+$bundleFile = $allCerts | Where-Object { $_.Name -match  'bundle|chain|intermediate|^gd_' } | Select-Object -First 1
+$keyFile    = Get-ChildItem cert\* -Include *.key -File -ErrorAction SilentlyContinue | Select-Object -First 1
+
+if ($certFile -and $keyFile) {
+    Write-Host "    Certificate : $($certFile.Name)"
+    if ($bundleFile) { Write-Host "    Bundle      : $($bundleFile.Name)" }
+    Write-Host "    Key         : $($keyFile.Name)"
+
+    # Build full-chain cert (cert + intermediate bundle) into a temp file
+    $tmpChain = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), "nexus-chain.crt")
+    if ($bundleFile) {
+        $chain = (Get-Content $certFile.FullName -Raw) + "`n" + (Get-Content $bundleFile.FullName -Raw)
+        [System.IO.File]::WriteAllText($tmpChain, $chain)
+        Write-Host "    Full chain   : cert + bundle combined"
+    } else {
+        Copy-Item $certFile.FullName $tmpChain
+    }
+
+    scp -i $KeyPath $tmpChain          "${server}:/tmp/nexus.crt"
+    scp -i $KeyPath $keyFile.FullName  "${server}:/tmp/nexus.key"
+    Remove-Item $tmpChain
+    ssh -i $KeyPath $server "sudo mv /tmp/nexus.crt /etc/ssl/certs/nexus.crt && sudo mv /tmp/nexus.key /etc/ssl/private/nexus.key && sudo chmod 644 /etc/ssl/certs/nexus.crt && sudo chmod 600 /etc/ssl/private/nexus.key"
+} else {
+    Write-Host "    No cert files found in cert/ - generating self-signed fallback..."
+    ssh -i $KeyPath $server 'if [ ! -f /etc/ssl/certs/nexus.crt ]; then sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /tmp/nexus.key -out /tmp/nexus.crt -subj "/CN=nexus360/O=Nexus360/C=AU" && sudo mv /tmp/nexus.key /etc/ssl/private/nexus.key && sudo mv /tmp/nexus.crt /etc/ssl/certs/nexus.crt && sudo chmod 600 /etc/ssl/private/nexus.key; fi'
+}
 
 Write-Host "==> Installing nginx config..."
 scp -i $KeyPath deploy/nginx.conf "${server}:/tmp/nexus-nginx.conf"
@@ -79,5 +107,4 @@ ssh -i $KeyPath $server "sudo rm -f /etc/nginx/sites-enabled/default"
 ssh -i $KeyPath $server "sudo nginx -t && sudo systemctl reload nginx"
 
 Write-Host ""
-Write-Host 'Deployed to https://18.221.101.26'
-Write-Host 'Note: browser will warn about self-signed cert. Accept the exception, or replace with a CA cert once a domain is assigned.'
+Write-Host "Deploy complete. https://acdem.nexus360.cloud"

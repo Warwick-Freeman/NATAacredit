@@ -43,7 +43,7 @@ npm run build     # outputs to dist/
 
 ## Deploying to Production
 
-Production server: `ubuntu@18.221.101.26` (AWS EC2)
+Production server: `ubuntu@18.221.101.26` (AWS EC2) — `https://acdem.nexus360.cloud`
 Stack: nginx (HTTPS on 443) → reverse proxy → .NET systemd service (port 5000)
 
 ### Full deploy (frontend + API)
@@ -62,10 +62,10 @@ The script:
 2. Publishes the .NET API (`dotnet publish -c Release`)
 3. Uploads frontend to `/var/www/nexus` via SSH/SCP
 4. Uploads API to `/opt/nexus-api/` and restarts the systemd service
-5. Installs/reloads nginx config
-6. Creates a self-signed TLS cert if none exists
+5. Uploads TLS certificate from `cert/` (GoDaddy-signed for acdem.nexus360.cloud)
+6. Installs/reloads nginx config
 
-After deploy: `https://18.221.101.26` (browser will warn about self-signed cert — accept the exception).
+After deploy: `https://acdem.nexus360.cloud`
 
 ### SSH key location
 `Hosting/N360Accredit.pem` — do not commit changes to this file, it is already in `.gitignore`.
