@@ -9,7 +9,7 @@ import { useNexusData } from '../NexusDataContext';
 import { DME_PROVIDERS, DX_LIST, initDxFromDiagnoses, generateOrderHtml } from '../dme-order';
 import PatientFormSendModal from '../patient-form-send-modal';
 import { RecordViewer } from '../form-filler';
-import { fetchPatientFormLinks, fetchPatients, createPatient, updatePatient } from '../api';
+import { fetchPatientFormLinks, fetchPatients, createPatient, updatePatient, sendPortalInvite, fetchPortalAccount } from '../api';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -845,6 +845,12 @@ function PatientDrawer({ patient, onClose, onCreateTask, onOrderDme, onUpdate, s
   const [copiedLinkId, setCopiedLinkId] = useState(null);
   const [viewRecord, setViewRecord] = useState(null);
   const [showSendModal, setShowSendModal] = useState(false);
+  const [portalAccount, setPortalAccount] = useState(null);  // null=loading, {exists,status,email}
+  const [showPortalInvite, setShowPortalInvite] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteSaving, setInviteSaving] = useState(false);
+  const [inviteResult, setInviteResult] = useState(null); // null | 'sent' | 'error'
+  const [inviteError, setInviteError] = useState('');
 
   function refreshLinks() {
     setLoadingLinks(true);
@@ -883,6 +889,39 @@ function PatientDrawer({ patient, onClose, onCreateTask, onOrderDme, onUpdate, s
   function setC(field, val) { setContactDraft(p => ({ ...p, [field]: val })); }
   function setA(field, val) { setContactDraft(p => ({ ...p, address: { ...p.address, [field]: val } })); }
   function setE(field, val) { setContactDraft(p => ({ ...p, emergencyContact: { ...p.emergencyContact, [field]: val } })); }
+
+  React.useEffect(() => {
+    fetchPortalAccount(patient.id).then(setPortalAccount).catch(() => setPortalAccount({ exists: false }));
+  }, [patient.id]);
+
+  function openPortalInvite() {
+    setInviteEmail(patient.contact?.email ?? '');
+    setInviteResult(null);
+    setInviteError('');
+    setShowPortalInvite(true);
+  }
+
+  async function handleSendInvite(e) {
+    e.preventDefault();
+    if (!inviteEmail) return;
+    setInviteSaving(true);
+    setInviteError('');
+    try {
+      const res = await sendPortalInvite(patient.id, inviteEmail);
+      if (res?.emailError) {
+        setInviteError(`Invite created but email failed: ${res.emailError}`);
+        setInviteResult('error');
+      } else {
+        setInviteResult('sent');
+      }
+      fetchPortalAccount(patient.id).then(setPortalAccount).catch(() => {});
+    } catch (err) {
+      setInviteError(err.message ?? 'Failed to send invite');
+      setInviteResult('error');
+    } finally {
+      setInviteSaving(false);
+    }
+  }
 
   return (
     <>
@@ -952,6 +991,58 @@ function PatientDrawer({ patient, onClose, onCreateTask, onOrderDme, onUpdate, s
               onClick={() => onCreateTask({ title: `Follow-up: ${patient.name} — ${patient.mrn}`, assignedTo: patient.physician, priority: 'medium' })}>
               <Icon name="plus" size={13} />Create follow-up task
             </button>
+
+            {/* ── Portal access ── */}
+            <div style={{ marginTop: 16, padding: '12px 14px', background: 'var(--surface-2)', borderRadius: 8, border: '1px solid var(--border)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: showPortalInvite ? 12 : 0 }}>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink)', marginBottom: 2 }}>Patient portal</div>
+                  {portalAccount === null
+                    ? <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>Loading…</div>
+                    : portalAccount.exists
+                      ? <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+                          <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: portalAccount.status === 'active' ? '#22c55e' : '#f59e0b', marginRight: 5, verticalAlign: 'middle' }} />
+                          {portalAccount.status === 'active' ? 'Active' : 'Invite sent'} · {portalAccount.email}
+                        </div>
+                      : <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>No portal account</div>
+                  }
+                </div>
+                {!showPortalInvite && (
+                  <button className="btn" style={{ fontSize: 12, padding: '4px 10px' }} onClick={openPortalInvite}>
+                    {portalAccount?.exists ? 'Resend invite' : 'Send invite'}
+                  </button>
+                )}
+              </div>
+
+              {showPortalInvite && (
+                inviteResult === 'sent'
+                  ? <div style={{ fontSize: 13, color: '#16a34a' }}>
+                      Invite sent to <strong>{inviteEmail}</strong>.
+                      <button className="btn" style={{ fontSize: 11, marginLeft: 10, padding: '2px 8px' }} onClick={() => setShowPortalInvite(false)}>Done</button>
+                    </div>
+                  : <form onSubmit={handleSendInvite} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <input
+                        className="input"
+                        type="email"
+                        value={inviteEmail}
+                        onChange={e => setInviteEmail(e.target.value)}
+                        placeholder="patient@email.com"
+                        style={{ fontSize: 13 }}
+                        required
+                        autoFocus
+                      />
+                      {inviteError && <div style={{ fontSize: 12, color: '#dc2626' }}>{inviteError}</div>}
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button type="submit" className="btn btn-primary" style={{ fontSize: 12, flex: 1 }} disabled={inviteSaving}>
+                          {inviteSaving ? 'Sending…' : 'Send invite'}
+                        </button>
+                        <button type="button" className="btn" style={{ fontSize: 12 }} onClick={() => setShowPortalInvite(false)}>
+                          Cancel
+                        </button>
+                      </div>
+                    </form>
+              )}
+            </div>
           </>
         )}
 

@@ -390,6 +390,20 @@ export async function sendFormLink(token) {
   });
 }
 
+// ── Patient portal ────────────────────────────────────────────────────────────
+
+export async function sendPortalInvite(patientId, email) {
+  return post('/api/portal/invite', {
+    patientId,
+    email,
+    baseUrl: window.location.origin + window.location.pathname,
+  });
+}
+
+export async function fetchPortalAccount(patientId) {
+  return get(`/api/portal/account/${encodeURIComponent(patientId)}`);
+}
+
 // ── Roles ─────────────────────────────────────────────────────────────────────
 
 export async function fetchRoles() { return get('/api/roles'); }

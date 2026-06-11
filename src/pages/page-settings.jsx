@@ -181,7 +181,7 @@ const SettingsPage = () => {
   const [n360TestResult, setN360TestResult] = useState(null); // null | 'ok' | 'fail'
   const [showN360Pass, setShowN360Pass] = useState(false);
 
-  // Twilio (SMS + Email via comms.twilio.com)
+  // Twilio (SMS + Email)
   const [twilioConfig, setTwilioConfig] = useState({ accountSid: '', authToken: '', from: '', emailFrom: '', emailFromName: '' });
   const [twilioSaving, setTwilioSaving] = useState(false);
   const [twilioSaved,  setTwilioSaved]  = useState(false);
@@ -1187,7 +1187,7 @@ const SettingsPage = () => {
                 <div style={{ display: 'flex', gap: 12 }}>
                   <div className="form-field" style={{ flex: 2, marginBottom: 0 }}>
                     <label className="form-label">From address</label>
-                    <input className="form-input" type="email" value={twilioConfig.emailFrom} onChange={e => setTwilioConfig(c => ({ ...c, emailFrom: e.target.value }))} placeholder="ACxxxxxxxx@yourdomain.com" />
+                    <input className="form-input" type="email" value={twilioConfig.emailFrom} onChange={e => setTwilioConfig(c => ({ ...c, emailFrom: e.target.value }))} placeholder="noreply@yourdomain.com" />
                   </div>
                   <div className="form-field" style={{ flex: 1, marginBottom: 0 }}>
                     <label className="form-label">From name</label>
@@ -1196,7 +1196,7 @@ const SettingsPage = () => {
                 </div>
 
                 <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>
-                  Find your credentials at <strong>console.twilio.com</strong>. SMS from-number must be E.164 format (e.g. +61412345678). Email from-address must be verified in your Twilio account.
+                  Twilio credentials for SMS and email at <strong>console.twilio.com</strong>. The from-address must be verified in your Twilio account.
                 </div>
                 <button className="btn btn-primary" style={{ alignSelf: 'flex-start' }} onClick={saveTwilioConfig} disabled={twilioSaving}>
                   <Icon name="check" size={13} />{twilioSaving ? 'Saving…' : 'Save'}

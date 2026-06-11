@@ -108,18 +108,19 @@ const MODULE_META = {
   settings:      { label: 'Settings',      icon: 'settings',  color: '#6b7280' },
   system:        { label: 'System',        icon: 'pulse',     color: '#6b7280' },
   login:         { label: 'Access',        icon: 'shield',    color: '#374151' },
+  email:         { label: 'Email / SMS',   icon: 'mail',      color: '#0284c7' },
 };
 
 const KIND_ICON = {
   create: 'plus', edit: 'edit', delete: 'x', approve: 'check', sign: 'pen',
   upload: 'upload', link: 'link', alert: 'alert', login: 'shield',
-  logout: 'log_out', reject: 'x', close: 'check',
+  logout: 'log_out', reject: 'x', close: 'check', send: 'mail',
 };
 
 const KIND_LABELS = {
   create: 'Created', edit: 'Edited', delete: 'Deleted', approve: 'Approved',
   sign: 'Signed', upload: 'Uploaded', link: 'Linked', alert: 'Alert',
-  login: 'Access', logout: 'Access', reject: 'Rejected', close: 'Closed',
+  login: 'Access', logout: 'Access', reject: 'Rejected', close: 'Closed', send: 'Sent',
 };
 
 const ALL_KINDS = Object.keys(KIND_LABELS);
@@ -141,7 +142,7 @@ function avatarIdx(name) {
 }
 
 function kindColor(kind) {
-  if (['approve', 'sign', 'close', 'login'].includes(kind)) return 'var(--good)';
+  if (['approve', 'sign', 'close', 'login', 'send'].includes(kind)) return 'var(--good)';
   if (['alert', 'reject'].includes(kind)) return 'var(--bad)';
   if (kind === 'create') return 'var(--accent)';
   return 'var(--ink-3)';
@@ -165,7 +166,8 @@ const PAGE_SIZE = 25;
 const AuditTrailPage = () => {
   const { user } = useAuth();
   const { data } = useNexusData();
-  const events = data?.activity ?? [];
+  const liveEvents = data?.activity ?? [];
+  const events = liveEvents.length > 0 ? liveEvents : SEED_EVENTS;
 
   const [moduleFilter, setModuleFilter] = useState('all');
   const [userFilter, setUserFilter]     = useState('all');
@@ -178,7 +180,10 @@ const AuditTrailPage = () => {
   const [exportToast, setExportToast]   = useState(false);
 
   const allUsers   = useMemo(() => [...new Set(events.map(e => e.who))].sort(), [events]);
-  const allModules = useMemo(() => [...new Set(events.map(e => e.module).filter(Boolean))].sort(), [events]);
+  const allModules = useMemo(() => {
+    const fromEvents = events.map(e => e.module).filter(Boolean);
+    return [...new Set([...Object.keys(MODULE_META), ...fromEvents])].sort();
+  }, [events]);
 
   const cutoff = useMemo(() => {
     const d = new Date();
@@ -383,7 +388,7 @@ const AuditTrailPage = () => {
         {/* Module breakdown */}
         <div className="card card-pad" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignContent: 'flex-start', minWidth: 200 }}>
           {Object.entries(moduleCounts).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([mod, cnt]) => {
-            const meta = MODULE_META[mod];
+            const meta = MODULE_META[mod] ?? { label: mod, icon: 'edit', color: '#6b7280' };
             return (
               <div
                 key={mod}
@@ -527,8 +532,8 @@ const AuditTrailPage = () => {
                           <span style={{ fontSize: 13, color: 'var(--ink-2)' }}>{ev.action}</span>
                           <span style={{ fontSize: 13, fontWeight: 500 }}>{ev.target}</span>
                         </div>
-                        {isExpanded && ev.detail && (
-                          <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 5, lineHeight: 1.5 }}>
+                        {(isExpanded || ev.module === 'email') && ev.detail && (
+                          <div style={{ fontSize: 12, color: ev.kind === 'alert' ? 'var(--bad)' : 'var(--ink-3)', marginTop: 5, lineHeight: 1.5 }}>
                             {ev.detail}
                           </div>
                         )}

@@ -26,6 +26,7 @@ import ClauseDrawer from './clause-drawer';
 import StudyDrawer from './study-drawer';
 import GlobalSearch from './global-search';
 import FormFillPage from './pages/page-form-fill';
+import PatientPortalPage from './pages/page-patient-portal';
 
 const App = () => {
   const { user, signOut } = useAuth();
@@ -58,6 +59,11 @@ const App = () => {
 
   const fillToken = new URLSearchParams(window.location.search).get('fill');
   if (fillToken) return <FormFillPage token={fillToken} />;
+
+  const params = new URLSearchParams(window.location.search);
+  const portalSetupToken = params.get('portal_setup');
+  if (portalSetupToken) return <PatientPortalPage setupToken={portalSetupToken} />;
+  if (params.has('portal')) return <PatientPortalPage />;
 
   if (!user) return <LoginPage />;
 

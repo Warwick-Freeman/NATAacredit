@@ -204,6 +204,18 @@ public class Patient
     public string CreatedAt { get; set; } = "";
 }
 
+public class PatientPortalAccount
+{
+    public int Id { get; set; }
+    public string PatientId { get; set; } = "";
+    public string Email { get; set; } = "";
+    public string PasswordHash { get; set; } = "";
+    public string Status { get; set; } = "invited";   // invited | active
+    public string InviteToken { get; set; } = "";
+    public string CreatedAt { get; set; } = "";
+    public string LastLogin { get; set; } = "";
+}
+
 public class PatientFormLink
 {
     public int Id { get; set; }

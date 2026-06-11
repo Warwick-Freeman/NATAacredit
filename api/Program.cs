@@ -297,6 +297,19 @@ using (var scope = app.Services.CreateScope())
         )
         """);
 
+    db.Database.ExecuteSqlRaw("""
+        CREATE TABLE IF NOT EXISTS PatientPortalAccounts (
+            Id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            PatientId    TEXT NOT NULL DEFAULT '',
+            Email        TEXT NOT NULL DEFAULT '',
+            PasswordHash TEXT NOT NULL DEFAULT '',
+            Status       TEXT NOT NULL DEFAULT 'invited',
+            InviteToken  TEXT NOT NULL DEFAULT '',
+            CreatedAt    TEXT NOT NULL DEFAULT '',
+            LastLogin    TEXT NOT NULL DEFAULT ''
+        )
+        """);
+
     SeedData.Seed(db);
     SeedData.SeedDocuments(db);
     SeedData.SeedUsers(db);
@@ -843,9 +856,143 @@ app.MapPost("/api/form-fill/{token}", async (string token, FormFillSubmitDto dto
     return Results.Ok(new { recordId = record.Id, recordRef = record.RecordRef });
 });
 
+// ── Patient portal ────────────────────────────────────────────────────────────
+
+// POST /api/portal/invite  (staff auth)
+app.MapPost("/api/portal/invite", async (PortalInviteDto dto, NexusDbContext db, IHttpClientFactory httpFactory, ClaimsPrincipal principal) =>
+{
+    var patient = await db.Patients.FirstOrDefaultAsync(p => p.PatientId == dto.PatientId);
+    if (patient == null) return Results.NotFound(new { error = "patient_not_found" });
+
+    var token = Guid.NewGuid().ToString("N");
+    var account = await db.PatientPortalAccounts.FirstOrDefaultAsync(a => a.PatientId == dto.PatientId);
+    if (account == null)
+    {
+        account = new NexusApi.Models.PatientPortalAccount {
+            PatientId = dto.PatientId, Email = dto.Email, Status = "invited",
+            InviteToken = token, CreatedAt = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss")
+        };
+        db.PatientPortalAccounts.Add(account);
+    }
+    else
+    {
+        account.Email = dto.Email;
+        account.InviteToken = token;
+        if (account.Status != "active") account.Status = "invited";
+    }
+    await db.SaveChangesAsync();
+
+    var setupUrl = $"{dto.BaseUrl.TrimEnd('/')}?portal_setup={token}";
+    var emailSent = false;
+    var emailError = "";
+
+    var cfg        = (await db.SiteConfig.ToListAsync()).ToDictionary(e => e.Key, e => e.Value);
+    var accountSid = cfg.GetValueOrDefault("twilio_account_sid", "");
+    var authToken  = cfg.GetValueOrDefault("twilio_auth_token",  "");
+    var fromEmail  = cfg.GetValueOrDefault("twilio_email_from",  "");
+    var fromName   = cfg.GetValueOrDefault("twilio_email_from_name", "Nexus 360");
+
+    if (!string.IsNullOrEmpty(accountSid) && !string.IsNullOrEmpty(authToken) && !string.IsNullOrEmpty(fromEmail))
+    {
+        var credentials = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes($"{accountSid}:{authToken}"));
+        var http = httpFactory.CreateClient();
+        http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", credentials);
+        var html = $"<p>Hi {patient.Name},</p>" +
+                   $"<p>You have been invited to access the Nexus 360 patient portal.</p>" +
+                   $"<p><a href=\"{setupUrl}\" style=\"background:#2563eb;color:white;padding:12px 28px;border-radius:6px;text-decoration:none;display:inline-block;font-weight:600\">Set up your account</a></p>" +
+                   $"<p style=\"color:#718096;font-size:12px\">Or copy this link: {setupUrl}</p>" +
+                   $"<p style=\"color:#718096;font-size:12px\">This link is unique to you — do not share it.</p>";
+        var payload = new {
+            from    = new { address = fromEmail, name = fromName },
+            to      = new[] { new { address = dto.Email } },
+            content = new { subject = "Your patient portal access — Nexus 360", html = html }
+        };
+        try {
+            var r = await http.PostAsJsonAsync("https://comms.twilio.com/v1/Emails", payload);
+            emailSent = r.IsSuccessStatusCode;
+            if (!emailSent) emailError = $"Twilio {(int)r.StatusCode}: {await r.Content.ReadAsStringAsync()}";
+        } catch (Exception ex) { emailError = ex.Message; }
+    }
+    else { emailError = "Twilio email not configured (check account SID, auth token and from-address in Settings)"; }
+
+    var actor = ActorName(principal);
+    if (emailSent)
+        db.Activity.Add(MakeActivity(actor, "sent portal invite email to", $"{dto.Email} ({patient.Name})", "send", "email", $"Patient: {dto.PatientId}. Portal account created/updated."));
+    else
+        db.Activity.Add(MakeActivity(actor, "failed to send portal invite email to", $"{dto.Email} ({patient.Name})", "alert", "email", emailError));
+    await db.SaveChangesAsync();
+
+    return Results.Ok(new { token, setupUrl, emailSent, emailError = emailSent ? null : emailError });
+}).RequireAuthorization();
+
+// GET /api/portal/account/{patientId}  (staff auth)
+app.MapGet("/api/portal/account/{patientId}", async (string patientId, NexusDbContext db) =>
+{
+    var account = await db.PatientPortalAccounts.FirstOrDefaultAsync(a => a.PatientId == patientId);
+    if (account == null) return Results.Ok(new { exists = false, status = (string?)null, email = (string?)null });
+    return Results.Ok(new { exists = true, account.Status, account.Email });
+}).RequireAuthorization();
+
+// GET /api/portal/setup/{token}  (public)
+app.MapGet("/api/portal/setup/{token}", async (string token, NexusDbContext db) =>
+{
+    var account = await db.PatientPortalAccounts.FirstOrDefaultAsync(a => a.InviteToken == token);
+    if (account == null) return Results.NotFound(new { error = "invalid_token" });
+    var patient = await db.Patients.FirstOrDefaultAsync(p => p.PatientId == account.PatientId);
+    return Results.Ok(new { account.Email, patientName = patient?.Name ?? "" });
+});
+
+// POST /api/portal/setup/{token}  (public)
+app.MapPost("/api/portal/setup/{token}", async (string token, PortalSetupDto dto, NexusDbContext db) =>
+{
+    var account = await db.PatientPortalAccounts.FirstOrDefaultAsync(a => a.InviteToken == token);
+    if (account == null) return Results.BadRequest(new { error = "invalid_token" });
+    account.PasswordHash = HashPassword(dto.Password);
+    account.Status = "active";
+    account.InviteToken = "";
+    await db.SaveChangesAsync();
+    var patient = await db.Patients.FirstOrDefaultAsync(p => p.PatientId == account.PatientId);
+    var portalJwt = GeneratePortalToken(account.Email, account.PatientId, jwtKey);
+    return Results.Ok(new { token = portalJwt, patientName = patient?.Name ?? "", email = account.Email });
+});
+
+// POST /api/portal/login  (public)
+app.MapPost("/api/portal/login", async (PortalLoginDto dto, NexusDbContext db) =>
+{
+    var account = await db.PatientPortalAccounts.FirstOrDefaultAsync(a => a.Email == dto.Email);
+    if (account == null || account.Status != "active" || !VerifyPassword(dto.Password, account.PasswordHash))
+        return Results.Unauthorized();
+    account.LastLogin = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss");
+    await db.SaveChangesAsync();
+    var patient = await db.Patients.FirstOrDefaultAsync(p => p.PatientId == account.PatientId);
+    var portalJwt = GeneratePortalToken(account.Email, account.PatientId, jwtKey);
+    return Results.Ok(new { token = portalJwt, patientName = patient?.Name ?? "", email = account.Email });
+});
+
+// GET /api/portal/me  (portal auth)
+app.MapGet("/api/portal/me", async (NexusDbContext db, ClaimsPrincipal principal) =>
+{
+    var patientId = principal.FindFirst("patientId")?.Value ?? "";
+    if (string.IsNullOrEmpty(patientId)) return Results.Forbid();
+    var patient = await db.Patients.FirstOrDefaultAsync(p => p.PatientId == patientId);
+    if (patient == null) return Results.NotFound();
+    return Results.Ok(new { patient.Name, patient.Dob, patient.Mrn, patient.Site });
+}).RequireAuthorization();
+
+// GET /api/portal/forms  (portal auth)
+app.MapGet("/api/portal/forms", async (NexusDbContext db, ClaimsPrincipal principal) =>
+{
+    var patientId = principal.FindFirst("patientId")?.Value ?? "";
+    if (string.IsNullOrEmpty(patientId)) return Results.Forbid();
+    return Results.Ok(await db.PatientFormLinks
+        .Where(l => l.PatientId == patientId)
+        .OrderByDescending(l => l.SentAt)
+        .ToListAsync());
+}).RequireAuthorization();
+
 // ── Send form link via Twilio (SMS + Email) ───────────────────────────────────
 
-app.MapPost("/api/send-form-link/{token}", async (string token, SendFormLinkDto dto, NexusDbContext db, IHttpClientFactory httpFactory) =>
+app.MapPost("/api/send-form-link/{token}", async (string token, SendFormLinkDto dto, NexusDbContext db, IHttpClientFactory httpFactory, ClaimsPrincipal principal) =>
 {
     var link = await db.PatientFormLinks.FirstOrDefaultAsync(l => l.Token == token);
     if (link == null) return Results.NotFound(new { error = "not_found" });
@@ -854,6 +1001,8 @@ app.MapPost("/api/send-form-link/{token}", async (string token, SendFormLinkDto 
     var accountSid = cfg.GetValueOrDefault("twilio_account_sid", "");
     var authToken  = cfg.GetValueOrDefault("twilio_auth_token",  "");
     var fillUrl    = (dto.BaseUrl?.TrimEnd('/') ?? "") + $"?fill={token}";
+    var actor      = ActorName(principal);
+    var target     = $"{link.FormTitle} → {link.RecipientName}";
 
     if (string.IsNullOrEmpty(accountSid) || string.IsNullOrEmpty(authToken))
         return Results.BadRequest(new { error = "Twilio not configured" });
@@ -863,7 +1012,7 @@ app.MapPost("/api/send-form-link/{token}", async (string token, SendFormLinkDto 
         var fromEmail = cfg.GetValueOrDefault("twilio_email_from", "");
         var fromName  = cfg.GetValueOrDefault("twilio_email_from_name", "Nexus 360");
         if (string.IsNullOrEmpty(fromEmail))
-            return Results.BadRequest(new { error = "Twilio email from-address not configured" });
+            return Results.BadRequest(new { error = "Email from-address not configured" });
         if (string.IsNullOrEmpty(link.RecipientEmail))
             return Results.BadRequest(new { error = "No recipient email on this link" });
 
@@ -872,30 +1021,33 @@ app.MapPost("/api/send-form-link/{token}", async (string token, SendFormLinkDto 
         http.DefaultRequestHeaders.Authorization =
             new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", credentials);
 
+        var html = $"<p>Hi {link.RecipientName},</p>" +
+                   $"<p>Please complete the following form at your convenience:</p>" +
+                   $"<p><a href=\"{fillUrl}\" style=\"background:#2563eb;color:white;padding:10px 24px;" +
+                   $"border-radius:6px;text-decoration:none;display:inline-block;font-weight:600\">" +
+                   $"{link.FormTitle}</a></p>" +
+                   $"<p style=\"font-size:12px;color:#718096\">Or copy this link: {fillUrl}</p>" +
+                   $"<p style=\"font-size:12px;color:#718096\">This is a one-time link — it expires once submitted.</p>";
         var payload = new
         {
             from    = new { address = fromEmail, name = fromName },
             to      = new[] { new { address = link.RecipientEmail } },
-            content = new
-            {
-                subject = $"Please complete: {link.FormTitle}",
-                html    =
-                    $"<p>Hi {link.RecipientName},</p>" +
-                    $"<p>Please complete the following form at your convenience:</p>" +
-                    $"<p><a href=\"{fillUrl}\" style=\"background:#2563eb;color:white;padding:10px 24px;" +
-                    $"border-radius:6px;text-decoration:none;display:inline-block;font-weight:600\">" +
-                    $"{link.FormTitle}</a></p>" +
-                    $"<p style=\"font-size:12px;color:#718096\">Or copy this link: {fillUrl}</p>" +
-                    $"<p style=\"font-size:12px;color:#718096\">This is a one-time link — it expires once submitted.</p>"
-            }
+            content = new { subject = $"Please complete: {link.FormTitle}", html = html }
         };
 
         var response = await http.PostAsJsonAsync("https://comms.twilio.com/v1/Emails", payload);
         if (!response.IsSuccessStatusCode)
         {
             var body = await response.Content.ReadAsStringAsync();
-            return Results.Problem($"Twilio email error {(int)response.StatusCode}: {body}");
+            var errDetail = $"Twilio {(int)response.StatusCode}: {body}";
+            db.Activity.Add(MakeActivity(actor, "failed to send form link email", target, "alert", "email",
+                $"To: {link.RecipientEmail}. Form: {link.FormId}. Error: {errDetail}"));
+            await db.SaveChangesAsync();
+            return Results.Problem(errDetail);
         }
+        db.Activity.Add(MakeActivity(actor, "sent form link email", target, "send", "email",
+            $"To: {link.RecipientEmail}. Form: {link.FormId}."));
+        await db.SaveChangesAsync();
     }
     else if (link.Method == "sms")
     {
@@ -912,7 +1064,16 @@ app.MapPost("/api/send-form-link/{token}", async (string token, SendFormLinkDto 
             to:   new Twilio.Types.PhoneNumber(link.RecipientPhone)
         );
         if (message.Status == Twilio.Rest.Api.V2010.Account.MessageResource.StatusEnum.Failed)
-            return Results.Problem($"Twilio SMS error: {message.ErrorMessage}");
+        {
+            var errDetail = $"Twilio SMS error: {message.ErrorMessage}";
+            db.Activity.Add(MakeActivity(actor, "failed to send form link SMS", target, "alert", "email",
+                $"To: {link.RecipientPhone}. Form: {link.FormId}. Error: {errDetail}"));
+            await db.SaveChangesAsync();
+            return Results.Problem(errDetail);
+        }
+        db.Activity.Add(MakeActivity(actor, "sent form link SMS", target, "send", "email",
+            $"To: {link.RecipientPhone}. Form: {link.FormId}."));
+        await db.SaveChangesAsync();
     }
     else
     {
@@ -1918,6 +2079,24 @@ string ActorName(ClaimsPrincipal p) =>
 string ActorRole(ClaimsPrincipal p) =>
     p.FindFirstValue("role") ?? p.FindFirstValue(ClaimTypes.Role) ?? "";
 
+string GeneratePortalToken(string email, string patientId, SymmetricSecurityKey key)
+{
+    var claims = new[]
+    {
+        new Claim(JwtRegisteredClaimNames.Sub,   email),
+        new Claim(JwtRegisteredClaimNames.Email, email),
+        new Claim("patientId", patientId),
+        new Claim("role",      "patient"),
+    };
+    var tok = new JwtSecurityToken(
+        issuer:             "nexus360",
+        audience:           "nexus360",
+        claims:             claims,
+        expires:            DateTime.UtcNow.AddDays(30),
+        signingCredentials: new SigningCredentials(key, SecurityAlgorithms.HmacSha256));
+    return new JwtSecurityTokenHandler().WriteToken(tok);
+}
+
 ActivityEntry MakeActivity(string who, string action, string target, string kind, string module, string detail = "")
 {
     var now = DateTime.Now;
@@ -1984,3 +2163,6 @@ record ProdigiLaunchDto(string StudyId, string ScorerId, string? ReviewerId);
 record WorkbookUpdateDto(string? Frequency, string? AssignedTo);
 record WorkbookCompleteDto(string? CompletedDate, string? Notes);
 record WorkbookCompletionDto(string Period, string? FormData, string? Status);
+record PortalInviteDto(string PatientId, string Email, string BaseUrl);
+record PortalSetupDto(string Password);
+record PortalLoginDto(string Email, string Password);
