@@ -10,6 +10,7 @@ import { ConsumableFormDrawer, StockReceiveDrawer, StockUseDrawer, PlaceOrderDra
 import NexusGrid from '../nexus-grid';
 import { useAuth, ALL_SITES } from '../AuthContext';
 import { useLocation, SITES as LOC_SITES } from '../LocationContext';
+import { useNexusData } from '../NexusDataContext';
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 const fmtDate = (iso) => {
@@ -476,6 +477,11 @@ const REGISTER_COL_DEFS = [
 const EquipmentPage = () => {
   const { userSites } = useAuth();
   const { siteId } = useLocation();
+  const { activeStandard } = useNexusData();
+  const isAasm = activeStandard === 'aasm';
+  const cl = isAasm
+    ? { header: 'cl. L-13, L-15', hst: 'cl. H-6', schedule: 'cl. L-15', incidents: 'cl. S-7', consumables: 'cl. L-15' }
+    : { header: 'cl. 5.3.1 – 5.3.7', hst: 'cl. 5.3', schedule: 'cl. 5.3.4', incidents: 'cl. 5.3.6', consumables: 'cl. 5.3.5' };
   // Derive which sites this user may access (empty = unrestricted)
   const allowedSites = userSites.length > 0 ? userSites : ALL_SITES.map(s => s.name);
   const siteRestricted = userSites.length > 0; // hide dropdown / lock filter when true
@@ -899,7 +905,7 @@ const EquipmentPage = () => {
   return (
     <div className="page page-wide">
       <PageHeader
-        eyebrow="Operations · cl. 5.3.1 – 5.3.7"
+        eyebrow={`Operations · ${cl.header}`}
         title="Equipment register"
         subtitle="ARTG-listed devices · acceptance · verification · maintenance · retention life + 7 yrs"
         actions={
@@ -1025,7 +1031,7 @@ const EquipmentPage = () => {
             <div className="card">
               <div className="card-head">
                 <div>
-                  <div className="card-title">HST device fleet · cl. 5.3</div>
+                  <div className="card-title">HST device fleet · {cl.hst}</div>
                   <div className="card-sub">Portable devices available for home sleep testing · dispatch and return tracking</div>
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--ink-3)', display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -1067,7 +1073,7 @@ const EquipmentPage = () => {
         <div className="card">
           <div className="card-head">
             <div>
-              <div className="card-title">Verification schedule · cl. 5.3.4</div>
+              <div className="card-title">Verification schedule · {cl.schedule}</div>
               <div className="card-sub">All devices sorted by next verification date · overdue first</div>
             </div>
           </div>
@@ -1084,7 +1090,7 @@ const EquipmentPage = () => {
         <div className="card">
           <div className="card-head">
             <div>
-              <div className="card-title">Adverse equipment incidents · cl. 5.3.6</div>
+              <div className="card-title">Adverse equipment incidents · {cl.incidents}</div>
               <div className="card-sub">Reported to manufacturer + TGA where applicable · mandatory reporting threshold: patient harm or near-miss</div>
             </div>
             <div className="topbar-spacer" />
@@ -1281,7 +1287,7 @@ const EquipmentPage = () => {
             <div className="card">
               <div className="card-head">
                 <div>
-                  <div className="card-title">Consumables inventory · cl. 5.3.5</div>
+                  <div className="card-title">Consumables inventory · {cl.consumables}</div>
                   <div className="card-sub">Single-use items · lot tracking · FEFO · reorder alerts</div>
                 </div>
                 <div className="topbar-spacer" />

@@ -58,6 +58,7 @@ public class Clause
     public string Owner { get; set; } = "";
     public string Standard { get; set; } = "asa";
     public string? Category { get; set; }
+    public string LinkedEvidenceJson { get; set; } = "[]";
 }
 
 public class ComplianceSection
@@ -178,6 +179,65 @@ public class AppUser
     public string LastSeen { get; set; } = "—";
     // JSON array of full site names. Empty array = unrestricted (sees all sites).
     public string Sites { get; set; } = "[]";
+}
+
+public class Patient
+{
+    public int Id { get; set; }
+    public string PatientId { get; set; } = "";
+    public string Name { get; set; } = "";
+    public string Initials { get; set; } = "";
+    public string Dob { get; set; } = "";
+    public string Sex { get; set; } = "M";
+    public string Mrn { get; set; } = "";
+    public string Site { get; set; } = "";
+    public string Referrer { get; set; } = "";
+    public string Physician { get; set; } = "";
+    public string Status { get; set; } = "active";
+    public string NextReview { get; set; } = "";
+    public string ContactJson { get; set; } = "{}";
+    public string DiagnosesJson { get; set; } = "[]";
+    public string StudiesJson { get; set; } = "[]";
+    public string AlertsJson { get; set; } = "[]";
+    public string TreatmentJson { get; set; } = "null";
+    public string ComplianceJson { get; set; } = "null";
+    public string CreatedAt { get; set; } = "";
+}
+
+public class PatientFormLink
+{
+    public int Id { get; set; }
+    public string Token { get; set; } = "";
+    public string PatientId { get; set; } = "";
+    public string PatientName { get; set; } = "";
+    public string RecipientName { get; set; } = "";
+    public string RecipientPhone { get; set; } = "";
+    public string RecipientEmail { get; set; } = "";
+    public string Method { get; set; } = "link";       // email | sms | link
+    public string FormId { get; set; } = "";
+    public string FormTitle { get; set; } = "";
+    public string SentAt { get; set; } = "";
+    public string SentBy { get; set; } = "";
+    public string Status { get; set; } = "pending";    // pending | complete
+    public string CompletedAt { get; set; } = "";
+    public int? FormRecordId { get; set; }
+}
+
+public class SiteRecord
+{
+    public int Id { get; set; }
+    public string SiteCode { get; set; } = "";
+    public string Name { get; set; } = "";
+    public string Type { get; set; } = "";
+    public string Beds { get; set; } = "0";
+}
+
+public class RoleRecord
+{
+    public int Id { get; set; }
+    public string RoleName { get; set; } = "";
+    public int Level { get; set; }
+    public string PermissionsJson { get; set; } = "{}";
 }
 
 public class Appointment

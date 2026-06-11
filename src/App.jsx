@@ -25,6 +25,7 @@ import TaskFormDrawer from './task-form-drawer';
 import ClauseDrawer from './clause-drawer';
 import StudyDrawer from './study-drawer';
 import GlobalSearch from './global-search';
+import FormFillPage from './pages/page-form-fill';
 
 const App = () => {
   const { user, signOut } = useAuth();
@@ -54,6 +55,9 @@ const App = () => {
   const { data, loading, error, refreshData, activeStandard } = useNexusData();
 
   const goTo = (r) => { setRoute(r); setSidebarOpen(false); window.scrollTo({ top: 0 }); };
+
+  const fillToken = new URLSearchParams(window.location.search).get('fill');
+  if (fillToken) return <FormFillPage token={fillToken} />;
 
   if (!user) return <LoginPage />;
 
@@ -129,7 +133,7 @@ const App = () => {
     switch (route) {
       case "home": return <HomePage data={data} goTo={goTo} openClause={setOpenClauseId} />;
       case "tasks": return <TasksPage />;
-      case "accreditation": return <AccreditationPage data={data} openClause={setOpenClauseId} />;
+      case "accreditation": return <AccreditationPage data={data} openClause={setOpenClauseId} goTo={goTo} />;
       case "indicators": return <IndicatorsPage data={data} />;
       case "scheduler": return <SchedulerPage />;
       case "patients": return <PatientsPage openStudy={setOpenStudyId} />;

@@ -1,16 +1,19 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import Icon from './icons';
 import { Pill } from './components';
+import { useAuth } from './AuthContext';
 import FormFiller, { RecordViewer } from './form-filler';
 import WysiwygEditor from './wysiwyg-editor';
 import SurveyFormFiller from './survey-form-filler';
 import SurveyFormPreview from './survey-form-preview';
+import PatientFormSendModal from './patient-form-send-modal';
 
 const STATUS_KIND = { Issued: 'good', Draft: 'outline', 'Under review': 'warn', 'Live form': 'info', Obsolete: 'bad', Superseded: 'outline' };
 
 const BASE = import.meta.env.VITE_API_URL ?? '';
 
 const DocViewer = ({ doc, autoEdit, onDesign, onClose, onAttach, onFormSaved, onDocUpdated, onRevisionCreated, onOpenRevision }) => {
+  const { hasPerm } = useAuth();
   const [htmlContent, setHtmlContent]   = useState(null);
   const [htmlLoading, setHtmlLoading]   = useState(false);
   const [pdfBlobUrl,  setPdfBlobUrl]    = useState(null);
@@ -29,6 +32,8 @@ const DocViewer = ({ doc, autoEdit, onDesign, onClose, onAttach, onFormSaved, on
   const [refreshKey,   setRefreshKey]   = useState(0);
   const [revising,     setRevising]     = useState(false);
 
+  const [showSendModal, setShowSendModal] = useState(false);
+
   // SurveyJS state
   const [surveyJson, setSurveyJson] = useState(null);
 
@@ -36,7 +41,7 @@ const DocViewer = ({ doc, autoEdit, onDesign, onClose, onAttach, onFormSaved, on
   const isSurveyForm  = doc?.folder === 'forms' && doc?.hasSurveyJson;
   const isForm        = isHtmlForm || isSurveyForm;
   const canEdit       = doc?.status === 'Draft' && doc?.fileType === 'html';
-  const canRevise     = (doc?.status === 'Issued' || doc?.status === 'Live form') && doc?.fileType === 'html' && doc?.folder !== 'records';
+  const canRevise     = hasPerm('canCreateDoc') && (doc?.status === 'Issued' || doc?.status === 'Live form') && doc?.fileType === 'html' && doc?.folder !== 'records';
   const hasRevisionHistory = !!(doc?.revisionOf) || canRevise;
 
   useEffect(() => {
@@ -213,6 +218,21 @@ const DocViewer = ({ doc, autoEdit, onDesign, onClose, onAttach, onFormSaved, on
     );
   }
 
+  // Render: send-to-patient modal
+  if (showSendModal) {
+    return (
+      <div className="doc-viewer-overlay" onClick={() => setShowSendModal(false)}>
+        <div className="doc-viewer" style={{ maxWidth: 480, width: '100%' }} onClick={e => e.stopPropagation()}>
+          <PatientFormSendModal
+            doc={doc}
+            onClose={() => setShowSendModal(false)}
+            onSent={() => setShowSendModal(false)}
+          />
+        </div>
+      </div>
+    );
+  }
+
   // Render: SurveyJS fill mode
   if (fillMode && isSurveyForm && surveyJson) {
     return (
@@ -371,6 +391,11 @@ const DocViewer = ({ doc, autoEdit, onDesign, onClose, onAttach, onFormSaved, on
               disabled={isSurveyForm ? !surveyJson : !htmlContent}>
               <Icon name="edit" size={14} />Fill form
             </button>
+            {hasPerm('canCreateDoc') && (
+              <button className="btn" onClick={() => setShowSendModal(true)}>
+                <Icon name="paper" size={14} />Send to patient
+              </button>
+            )}
             <button className="btn" onClick={() => { loadRecords(); setShowRecords(v => !v); }}>
               <Icon name="paper" size={14} />Records
               {records?.length > 0 && (

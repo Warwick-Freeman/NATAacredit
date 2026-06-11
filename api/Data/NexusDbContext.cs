@@ -21,4 +21,8 @@ public class NexusDbContext(DbContextOptions<NexusDbContext> options) : DbContex
     public DbSet<FormRecord> FormRecords => Set<FormRecord>();
     public DbSet<WorkbookSchedule> WorkbookSchedules => Set<WorkbookSchedule>();
     public DbSet<WorkbookCompletion> WorkbookCompletions => Set<WorkbookCompletion>();
+    public DbSet<SiteRecord> Sites => Set<SiteRecord>();
+    public DbSet<RoleRecord> Roles => Set<RoleRecord>();
+    public DbSet<Patient> Patients => Set<Patient>();
+    public DbSet<PatientFormLink> PatientFormLinks => Set<PatientFormLink>();
 }

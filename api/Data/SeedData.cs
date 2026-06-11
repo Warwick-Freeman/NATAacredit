@@ -23,6 +23,108 @@ public static class SeedData
         bool done = false, bool active = false, bool rejected = false, string comment = "") =>
         new { step, who, date, done, active, rejected, comment };
 
+    private static readonly JsonSerializerOptions CamelCase = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+    private static string J(object? obj) => JsonSerializer.Serialize(obj, CamelCase);
+
+    public static void SeedPatients(NexusDbContext db)
+    {
+        if (db.Patients.Any()) return;
+
+        var patients = new[]
+        {
+            new Patient {
+                PatientId = "PAT-001", Name = "R. Kingston", Initials = "RK", Dob = "1974-06-12", Sex = "M",
+                Mrn = "MRN-4412", Site = "Riverside Main Lab", Status = "active",
+                Referrer = "Dr. H. Williams (GP)", Physician = "Dr. R. Okafor", NextReview = "2026-07-20",
+                DiagnosesJson  = J(new[]{"Severe OSA (AHI 42.3/h)","Hypertension","Type 2 DM"}),
+                StudiesJson    = J(new[]{"PSG-2024-018","PSG-2026-0441"}),
+                AlertsJson     = J(new[]{"Compliance 61% — below 70% Medicare threshold"}),
+                TreatmentJson  = J(new{ type="CPAP", provider="resmed", device="ResMed AirSense 11 AutoSet", serial="RS-24-7734821", startDate="2024-09-12", prescription=new{mode="APAP",pMin=8,pMax=12,mask="ResMed AirFit F20 (Full face)",humidifier="Auto"}}),
+                ComplianceJson = J(new{ rate=61, meanUsage=4.1, meanAhi=3.2, p90Pressure=10.4, meanLeak=12, lastSync="2026-05-15"}),
+                ContactJson    = J(new{ phone="0412 345 678", email="r.kingston@email.com.au", address=new{line1="42 Riverside Drive",line2="",suburb="Richmond",state="VIC",postcode="3121"}, emergencyContact=new{name="Jane Kingston",relationship="Spouse",phone="0409 876 543"}}),
+            },
+            new Patient {
+                PatientId = "PAT-002", Name = "T. Nguyen", Initials = "TN", Dob = "1989-09-03", Sex = "M",
+                Mrn = "MRN-4387", Site = "Riverside Main Lab", Status = "active",
+                Referrer = "Dr. K. Cheng (Cardiologist)", Physician = "Dr. R. Okafor", NextReview = "2026-08-03",
+                DiagnosesJson  = J(new[]{"Moderate OSA (AHI 18.7/h)","Obesity BMI 33.2"}),
+                StudiesJson    = J(new[]{"PSG-2025-003","PSG-2026-0440"}),
+                AlertsJson     = J(Array.Empty<string>()),
+                TreatmentJson  = J(new{ type="CPAP", provider="resmed", device="ResMed AirSense 11 AutoSet", serial="RS-24-8821034", startDate="2025-02-03", prescription=new{mode="APAP",pMin=6,pMax=10,mask="ResMed AirFit N30i (Nasal cradle)",humidifier="Auto"}}),
+                ComplianceJson = J(new{ rate=89, meanUsage=6.8, meanAhi=1.4, p90Pressure=8.8, meanLeak=6, lastSync="2026-05-15"}),
+                ContactJson    = J(new{ phone="0421 987 654", email="t.nguyen@gmail.com", address=new{line1="8 St Kilda Road",line2="Apt 14",suburb="St Kilda",state="VIC",postcode="3182"}, emergencyContact=new{name="Linh Nguyen",relationship="Spouse",phone="0418 234 567"}}),
+            },
+            new Patient {
+                PatientId = "PAT-003", Name = "D. Mitchell", Initials = "DM", Dob = "1955-04-08", Sex = "M",
+                Mrn = "MRN-4301", Site = "Riverside Main Lab", Status = "active",
+                Referrer = "Dr. P. Nguyen (Cardiologist)", Physician = "Dr. R. Okafor", NextReview = "2026-06-18",
+                DiagnosesJson  = J(new[]{"Severe OSA (AHI 58.1/h)","Atrial fibrillation","CHF (EF 45%)"}),
+                StudiesJson    = J(new[]{"PSG-2023-041","PSG-2023-055","PSG-2026-0438"}),
+                AlertsJson     = J(new[]{"Review date approaching — 33 days"}),
+                TreatmentJson  = J(new{ type="BiPAP", provider="philips", device="Philips DreamStation 2 Auto BiPAP", serial="PH-23-5512789", startDate="2023-05-18", prescription=new{mode="Auto BiPAP",ipap=14,epap=8,mask="Philips DreamWear Full Face",humidifier="Heated tube"}}),
+                ComplianceJson = J(new{ rate=94, meanUsage=7.2, meanAhi=2.8, p90Pressure=(double?)null, meanLeak=9, lastSync="2026-05-14"}),
+                ContactJson    = J(new{ phone="0435 111 222", email="d.mitchell@outlook.com", address=new{line1="17 Hawthorn Street",line2="",suburb="Hawthorn",state="VIC",postcode="3122"}, emergencyContact=new{name="Carol Mitchell",relationship="Spouse",phone="0407 333 444"}}),
+            },
+            new Patient {
+                PatientId = "PAT-004", Name = "L. Walsh", Initials = "LW", Dob = "2012-02-14", Sex = "F",
+                Mrn = "MRN-4455", Site = "Eastside Paediatric Lab", Status = "monitoring",
+                Referrer = "Dr. M. Fisher (Paediatric ENT)", Physician = "Dr. L. Hartono", NextReview = "2026-09-10",
+                DiagnosesJson  = J(new[]{"Paediatric OSA — post-adenotonsillectomy monitoring"}),
+                StudiesJson    = J(new[]{"PSG-2026-0439"}),
+                AlertsJson     = J(Array.Empty<string>()),
+                TreatmentJson  = "null", ComplianceJson = "null",
+                ContactJson    = J(new{ phone="0398 654 321", email="walsh.family@iinet.net.au", address=new{line1="5 Doncaster Road",line2="",suburb="Doncaster",state="VIC",postcode="3108"}, emergencyContact=new{name="Mark Walsh",relationship="Parent",phone="0412 654 321"}}),
+            },
+            new Patient {
+                PatientId = "PAT-005", Name = "S. Carter", Initials = "SC", Dob = "1998-07-17", Sex = "F",
+                Mrn = "MRN-4398", Site = "Riverside Main Lab", Status = "active",
+                Referrer = "Dr. J. Park (Neurologist)", Physician = "Dr. R. Okafor", NextReview = "2026-07-01",
+                DiagnosesJson  = J(new[]{"Narcolepsy Type 1 (CSF hypocretin <110 pg/mL)","Cataplexy confirmed"}),
+                StudiesJson    = J(new[]{"PSG-2025-008","MSLT-2026-0031"}),
+                AlertsJson     = J(Array.Empty<string>()),
+                TreatmentJson  = J(new{ type="Medication", provider=(string?)null, device=(string?)null, serial=(string?)null, startDate="2025-06-01", prescription=new{mode="Modafinil 200mg mane + Sodium oxybate 4.5g nocte",mask=(string?)null}}),
+                ComplianceJson = "null",
+                ContactJson    = J(new{ phone="0447 222 333", email="s.carter@student.unimelb.edu.au", address=new{line1="33 Johnston Street",line2="Unit 7",suburb="Fitzroy",state="VIC",postcode="3065"}, emergencyContact=new{name="Helen Carter",relationship="Mother",phone="0388 445 566"}}),
+            },
+            new Patient {
+                PatientId = "PAT-006", Name = "P. Brown", Initials = "PB", Dob = "1968-11-22", Sex = "F",
+                Mrn = "MRN-4471", Site = "Home Service – North", Status = "awaiting-study",
+                Referrer = "Dr. S. Adams (GP)", Physician = "Dr. F. Liu", NextReview = "",
+                DiagnosesJson  = J(new[]{"Suspected OSA (Epworth 16/24)","Hypothyroidism","Obesity BMI 31.4"}),
+                StudiesJson    = J(new[]{"HSAT-2026-0218"}),
+                AlertsJson     = J(new[]{"HSAT-2026-0218 in scoring — report pending"}),
+                TreatmentJson  = "null", ComplianceJson = "null",
+                ContactJson    = J(new{ phone="0393 887 766", email="patricia.brown@bigpond.com", address=new{line1="102 Brunswick Road",line2="",suburb="Brunswick",state="VIC",postcode="3056"}, emergencyContact=new{name="Gary Brown",relationship="Spouse",phone="0414 556 677"}}),
+            },
+            new Patient {
+                PatientId = "PAT-007", Name = "A. Park", Initials = "AP", Dob = "1971-01-29", Sex = "M",
+                Mrn = "MRN-4329", Site = "Eastside Paediatric Lab", Status = "active",
+                Referrer = "Dr. K. Cheng (Cardiologist)", Physician = "Dr. F. Liu", NextReview = "2026-10-28",
+                DiagnosesJson  = J(new[]{"Severe OSA (AHI 37.8/h)","Hypertension","Obesity BMI 34.1"}),
+                StudiesJson    = J(new[]{"PSG-2026-0437"}),
+                AlertsJson     = J(Array.Empty<string>()),
+                TreatmentJson  = J(new{ type="CPAP", provider="fp", device="Fisher & Paykel SleepStyle 650", serial="FP-26-3301122", startDate="2026-04-28", prescription=new{mode="APAP",pMin=7,pMax=14,mask="F&P Evora Full Face",humidifier="Integrated"}}),
+                ComplianceJson = J(new{ rate=72, meanUsage=5.1, meanAhi=4.8, p90Pressure=11.2, meanLeak=18, lastSync="2026-05-13"}),
+                ContactJson    = J(new{ phone="0398 123 456", email="a.park@kew.net.au", address=new{line1="29 Cotham Road",line2="",suburb="Kew",state="VIC",postcode="3101"}, emergencyContact=new{name="Susan Park",relationship="Spouse",phone="0402 789 012"}}),
+            },
+            new Patient {
+                PatientId = "PAT-008", Name = "M. Torres", Initials = "MT", Dob = "1983-05-15", Sex = "F",
+                Mrn = "MRN-4489", Site = "Home Service – North", Status = "active",
+                Referrer = "Dr. T. Brown (GP)", Physician = "Dr. F. Liu", NextReview = "2026-08-20",
+                DiagnosesJson  = J(new[]{"Moderate OSA (AHI 22.4/h) — confirmed HSAT-2026-0217","Excessive daytime sleepiness (ESS 14/24)"}),
+                StudiesJson    = J(new[]{"HSAT-2026-0217"}),
+                AlertsJson     = J(new[]{"CPAP prescription pending — report signed 09 May 2026"}),
+                TreatmentJson  = "null", ComplianceJson = "null",
+                ContactJson    = J(new{ phone="0411 765 432", email="maria.torres@hotmail.com", address=new{line1="14 Murray Road",line2="Unit 3",suburb="Preston",state="VIC",postcode="3072"}, emergencyContact=new{name="Carlos Torres",relationship="Spouse",phone="0423 876 543"}}),
+            },
+        };
+
+        var now = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss");
+        foreach (var p in patients) p.CreatedAt = now;
+        db.Patients.AddRange(patients);
+        db.SaveChanges();
+    }
+
     public static void SeedUsers(NexusDbContext db)
     {
         if (db.Users.Any()) return;

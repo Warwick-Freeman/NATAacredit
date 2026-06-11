@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useRef, useEffect } from 'react';
+import { fetchSites, fetchRoles } from './api.js';
 
 export const ROLE_LEVEL = {
   // ASA / NATA roles
@@ -107,19 +108,37 @@ export function AuthProvider({ children }) {
 
   const [users, setUsers] = useState([]);
   const usersRef = useRef([]);
+  const [allSites, setAllSites] = useState(ALL_SITES);
+  const [roleMap, setRoleMap] = useState(null);
 
   const syncUsers = (next) => {
     usersRef.current = next;
     setUsers(next);
   };
 
-  // Load user list from API once logged in
+  // Load user list, sites, and roles from API once logged in
   useEffect(() => {
     if (!user) return;
     const token = getToken();
     fetch(`${BASE}/api/users`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.ok ? r.json() : [])
       .then(list => syncUsers(list.map(u => ({ ...u, password: undefined }))))
+      .catch(() => {});
+    fetchSites()
+      .then(list => {
+        if (list?.length) setAllSites(list.map(s => ({ code: s.siteCode, name: s.name, type: s.type, beds: s.beds, abbr: s.name })));
+      })
+      .catch(() => {});
+    fetchRoles()
+      .then(list => {
+        if (!list?.length) return;
+        const map = {};
+        list.forEach(r => {
+          try { map[r.roleName] = { level: r.level, ...JSON.parse(r.permissionsJson) }; }
+          catch { /* ignore malformed */ }
+        });
+        setRoleMap(map);
+      })
       .catch(() => {});
   }, [user]);
 
@@ -148,7 +167,13 @@ export function AuthProvider({ children }) {
   }
 
   function hasPerm(permission) {
-    return can(user?.role, permission);
+    const src = roleMap ?? ROLE_PERMISSIONS;
+    return !!(src[user?.role]?.[permission]);
+  }
+
+  function getRoleLevel(roleName) {
+    if (roleMap?.[roleName] !== undefined) return roleMap[roleName].level ?? 0;
+    return ROLE_LEVEL[roleName] ?? 0;
   }
 
   async function addUser(data) {
@@ -201,7 +226,7 @@ export function AuthProvider({ children }) {
   const userSites = user?.sites ?? [];
 
   return (
-    <AuthContext.Provider value={{ user, users, userSites, signIn, signOut, hasPerm, addUser, updateUser }}>
+    <AuthContext.Provider value={{ user, users, userSites, signIn, signOut, hasPerm, addUser, updateUser, allSites, setAllSites, roleMap, setRoleMap, getRoleLevel }}>
       {children}
     </AuthContext.Provider>
   );

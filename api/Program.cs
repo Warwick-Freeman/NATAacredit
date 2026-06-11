@@ -49,6 +49,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 
 builder.Services.AddAuthorization();
+builder.Services.AddHttpClient();
 
 builder.Services.AddCors(opt => opt.AddDefaultPolicy(p =>
     p.WithOrigins(
@@ -122,6 +123,7 @@ using (var scope = app.Services.CreateScope())
         "ALTER TABLE Documents ADD COLUMN SurveyJson TEXT",
         "ALTER TABLE Tasks ADD COLUMN AssignedTo TEXT NOT NULL DEFAULT ''",
         "ALTER TABLE Users ADD COLUMN Sites TEXT NOT NULL DEFAULT '[]'",
+        "ALTER TABLE Clauses ADD COLUMN LinkedEvidenceJson TEXT NOT NULL DEFAULT '[]'",
     })
     {
         try { db.Database.ExecuteSqlRaw(col); } catch { /* column already exists */ }
@@ -232,9 +234,73 @@ using (var scope = app.Services.CreateScope())
         )
         """);
 
+    db.Database.ExecuteSqlRaw("""
+        CREATE TABLE IF NOT EXISTS Sites (
+            Id       INTEGER PRIMARY KEY AUTOINCREMENT,
+            SiteCode TEXT NOT NULL DEFAULT '',
+            Name     TEXT NOT NULL DEFAULT '',
+            Type     TEXT NOT NULL DEFAULT '',
+            Beds     TEXT NOT NULL DEFAULT '0'
+        )
+        """);
+
+    db.Database.ExecuteSqlRaw("""
+        CREATE TABLE IF NOT EXISTS Roles (
+            Id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            RoleName        TEXT NOT NULL DEFAULT '',
+            Level           INTEGER NOT NULL DEFAULT 0,
+            PermissionsJson TEXT NOT NULL DEFAULT '{{}}'
+        )
+        """);
+
+    db.Database.ExecuteSqlRaw("""
+        CREATE TABLE IF NOT EXISTS Patients (
+            Id             INTEGER PRIMARY KEY AUTOINCREMENT,
+            PatientId      TEXT NOT NULL DEFAULT '',
+            Name           TEXT NOT NULL DEFAULT '',
+            Initials       TEXT NOT NULL DEFAULT '',
+            Dob            TEXT NOT NULL DEFAULT '',
+            Sex            TEXT NOT NULL DEFAULT 'M',
+            Mrn            TEXT NOT NULL DEFAULT '',
+            Site           TEXT NOT NULL DEFAULT '',
+            Referrer       TEXT NOT NULL DEFAULT '',
+            Physician      TEXT NOT NULL DEFAULT '',
+            Status         TEXT NOT NULL DEFAULT 'active',
+            NextReview     TEXT NOT NULL DEFAULT '',
+            ContactJson    TEXT NOT NULL DEFAULT '{{}}',
+            DiagnosesJson  TEXT NOT NULL DEFAULT '[]',
+            StudiesJson    TEXT NOT NULL DEFAULT '[]',
+            AlertsJson     TEXT NOT NULL DEFAULT '[]',
+            TreatmentJson  TEXT NOT NULL DEFAULT 'null',
+            ComplianceJson TEXT NOT NULL DEFAULT 'null',
+            CreatedAt      TEXT NOT NULL DEFAULT ''
+        )
+        """);
+
+    db.Database.ExecuteSqlRaw("""
+        CREATE TABLE IF NOT EXISTS PatientFormLinks (
+            Id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            Token         TEXT NOT NULL DEFAULT '',
+            PatientId     TEXT NOT NULL DEFAULT '',
+            PatientName   TEXT NOT NULL DEFAULT '',
+            RecipientName TEXT NOT NULL DEFAULT '',
+            RecipientPhone TEXT NOT NULL DEFAULT '',
+            RecipientEmail TEXT NOT NULL DEFAULT '',
+            Method        TEXT NOT NULL DEFAULT 'link',
+            FormId        TEXT NOT NULL DEFAULT '',
+            FormTitle     TEXT NOT NULL DEFAULT '',
+            SentAt        TEXT NOT NULL DEFAULT '',
+            SentBy        TEXT NOT NULL DEFAULT '',
+            Status        TEXT NOT NULL DEFAULT 'pending',
+            CompletedAt   TEXT NOT NULL DEFAULT '',
+            FormRecordId  INTEGER NULL
+        )
+        """);
+
     SeedData.Seed(db);
     SeedData.SeedDocuments(db);
     SeedData.SeedUsers(db);
+    SeedData.SeedPatients(db);
     SeedData.SeedRooms(db);
     SeedData.SeedAppointments(db);
 
@@ -299,6 +365,43 @@ using (var scope = app.Services.CreateScope())
                 LastCompleted = "", NextDue = nextDue, AssignedTo = "", Notes = "",
             });
         }
+        db.SaveChanges();
+    }
+
+    if (!db.Sites.Any())
+    {
+        db.Sites.AddRange(
+            new NexusApi.Models.SiteRecord { SiteCode = "RML", Name = "Riverside Main Lab",      Type = "Adult attended PSG · CPAP · MSLT/MWT",  Beds = "6" },
+            new NexusApi.Models.SiteRecord { SiteCode = "EPL", Name = "Eastside Paediatric Lab", Type = "Paediatric attended PSG · NIV",          Beds = "3" },
+            new NexusApi.Models.SiteRecord { SiteCode = "HSN", Name = "Home Service – North",    Type = "Type 2/3/4 HSAT · CPAP follow-up",      Beds = "—" }
+        );
+        db.SaveChanges();
+    }
+
+    if (!db.Roles.Any())
+    {
+        string P(bool cd, bool ud, bool pr, bool ad, bool isd, bool cs, bool mu, bool iu) =>
+            $"{{\"canCreateDoc\":{cd.ToString().ToLower()},\"canUploadDoc\":{ud.ToString().ToLower()},\"canPeerReviewDoc\":{pr.ToString().ToLower()},\"canApproveDoc\":{ad.ToString().ToLower()},\"canIssueDoc\":{isd.ToString().ToLower()},\"canSignStudy\":{cs.ToString().ToLower()},\"canManageUsers\":{mu.ToString().ToLower()},\"canInviteUsers\":{iu.ToString().ToLower()}}}";
+        db.Roles.AddRange(
+            new NexusApi.Models.RoleRecord { RoleName = "Medical Director",                         Level = 5, PermissionsJson = P(true,  true,  true,  true,  true,  true,  true,  true ) },
+            new NexusApi.Models.RoleRecord { RoleName = "Quality Manager",                          Level = 4, PermissionsJson = P(true,  true,  true,  true,  true,  false, true,  true ) },
+            new NexusApi.Models.RoleRecord { RoleName = "Paediatric Sleep Physician",               Level = 3, PermissionsJson = P(true,  true,  true,  true,  false, true,  false, false) },
+            new NexusApi.Models.RoleRecord { RoleName = "Reporting Physician",                      Level = 3, PermissionsJson = P(true,  true,  true,  true,  false, true,  false, false) },
+            new NexusApi.Models.RoleRecord { RoleName = "Senior Technologist",                      Level = 2, PermissionsJson = P(true,  true,  true,  false, false, false, false, false) },
+            new NexusApi.Models.RoleRecord { RoleName = "Scoring Technologist",                     Level = 1, PermissionsJson = P(false, false, false, false, false, false, false, false) },
+            new NexusApi.Models.RoleRecord { RoleName = "Recording Tech",                           Level = 1, PermissionsJson = P(false, false, false, false, false, false, false, false) },
+            new NexusApi.Models.RoleRecord { RoleName = "Reception / Bookings",                     Level = 0, PermissionsJson = P(false, false, false, false, false, false, false, false) },
+            new NexusApi.Models.RoleRecord { RoleName = "External Auditor",                         Level = 0, PermissionsJson = P(false, false, false, false, false, false, false, false) },
+            new NexusApi.Models.RoleRecord { RoleName = "External Assessor",                        Level = 0, PermissionsJson = P(false, false, false, false, false, false, false, false) },
+            new NexusApi.Models.RoleRecord { RoleName = "Network Director",                         Level = 5, PermissionsJson = P(true,  true,  true,  true,  true,  true,  true,  true ) },
+            new NexusApi.Models.RoleRecord { RoleName = "Site Director",                            Level = 4, PermissionsJson = P(true,  true,  true,  true,  true,  true,  true,  true ) },
+            new NexusApi.Models.RoleRecord { RoleName = "Lead Technologist (RPSGT)",                Level = 2, PermissionsJson = P(true,  true,  true,  false, false, false, false, false) },
+            new NexusApi.Models.RoleRecord { RoleName = "Registered Polysomnographic Technologist", Level = 1, PermissionsJson = P(false, false, false, false, false, false, false, false) },
+            new NexusApi.Models.RoleRecord { RoleName = "Sleep Technician",                         Level = 1, PermissionsJson = P(false, false, false, false, false, false, false, false) },
+            new NexusApi.Models.RoleRecord { RoleName = "Scheduling / Receptionist",                Level = 0, PermissionsJson = P(false, false, false, false, false, false, false, false) },
+            new NexusApi.Models.RoleRecord { RoleName = "External Reviewer",                        Level = 0, PermissionsJson = P(false, false, false, false, false, false, false, false) },
+            new NexusApi.Models.RoleRecord { RoleName = "AASM Accreditation Reviewer",              Level = 0, PermissionsJson = P(false, false, false, false, false, false, false, false) }
+        );
         db.SaveChanges();
     }
 }
@@ -530,9 +633,10 @@ app.MapPut("/api/clauses/{id}", async (string id, ClauseUpdateDto dto, NexusDbCo
             _         => dto.Status,
         };
     }
-    if (dto.Evidence.HasValue) clause.Evidence     = dto.Evidence.Value;
-    if (dto.Owner != null)     clause.Owner        = dto.Owner;
-    if (dto.LastReviewed != null) clause.LastReviewed = dto.LastReviewed;
+    if (dto.Evidence.HasValue)    clause.Evidence          = dto.Evidence.Value;
+    if (dto.Owner != null)        clause.Owner             = dto.Owner;
+    if (dto.LastReviewed != null) clause.LastReviewed      = dto.LastReviewed;
+    if (dto.LinkedEvidence != null) clause.LinkedEvidenceJson = dto.LinkedEvidence;
     var displayStatus = clause.Status switch {
         "nonconformant" => "non-conformant",
         "review"        => "under review",
@@ -550,6 +654,308 @@ app.MapPut("/api/clauses/{id}", async (string id, ClauseUpdateDto dto, NexusDbCo
     ));
     await db.SaveChangesAsync();
     return Results.Ok(clause);
+}).RequireAuthorization();
+
+// ── Sites ─────────────────────────────────────────────────────────────────────
+
+app.MapGet("/api/sites", async (NexusDbContext db) =>
+    await db.Sites.OrderBy(s => s.Id).ToListAsync()
+).RequireAuthorization();
+
+app.MapPost("/api/sites", async (SiteDto dto, NexusDbContext db) =>
+{
+    var site = new NexusApi.Models.SiteRecord { SiteCode = dto.SiteCode, Name = dto.Name, Type = dto.Type ?? "", Beds = dto.Beds ?? "0" };
+    db.Sites.Add(site);
+    await db.SaveChangesAsync();
+    return Results.Ok(site);
+}).RequireAuthorization();
+
+app.MapPut("/api/sites/{siteCode}", async (string siteCode, SiteDto dto, NexusDbContext db) =>
+{
+    var site = await db.Sites.FirstOrDefaultAsync(s => s.SiteCode == siteCode);
+    if (site == null) return Results.NotFound();
+    site.SiteCode = dto.SiteCode;
+    site.Name = dto.Name;
+    site.Type = dto.Type ?? "";
+    site.Beds = dto.Beds ?? "0";
+    await db.SaveChangesAsync();
+    return Results.Ok(site);
+}).RequireAuthorization();
+
+app.MapDelete("/api/sites/{siteCode}", async (string siteCode, NexusDbContext db) =>
+{
+    var site = await db.Sites.FirstOrDefaultAsync(s => s.SiteCode == siteCode);
+    if (site == null) return Results.NotFound();
+    db.Sites.Remove(site);
+    await db.SaveChangesAsync();
+    return Results.Ok();
+}).RequireAuthorization();
+
+// ── Patients ──────────────────────────────────────────────────────────────────
+
+app.MapGet("/api/patients", async (string? site, NexusDbContext db, ClaimsPrincipal principal) =>
+{
+    var q = db.Patients.AsQueryable();
+    if (!string.IsNullOrEmpty(site)) q = q.Where(p => p.Site == site);
+    var actorEmail = ActorName(principal);
+    var userSites = System.Text.Json.JsonSerializer.Deserialize<List<string>>(
+        (await db.Users.FirstOrDefaultAsync(u => u.Email == actorEmail))?.Sites ?? "[]") ?? [];
+    if (userSites.Count > 0) q = q.Where(p => userSites.Contains(p.Site));
+    return await q.OrderBy(p => p.Name).ToListAsync();
+}).RequireAuthorization();
+
+app.MapPost("/api/patients", async (PatientCreateDto dto, NexusDbContext db, ClaimsPrincipal principal) =>
+{
+    var patient = new NexusApi.Models.Patient {
+        PatientId   = $"PAT-{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+        Name        = dto.Name.Trim(),
+        Initials    = string.IsNullOrWhiteSpace(dto.Initials)
+                        ? string.Concat(dto.Name.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                            .Take(3).Select(w => char.ToUpper(w[0])))
+                        : dto.Initials.Trim(),
+        Dob         = dto.Dob ?? "",
+        Sex         = dto.Sex ?? "M",
+        Mrn         = dto.Mrn?.Trim() ?? "",
+        Site        = dto.Site ?? "",
+        Referrer    = dto.Referrer?.Trim() ?? "",
+        Physician   = dto.Physician?.Trim() ?? "",
+        Status      = dto.Status ?? "active",
+        NextReview  = dto.NextReview ?? "",
+        ContactJson    = dto.ContactJson    ?? "{}",
+        DiagnosesJson  = dto.DiagnosesJson  ?? "[]",
+        StudiesJson    = dto.StudiesJson    ?? "[]",
+        AlertsJson     = dto.AlertsJson     ?? "[]",
+        TreatmentJson  = dto.TreatmentJson  ?? "null",
+        ComplianceJson = dto.ComplianceJson ?? "null",
+        CreatedAt   = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss"),
+    };
+    db.Patients.Add(patient);
+    await db.SaveChangesAsync();
+    db.Activity.Add(MakeActivity(ActorName(principal), "added patient", patient.Name, "add", "patients", ""));
+    await db.SaveChangesAsync();
+    return Results.Ok(patient);
+}).RequireAuthorization();
+
+app.MapPut("/api/patients/{id}", async (string id, PatientCreateDto dto, NexusDbContext db) =>
+{
+    var patient = await db.Patients.FirstOrDefaultAsync(p => p.PatientId == id);
+    if (patient == null) return Results.NotFound();
+    patient.Name        = dto.Name.Trim();
+    patient.Initials    = string.IsNullOrWhiteSpace(dto.Initials)
+                            ? patient.Initials
+                            : dto.Initials.Trim();
+    patient.Dob         = dto.Dob         ?? patient.Dob;
+    patient.Sex         = dto.Sex         ?? patient.Sex;
+    patient.Mrn         = dto.Mrn?.Trim() ?? patient.Mrn;
+    patient.Site        = dto.Site        ?? patient.Site;
+    patient.Referrer    = dto.Referrer?.Trim()  ?? patient.Referrer;
+    patient.Physician   = dto.Physician?.Trim() ?? patient.Physician;
+    patient.Status      = dto.Status      ?? patient.Status;
+    patient.NextReview  = dto.NextReview  ?? patient.NextReview;
+    if (dto.ContactJson    != null) patient.ContactJson    = dto.ContactJson;
+    if (dto.DiagnosesJson  != null) patient.DiagnosesJson  = dto.DiagnosesJson;
+    if (dto.StudiesJson    != null) patient.StudiesJson    = dto.StudiesJson;
+    if (dto.AlertsJson     != null) patient.AlertsJson     = dto.AlertsJson;
+    if (dto.TreatmentJson  != null) patient.TreatmentJson  = dto.TreatmentJson;
+    if (dto.ComplianceJson != null) patient.ComplianceJson = dto.ComplianceJson;
+    await db.SaveChangesAsync();
+    return Results.Ok(patient);
+}).RequireAuthorization();
+
+app.MapDelete("/api/patients/{id}", async (string id, NexusDbContext db) =>
+{
+    var patient = await db.Patients.FirstOrDefaultAsync(p => p.PatientId == id);
+    if (patient == null) return Results.NotFound();
+    db.Patients.Remove(patient);
+    await db.SaveChangesAsync();
+    return Results.NoContent();
+}).RequireAuthorization();
+
+// ── Patient form links ────────────────────────────────────────────────────────
+
+app.MapPost("/api/patient-form-links", async (PatientFormLinkCreateDto dto, NexusDbContext db, HttpContext ctx) =>
+{
+    var token = Guid.NewGuid().ToString("N");
+    var sentBy = ctx.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "";
+    var link = new NexusApi.Models.PatientFormLink {
+        Token = token, PatientId = dto.PatientId ?? "", PatientName = dto.PatientName ?? "",
+        RecipientName = dto.RecipientName ?? "", RecipientPhone = dto.RecipientPhone ?? "",
+        RecipientEmail = dto.RecipientEmail ?? "", Method = dto.Method ?? "link",
+        FormId = dto.FormId, FormTitle = dto.FormTitle,
+        SentAt = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss"), SentBy = sentBy, Status = "pending"
+    };
+    db.PatientFormLinks.Add(link);
+    await db.SaveChangesAsync();
+    return Results.Ok(new { link.Id, link.Token, link.Status, link.SentAt });
+}).RequireAuthorization();
+
+app.MapGet("/api/patient-form-links", async (string? patientId, NexusDbContext db) =>
+{
+    var q = db.PatientFormLinks.AsQueryable();
+    if (!string.IsNullOrEmpty(patientId)) q = q.Where(l => l.PatientId == patientId);
+    return await q.OrderByDescending(l => l.SentAt).ToListAsync();
+}).RequireAuthorization();
+
+// Public endpoints — no auth required
+app.MapGet("/api/form-fill/{token}", async (string token, NexusDbContext db, IWebHostEnvironment env) =>
+{
+    var link = await db.PatientFormLinks.FirstOrDefaultAsync(l => l.Token == token);
+    if (link == null) return Results.NotFound(new { error = "not_found" });
+    if (link.Status == "complete")
+        return Results.Ok(new { status = "complete", formTitle = link.FormTitle, patientName = link.PatientName });
+    var doc = await db.Documents.FirstOrDefaultAsync(d => d.DocId == link.FormId);
+    if (doc == null) return Results.NotFound(new { error = "form_not_found" });
+    string? htmlContent = null;
+    if (doc.FileType == "html" && doc.StoredFileName != null) {
+        var dataDir = Path.Combine(env.ContentRootPath, "..", "data");
+        var path = Path.Combine(dataDir, doc.StoredFileName);
+        if (File.Exists(path)) htmlContent = await File.ReadAllTextAsync(path);
+    }
+    return Results.Ok(new {
+        token, formId = link.FormId, formTitle = link.FormTitle,
+        patientName = link.PatientName, patientId = link.PatientId,
+        formType = doc.SurveyJson != null ? "survey" : "html",
+        htmlContent, surveyJson = doc.SurveyJson, status = link.Status
+    });
+});
+
+app.MapPost("/api/form-fill/{token}", async (string token, FormFillSubmitDto dto, NexusDbContext db) =>
+{
+    var link = await db.PatientFormLinks.FirstOrDefaultAsync(l => l.Token == token);
+    if (link == null) return Results.NotFound(new { error = "not_found" });
+    if (link.Status == "complete") return Results.BadRequest(new { error = "already_complete" });
+    var now = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss");
+    var record = new NexusApi.Models.FormRecord {
+        FormId = link.FormId,
+        RecordRef = $"REC-{token[..8].ToUpper()}",
+        FormTitle = link.FormTitle,
+        CompletedBy = link.PatientName.Length > 0 ? link.PatientName : link.RecipientName,
+        CompletedAt = now,
+        Period = DateTime.Now.ToString("MMM yyyy"),
+        Notes = $"Submitted via {link.Method} link",
+        FormData = dto.FormData,
+        SnapshotHtml = dto.SnapshotHtml ?? ""
+    };
+    db.FormRecords.Add(record);
+    await db.SaveChangesAsync();
+    link.Status = "complete"; link.CompletedAt = now; link.FormRecordId = record.Id;
+    await db.SaveChangesAsync();
+    return Results.Ok(new { recordId = record.Id, recordRef = record.RecordRef });
+});
+
+// ── Send form link via Twilio (SMS + Email) ───────────────────────────────────
+
+app.MapPost("/api/send-form-link/{token}", async (string token, SendFormLinkDto dto, NexusDbContext db, IHttpClientFactory httpFactory) =>
+{
+    var link = await db.PatientFormLinks.FirstOrDefaultAsync(l => l.Token == token);
+    if (link == null) return Results.NotFound(new { error = "not_found" });
+
+    var cfg        = (await db.SiteConfig.ToListAsync()).ToDictionary(e => e.Key, e => e.Value);
+    var accountSid = cfg.GetValueOrDefault("twilio_account_sid", "");
+    var authToken  = cfg.GetValueOrDefault("twilio_auth_token",  "");
+    var fillUrl    = (dto.BaseUrl?.TrimEnd('/') ?? "") + $"?fill={token}";
+
+    if (string.IsNullOrEmpty(accountSid) || string.IsNullOrEmpty(authToken))
+        return Results.BadRequest(new { error = "Twilio not configured" });
+
+    if (link.Method == "email")
+    {
+        var fromEmail = cfg.GetValueOrDefault("twilio_email_from", "");
+        var fromName  = cfg.GetValueOrDefault("twilio_email_from_name", "Nexus 360");
+        if (string.IsNullOrEmpty(fromEmail))
+            return Results.BadRequest(new { error = "Twilio email from-address not configured" });
+        if (string.IsNullOrEmpty(link.RecipientEmail))
+            return Results.BadRequest(new { error = "No recipient email on this link" });
+
+        var credentials = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes($"{accountSid}:{authToken}"));
+        var http = httpFactory.CreateClient();
+        http.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", credentials);
+
+        var payload = new
+        {
+            from    = new { address = fromEmail, name = fromName },
+            to      = new[] { new { address = link.RecipientEmail } },
+            content = new
+            {
+                subject = $"Please complete: {link.FormTitle}",
+                html    =
+                    $"<p>Hi {link.RecipientName},</p>" +
+                    $"<p>Please complete the following form at your convenience:</p>" +
+                    $"<p><a href=\"{fillUrl}\" style=\"background:#2563eb;color:white;padding:10px 24px;" +
+                    $"border-radius:6px;text-decoration:none;display:inline-block;font-weight:600\">" +
+                    $"{link.FormTitle}</a></p>" +
+                    $"<p style=\"font-size:12px;color:#718096\">Or copy this link: {fillUrl}</p>" +
+                    $"<p style=\"font-size:12px;color:#718096\">This is a one-time link — it expires once submitted.</p>"
+            }
+        };
+
+        var response = await http.PostAsJsonAsync("https://comms.twilio.com/v1/Emails", payload);
+        if (!response.IsSuccessStatusCode)
+        {
+            var body = await response.Content.ReadAsStringAsync();
+            return Results.Problem($"Twilio email error {(int)response.StatusCode}: {body}");
+        }
+    }
+    else if (link.Method == "sms")
+    {
+        var fromNumber = cfg.GetValueOrDefault("twilio_from", "");
+        if (string.IsNullOrEmpty(fromNumber))
+            return Results.BadRequest(new { error = "Twilio SMS from-number not configured" });
+        if (string.IsNullOrEmpty(link.RecipientPhone))
+            return Results.BadRequest(new { error = "No recipient phone on this link" });
+
+        Twilio.TwilioClient.Init(accountSid, authToken);
+        var message = await Twilio.Rest.Api.V2010.Account.MessageResource.CreateAsync(
+            body: $"Hi {link.RecipientName}, please complete your form here: {fillUrl}",
+            from: new Twilio.Types.PhoneNumber(fromNumber),
+            to:   new Twilio.Types.PhoneNumber(link.RecipientPhone)
+        );
+        if (message.Status == Twilio.Rest.Api.V2010.Account.MessageResource.StatusEnum.Failed)
+            return Results.Problem($"Twilio SMS error: {message.ErrorMessage}");
+    }
+    else
+    {
+        return Results.BadRequest(new { error = "Method does not support auto-send" });
+    }
+
+    return Results.Ok(new { sent = true, method = link.Method });
+}).RequireAuthorization();
+
+// ── Roles ─────────────────────────────────────────────────────────────────────
+
+app.MapGet("/api/roles", async (NexusDbContext db) =>
+    await db.Roles.OrderByDescending(r => r.Level).ThenBy(r => r.RoleName).ToListAsync()
+).RequireAuthorization();
+
+app.MapPost("/api/roles", async (RoleUpsertDto dto, NexusDbContext db) =>
+{
+    if (await db.Roles.AnyAsync(r => r.RoleName == dto.RoleName)) return Results.Conflict();
+    var role = new NexusApi.Models.RoleRecord { RoleName = dto.RoleName, Level = dto.Level, PermissionsJson = dto.PermissionsJson };
+    db.Roles.Add(role);
+    await db.SaveChangesAsync();
+    return Results.Ok(role);
+}).RequireAuthorization();
+
+app.MapPut("/api/roles/{roleName}", async (string roleName, RoleUpsertDto dto, NexusDbContext db) =>
+{
+    var role = await db.Roles.FirstOrDefaultAsync(r => r.RoleName == roleName);
+    if (role == null) return Results.NotFound();
+    role.Level = dto.Level;
+    role.PermissionsJson = dto.PermissionsJson;
+    await db.SaveChangesAsync();
+    return Results.Ok(role);
+}).RequireAuthorization();
+
+app.MapDelete("/api/roles/{roleName}", async (string roleName, NexusDbContext db) =>
+{
+    var role = await db.Roles.FirstOrDefaultAsync(r => r.RoleName == roleName);
+    if (role == null) return Results.NotFound();
+    var count = await db.Users.CountAsync(u => u.Role == roleName);
+    if (count > 0) return Results.BadRequest($"{count} user(s) still assigned to this role.");
+    db.Roles.Remove(role);
+    await db.SaveChangesAsync();
+    return Results.Ok();
 }).RequireAuthorization();
 
 app.MapGet("/api/compliance", async (NexusDbContext db) =>
@@ -1533,7 +1939,18 @@ record LoginDto(string Email, string Password);
 record UserUpdateDto(string? Name, string? Role, bool? Mfa, string? Auth, string[]? Sites);
 record UserCreateDto(string Name, string Email, string Role, bool Mfa, string Auth, string[]? Sites, string Password);
 record StudyStatusDto(string Status, int? SignedDays);
-record ClauseUpdateDto(string? Status, int? Evidence, string? Owner, string? LastReviewed);
+record ClauseUpdateDto(string? Status, int? Evidence, string? Owner, string? LastReviewed, string? LinkedEvidence);
+record SiteDto(string SiteCode, string Name, string? Type, string? Beds);
+record RoleUpsertDto(string RoleName, int Level, string PermissionsJson);
+record PatientFormLinkCreateDto(string? PatientId, string? PatientName, string? RecipientName, string? RecipientPhone, string? RecipientEmail, string? Method, string FormId, string FormTitle);
+record FormFillSubmitDto(string FormData, string? SnapshotHtml);
+record SendFormLinkDto(string BaseUrl);
+record PatientCreateDto(
+    string Name, string? Initials, string? Dob, string? Sex, string? Mrn,
+    string? Site, string? Referrer, string? Physician, string? Status, string? NextReview,
+    string? ContactJson, string? DiagnosesJson, string? StudiesJson,
+    string? AlertsJson, string? TreatmentJson, string? ComplianceJson
+);
 
 record DocumentDto(
     string DocId, string Title, string Version, string Status, string Folder,

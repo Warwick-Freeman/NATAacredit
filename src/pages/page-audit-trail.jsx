@@ -215,7 +215,23 @@ const AuditTrailPage = () => {
   }, [filtered]);
 
   function doExport() {
-    setExportToast(true);
+    const headers = ['Timestamp', 'User', 'Module', 'Kind', 'Action', 'Target', 'Detail', 'Hash'];
+    const escape = v => {
+      const s = String(v ?? '');
+      return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const csv = [headers, ...filtered.map(ev => [
+      ev.ts, ev.who, ev.module ?? '', ev.kind ?? '', ev.action ?? '', ev.target ?? '', ev.detail ?? '', ev.hash ?? '',
+    ])].map(row => row.map(escape).join(',')).join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `audit-trail-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setExportToast(filtered.length);
     setTimeout(() => setExportToast(false), 3000);
   }
 
@@ -328,8 +344,8 @@ const AuditTrailPage = () => {
         <div className="banner info" style={{ marginBottom: 18 }}>
           <Icon name="check" size={16} />
           <div style={{ flex: 1 }}>
-            <strong>Export queued.</strong>
-            <span style={{ fontSize: 12, marginLeft: 8 }}>audit-trail-{new Date().toISOString().slice(0,10)}.csv will download shortly.</span>
+            <strong>Exported {exportToast} record{exportToast !== 1 ? 's' : ''}.</strong>
+            <span style={{ fontSize: 12, marginLeft: 8 }}>audit-trail-{new Date().toISOString().slice(0,10)}.csv</span>
           </div>
           <button className="btn-icon" onClick={() => setExportToast(false)}><Icon name="x" size={14} /></button>
         </div>

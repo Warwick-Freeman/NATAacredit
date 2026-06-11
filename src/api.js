@@ -18,6 +18,32 @@ async function get(path) {
   return res.json();
 }
 
+async function post(path, body) {
+  const res = await fetch(`${BASE}${path}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(body),
+  });
+  if (res.status === 401) { clearSessionAndReload(); return; }
+  if (!res.ok) { const t = await res.text(); throw new Error(t || `API error ${res.status}`); }
+  return res.json().catch(() => null);
+}
+
+async function put(path, body) {
+  const res = await fetch(`${BASE}${path}`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify(body),
+  });
+  if (res.status === 401) { clearSessionAndReload(); return; }
+  if (!res.ok) { const t = await res.text(); throw new Error(t || `API error ${res.status}`); }
+  return res.json().catch(() => null);
+}
+
+async function del(path) {
+  const res = await fetch(`${BASE}${path}`, { method: 'DELETE', headers: authHeaders() });
+  if (res.status === 401) { clearSessionAndReload(); return; }
+  if (!res.ok) { const t = await res.text(); throw new Error(t || `API error ${res.status}`); }
+}
+
 // Each API response uses camelCase from .NET's default JSON serializer.
 // We normalise the shape to match what the components expect.
 
@@ -68,12 +94,15 @@ function normaliseIndicator(k) {
 const CLAUSE_STATUS_MAP = { nonconformant: 'nc', review: 'partial' };
 
 function normaliseClause(c) {
+  let linkedEvidence = [];
+  try { linkedEvidence = JSON.parse(c.linkedEvidenceJson || '[]'); } catch { linkedEvidence = []; }
   return {
     id: c.clauseId,
     title: c.title,
     section: c.section,
     status: CLAUSE_STATUS_MAP[c.status] || c.status,
     evidence: c.evidence,
+    linkedEvidence,
     lastReviewed: c.lastReviewed,
     owner: c.owner,
     notes: '',
@@ -127,10 +156,14 @@ function normaliseActivity(a) {
 }
 
 export async function patchClause(id, data) {
+  const payload = { ...data };
+  if (Array.isArray(payload.linkedEvidence)) {
+    payload.linkedEvidence = JSON.stringify(payload.linkedEvidence);
+  }
   const res = await fetch(`${BASE}/api/clauses/${encodeURIComponent(id)}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
-    body: JSON.stringify(data),
+    body: JSON.stringify(payload),
   });
   if (res.status === 401) { clearSessionAndReload(); return; }
   if (!res.ok) throw new Error(`API error ${res.status}`);
@@ -255,6 +288,117 @@ export async function saveConfigKey(key, value) {
   if (!res.ok) throw new Error(`Failed to save config key: ${key}`);
   return res.json();
 }
+
+// ── Sites ─────────────────────────────────────────────────────────────────────
+
+export async function fetchSites() { return get('/api/sites'); }
+
+export async function createSite(data) { return post('/api/sites', data); }
+
+export async function updateSite(siteCode, data) { return put(`/api/sites/${encodeURIComponent(siteCode)}`, data); }
+
+export async function deleteSite(siteCode) { return del(`/api/sites/${encodeURIComponent(siteCode)}`); }
+
+// ── Patients ──────────────────────────────────────────────────────────────────
+
+function parseJson(s, fallback) { try { return JSON.parse(s); } catch { return fallback; } }
+
+export function normalisePatient(p) {
+  return {
+    id:          p.patientId,
+    name:        p.name,
+    initials:    p.initials,
+    dob:         p.dob,
+    sex:         p.sex,
+    mrn:         p.mrn,
+    site:        p.site,
+    referrer:    p.referrer,
+    physician:   p.physician,
+    status:      p.status,
+    nextReview:  p.nextReview,
+    contact:     parseJson(p.contactJson,    { phone: '', email: '', address: { line1: '', line2: '', suburb: '', state: 'VIC', postcode: '' }, emergencyContact: { name: '', relationship: '', phone: '' } }),
+    diagnoses:   parseJson(p.diagnosesJson,  []),
+    studies:     parseJson(p.studiesJson,    []),
+    alerts:      parseJson(p.alertsJson,     []),
+    treatment:   parseJson(p.treatmentJson,  null),
+    compliance:  parseJson(p.complianceJson, null),
+  };
+}
+
+export async function fetchPatients() {
+  const list = await get('/api/patients');
+  return (list ?? []).map(normalisePatient);
+}
+
+export async function createPatient(data) {
+  const result = await post('/api/patients', {
+    name:        data.name,
+    initials:    data.initials,
+    dob:         data.dob,
+    sex:         data.sex,
+    mrn:         data.mrn,
+    site:        data.site,
+    referrer:    data.referrer,
+    physician:   data.physician,
+    status:      data.status,
+    nextReview:  data.nextReview ?? '',
+    contactJson:    JSON.stringify(data.contact    ?? {}),
+    diagnosesJson:  JSON.stringify(data.diagnoses  ?? []),
+    studiesJson:    JSON.stringify(data.studies    ?? []),
+    alertsJson:     JSON.stringify(data.alerts     ?? []),
+    treatmentJson:  JSON.stringify(data.treatment  ?? null),
+    complianceJson: JSON.stringify(data.compliance ?? null),
+  });
+  return normalisePatient(result);
+}
+
+export async function updatePatient(id, data) {
+  const result = await put(`/api/patients/${encodeURIComponent(id)}`, {
+    name:        data.name,
+    initials:    data.initials,
+    dob:         data.dob,
+    sex:         data.sex,
+    mrn:         data.mrn,
+    site:        data.site,
+    referrer:    data.referrer,
+    physician:   data.physician,
+    status:      data.status,
+    nextReview:  data.nextReview ?? '',
+    contactJson:    data.contact    !== undefined ? JSON.stringify(data.contact)    : undefined,
+    diagnosesJson:  data.diagnoses  !== undefined ? JSON.stringify(data.diagnoses)  : undefined,
+    studiesJson:    data.studies    !== undefined ? JSON.stringify(data.studies)    : undefined,
+    alertsJson:     data.alerts     !== undefined ? JSON.stringify(data.alerts)     : undefined,
+    treatmentJson:  data.treatment  !== undefined ? JSON.stringify(data.treatment)  : undefined,
+    complianceJson: data.compliance !== undefined ? JSON.stringify(data.compliance) : undefined,
+  });
+  return normalisePatient(result);
+}
+
+export async function deletePatient(id) { return del(`/api/patients/${encodeURIComponent(id)}`); }
+
+// ── Patient form links ────────────────────────────────────────────────────────
+
+export async function createPatientFormLink(data) { return post('/api/patient-form-links', data); }
+
+export async function fetchPatientFormLinks(patientId) {
+  return get(`/api/patient-form-links?patientId=${encodeURIComponent(patientId)}`);
+}
+
+export async function sendFormLink(token) {
+  return post(`/api/send-form-link/${token}`, {
+    baseUrl: window.location.origin + window.location.pathname,
+  });
+}
+
+// ── Roles ─────────────────────────────────────────────────────────────────────
+
+export async function fetchRoles() { return get('/api/roles'); }
+
+export async function createRole(data) { return post('/api/roles', data); }
+
+export async function updateRolePerms(roleName, data) { return put(`/api/roles/${encodeURIComponent(roleName)}`, data); }
+
+export async function deleteRole(roleName) { return del(`/api/roles/${encodeURIComponent(roleName)}`); }
 
 export async function fetchAll() {
   const [studies, equipment, indicators, clauses, compliance, tasks, activity] =

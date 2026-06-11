@@ -7,6 +7,9 @@ import { useTaskContext } from '../TaskContext';
 import { useAuth } from '../AuthContext';
 import { useNexusData } from '../NexusDataContext';
 import { DME_PROVIDERS, DX_LIST, initDxFromDiagnoses, generateOrderHtml } from '../dme-order';
+import PatientFormSendModal from '../patient-form-send-modal';
+import { RecordViewer } from '../form-filler';
+import { fetchPatientFormLinks, fetchPatients, createPatient, updatePatient } from '../api';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -169,29 +172,6 @@ const CPAP_PROVIDERS = {
   lowenstein: { label: 'Löwenstein prismaLAB',      color: '#065f46', connected: false, lastSync: null,               patients: 0 },
 };
 
-const PROVIDER_APIS = [
-  {
-    id: 'resmed', name: 'ResMed AirView API', logo: 'ResMed', endpoint: 'https://api.resmed.com/v1',
-    auth: 'OAuth 2.0 (client_credentials)', scopes: 'therapy.read patient.read',
-    dataFields: ['Daily usage (hours)', 'AHI (events/h)', 'Mask leak (L/min)', '90th percentile pressure', 'Apnea/hypopnea counts', 'CSR index (ASV)'],
-    syncInterval: 'Every 6 hours (device uploads via cellular/Wi-Fi)',
-    docs: 'developer.resmed.com',
-  },
-  {
-    id: 'philips', name: 'Philips DreamStation API', logo: 'Philips', endpoint: 'https://api.connected-health.philips.com/v2',
-    auth: 'OAuth 2.0 (authorization_code)', scopes: 'therapy.read',
-    dataFields: ['Daily usage', 'AHI', 'Pressure', 'Leak', 'Compliance flag'],
-    syncInterval: 'Every 12 hours',
-    docs: 'developer.philips.com/healthcare',
-  },
-  {
-    id: 'fp', name: 'Fisher & Paykel myAir API', logo: 'F&P', endpoint: 'Contact F&P Healthcare for API access',
-    auth: 'Partner agreement required', scopes: 'therapy.read',
-    dataFields: ['Daily usage', 'AHI', 'Leak', 'Pressure'],
-    syncInterval: 'Daily batch',
-    docs: 'Contact fphealthcare.com/professionals',
-  },
-];
 
 // ─── DME order modal ──────────────────────────────────────────────────────────
 
@@ -726,12 +706,158 @@ function CompliancePill({ rate }) {
   return <Pill kind={kind}>{rate}%</Pill>;
 }
 
+// ─── add patient modal ────────────────────────────────────────────────────────
+
+const BLANK_PATIENT = {
+  name: '', initials: '', dob: '', sex: 'M', mrn: '', site: '',
+  referrer: '', physician: '', status: 'active',
+};
+
+function AddPatientModal({ onClose, onAdd, sites = [] }) {
+  const [form, setForm] = useState(BLANK_PATIENT);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const canSave = form.name.trim() && form.dob && form.mrn.trim();
+
+  async function handleSave() {
+    setSaving(true);
+    setError('');
+    try {
+      const saved = await createPatient({
+        name: form.name.trim(),
+        initials: form.initials.trim(),
+        dob: form.dob,
+        sex: form.sex,
+        mrn: form.mrn.trim(),
+        site: form.site,
+        referrer: form.referrer.trim(),
+        physician: form.physician.trim(),
+        status: form.status,
+        nextReview: '',
+        contact: { ...BLANK_CONTACT },
+        diagnoses: [], studies: [], alerts: [],
+        treatment: null, compliance: null,
+      });
+      saved.age = ageFromDob(saved.dob);
+      onAdd(saved);
+      onClose();
+    } catch (e) {
+      setError(e.message ?? 'Failed to save patient');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="doc-viewer-overlay" onClick={onClose}>
+      <div style={{ background: 'var(--surface)', borderRadius: 14, width: '100%', maxWidth: 480, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 8px 40px rgba(0,0,0,0.22)', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
+        <div className="drawer-head" style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center' }}>
+          <div>
+            <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>Patients</div>
+            <div style={{ fontSize: 15, fontWeight: 600 }}>Add patient</div>
+          </div>
+          <button className="btn-icon" style={{ marginLeft: 'auto' }} onClick={onClose}><Icon name="x" size={14} /></button>
+        </div>
+
+        <div className="drawer-body" style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div className="form-row">
+            <div className="form-field" style={{ flex: 2 }}>
+              <label className="form-label">Full name *</label>
+              <input className="form-input" value={form.name} onChange={e => set('name', e.target.value)} placeholder="e.g. J. Smith" autoFocus />
+            </div>
+            <div className="form-field" style={{ flex: 1 }}>
+              <label className="form-label">Initials</label>
+              <input className="form-input" value={form.initials} onChange={e => set('initials', e.target.value)} placeholder="Auto" maxLength={4} />
+            </div>
+          </div>
+
+          <div className="form-row">
+            <div className="form-field" style={{ flex: 1 }}>
+              <label className="form-label">Date of birth *</label>
+              <input className="form-input" type="date" value={form.dob} onChange={e => set('dob', e.target.value)} />
+            </div>
+            <div className="form-field" style={{ flex: 1 }}>
+              <label className="form-label">Sex</label>
+              <select className="form-input" value={form.sex} onChange={e => set('sex', e.target.value)}>
+                <option value="M">Male</option>
+                <option value="F">Female</option>
+                <option value="O">Other</option>
+              </select>
+            </div>
+            <div className="form-field" style={{ flex: 1 }}>
+              <label className="form-label">MRN *</label>
+              <input className="form-input" value={form.mrn} onChange={e => set('mrn', e.target.value)} placeholder="MRN-0000" />
+            </div>
+          </div>
+
+          <div className="form-row">
+            <div className="form-field" style={{ flex: 1 }}>
+              <label className="form-label">Site</label>
+              <select className="form-input" value={form.site} onChange={e => set('site', e.target.value)}>
+                <option value="">— select —</option>
+                {sites.map(s => <option key={s.code ?? s.name} value={s.name}>{s.name}</option>)}
+              </select>
+            </div>
+            <div className="form-field" style={{ flex: 1 }}>
+              <label className="form-label">Status</label>
+              <select className="form-input" value={form.status} onChange={e => set('status', e.target.value)}>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+                <option value="discharged">Discharged</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="form-field">
+            <label className="form-label">Referring clinician</label>
+            <input className="form-input" value={form.referrer} onChange={e => set('referrer', e.target.value)} placeholder="e.g. Dr. A. Brown (GP)" />
+          </div>
+
+          <div className="form-field">
+            <label className="form-label">Physician</label>
+            <input className="form-input" value={form.physician} onChange={e => set('physician', e.target.value)} placeholder="e.g. Dr. R. Okafor" />
+          </div>
+
+          {error && <div style={{ fontSize: 12, color: 'var(--bad)', padding: '6px 0' }}>{error}</div>}
+          <div style={{ display: 'flex', gap: 8, paddingTop: 4 }}>
+            <button className="btn btn-primary" style={{ flex: 1 }} disabled={!canSave || saving} onClick={handleSave}>
+              {saving ? 'Saving…' : 'Add patient'}
+            </button>
+            <button className="btn" onClick={onClose} disabled={saving}>Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── patient detail drawer ─────────────────────────────────────────────────────
 
 function PatientDrawer({ patient, onClose, onCreateTask, onOrderDme, onUpdate, studies = [], openStudy }) {
   const [dtab, setDtab] = useState('overview');
   const [contactEdit, setContactEdit] = useState(false);
   const [contactDraft, setContactDraft] = useState(null);
+  const [contactSaving, setContactSaving] = useState(false);
+  const [contactError, setContactError] = useState('');
+  const [formLinks, setFormLinks] = useState(null);
+  const [loadingLinks, setLoadingLinks] = useState(false);
+  const [copiedLinkId, setCopiedLinkId] = useState(null);
+  const [viewRecord, setViewRecord] = useState(null);
+  const [showSendModal, setShowSendModal] = useState(false);
+
+  function refreshLinks() {
+    setLoadingLinks(true);
+    fetchPatientFormLinks(patient.id)
+      .then(list => setFormLinks(list ?? []))
+      .catch(() => setFormLinks([]))
+      .finally(() => setLoadingLinks(false));
+  }
+
+  React.useEffect(() => {
+    if (dtab !== 'forms' || formLinks !== null) return;
+    refreshLinks();
+  }, [dtab, patient.id, formLinks]);
   const complianceDays = patient.compliance ? makeDailyData(patient.id, patient.compliance.rate, patient.compliance.meanUsage) : [];
   const provider = patient.treatment?.provider ? CPAP_PROVIDERS[patient.treatment.provider] : null;
   const contact = patient.contact ?? { phone: '', email: '', address: { line1: '', line2: '', suburb: '', state: '', postcode: '' }, emergencyContact: { name: '', relationship: '', phone: '' } };
@@ -740,9 +866,19 @@ function PatientDrawer({ patient, onClose, onCreateTask, onOrderDme, onUpdate, s
     setContactDraft(JSON.parse(JSON.stringify(contact)));
     setContactEdit(true);
   }
-  function saveContact() {
-    onUpdate?.({ ...patient, contact: contactDraft });
-    setContactEdit(false);
+  async function saveContact() {
+    setContactSaving(true);
+    setContactError('');
+    try {
+      const updated = await updatePatient(patient.id, { ...patient, contact: contactDraft });
+      updated.age = ageFromDob(updated.dob);
+      onUpdate?.(updated);
+      setContactEdit(false);
+    } catch (e) {
+      setContactError(e.message ?? 'Failed to save');
+    } finally {
+      setContactSaving(false);
+    }
   }
   function setC(field, val) { setContactDraft(p => ({ ...p, [field]: val })); }
   function setA(field, val) { setContactDraft(p => ({ ...p, address: { ...p.address, [field]: val } })); }
@@ -777,6 +913,7 @@ function PatientDrawer({ patient, onClose, onCreateTask, onOrderDme, onUpdate, s
           { id: 'overview', label: 'Overview' },
           ...(patient.compliance ? [{ id: 'compliance', label: 'CPAP compliance' }] : []),
           { id: 'studies', label: 'Studies' },
+          { id: 'forms', label: 'Forms' },
           { id: 'prescription', label: 'Prescription' },
           { id: 'contact', label: 'Contact' },
         ]} />
@@ -958,9 +1095,12 @@ function PatientDrawer({ patient, onClose, onCreateTask, onOrderDme, onUpdate, s
                   ))}
                 </div>
 
+                {contactError && <div style={{ fontSize: 12, color: 'var(--bad)', marginBottom: 6 }}>{contactError}</div>}
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <button className="btn" onClick={() => setContactEdit(false)}>Cancel</button>
-                  <button className="btn btn-primary" onClick={saveContact}><Icon name="check" size={13} />Save</button>
+                  <button className="btn" onClick={() => setContactEdit(false)} disabled={contactSaving}>Cancel</button>
+                  <button className="btn btn-primary" onClick={saveContact} disabled={contactSaving}>
+                    <Icon name="check" size={13} />{contactSaving ? 'Saving…' : 'Save'}
+                  </button>
                 </div>
               </>
             ) : (
@@ -1008,6 +1148,75 @@ function PatientDrawer({ patient, onClose, onCreateTask, onOrderDme, onUpdate, s
           </div>
         )}
 
+        {/* ── Forms ── */}
+        {dtab === 'forms' && (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>Sent forms</div>
+              <button className="btn" style={{ fontSize: 11 }} onClick={refreshLinks} disabled={loadingLinks}>
+                <Icon name="activity" size={11} />{loadingLinks ? 'Refreshing…' : 'Refresh'}
+              </button>
+              <button className="btn btn-primary" style={{ fontSize: 12 }} onClick={() => setShowSendModal(true)}>
+                <Icon name="plus" size={12} />Send form
+              </button>
+            </div>
+            {loadingLinks && (
+              <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--ink-3)', fontSize: 13 }}>Loading…</div>
+            )}
+            {!loadingLinks && (!formLinks || formLinks.length === 0) && (
+              <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--ink-3)', fontSize: 13 }}>No forms sent to this patient yet.</div>
+            )}
+            {!loadingLinks && formLinks && formLinks.map(link => (
+              <div key={link.id} style={{ border: '1px solid var(--border)', borderRadius: 10, padding: '12px 14px', marginBottom: 10, display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{link.formTitle}</div>
+                  <div style={{ fontSize: 11, color: 'var(--ink-3)', marginBottom: 6 }}>
+                    Sent {link.sentAt ? new Date(link.sentAt).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                    {' · '}{link.method === 'email' ? 'Email' : link.method === 'sms' ? 'SMS' : 'Link'}
+                    {' · '}to {link.recipientName}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <span style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 99,
+                      background: link.status === 'complete' ? 'var(--good-soft)' : 'var(--warn-soft)',
+                      color: link.status === 'complete' ? 'var(--good)' : 'var(--warn)',
+                    }}>
+                      {link.status === 'complete' ? '✓ Complete' : '○ Pending'}
+                    </span>
+                    {link.status === 'complete' && link.formRecordId && (
+                      <button className="btn" style={{ fontSize: 11 }} onClick={() => setViewRecord({
+                        id: link.formRecordId,
+                        recordRef: 'REC-' + (link.token ?? '').slice(0, 8).toUpperCase(),
+                        period: link.completedAt ? new Date(link.completedAt).toLocaleDateString('en-AU', { month: 'short', year: 'numeric' }) : '',
+                        completedBy: link.patientName,
+                        completedAt: link.completedAt,
+                      })}>
+                        <Icon name="eye" size={11} />View results
+                      </button>
+                    )}
+                    {link.status === 'pending' && link.token && (
+                      <button className="btn" style={{ fontSize: 11 }} onClick={() => {
+                        const url = `${window.location.origin}${window.location.pathname}?fill=${link.token}`;
+                        const el = document.createElement('input');
+                        el.value = url; el.style.cssText = 'position:absolute;opacity:0;top:0;left:0';
+                        document.body.appendChild(el); el.focus(); el.select(); el.setSelectionRange(0, 99999);
+                        try { document.execCommand('copy'); } catch {}
+                        document.body.removeChild(el);
+                        navigator.clipboard?.writeText(url).catch(() => {});
+                        setCopiedLinkId(link.id);
+                        setTimeout(() => setCopiedLinkId(null), 2000);
+                      }}>
+                        <Icon name={copiedLinkId === link.id ? 'check' : 'copy'} size={11} />
+                        {copiedLinkId === link.id ? 'Copied!' : 'Copy link'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* ── Prescription ── */}
         {dtab === 'prescription' && (
           <div>
@@ -1052,6 +1261,31 @@ function PatientDrawer({ patient, onClose, onCreateTask, onOrderDme, onUpdate, s
           </div>
         )}
       </div>
+
+      {/* ── PatientFormSendModal overlay ── */}
+      {showSendModal && (
+        <div className="doc-viewer-overlay" onClick={() => setShowSendModal(false)}>
+          <div className="doc-viewer" style={{ maxWidth: 480, width: '100%' }} onClick={e => e.stopPropagation()}>
+            <PatientFormSendModal
+              patient={patient}
+              onClose={() => setShowSendModal(false)}
+              onSent={(link) => {
+                setFormLinks(prev => [link, ...(prev ?? [])]);
+                setShowSendModal(false);
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* ── RecordViewer overlay ── */}
+      {viewRecord && (
+        <div className="doc-viewer-overlay" onClick={() => setViewRecord(null)}>
+          <div className="doc-viewer" onClick={e => e.stopPropagation()}>
+            <RecordViewer record={viewRecord} onClose={() => setViewRecord(null)} />
+          </div>
+        </div>
+      )}
     </>
   );
 }
@@ -1062,20 +1296,23 @@ const PatientsPage = ({ openStudy }) => {
   const [tab, setTab] = useState('patients');
   const { site } = useLocation();
   const { openCreateTask } = useTaskContext();
-  const { userSites } = useAuth();
-  const { user } = useAuth();
+  const { userSites, allSites, user } = useAuth();
   const { data } = useNexusData();
 
-  const [patients, setPatients] = useState(() =>
-    userSites.length === 0 ? SEED_PATIENTS
-      : SEED_PATIENTS.filter(p => userSites.includes(p.site))
-  );
+  const [patients, setPatients] = useState([]);
+  const [patientsLoading, setPatientsLoading] = useState(true);
+
+  React.useEffect(() => {
+    fetchPatients()
+      .then(list => setPatients(list.map(p => ({ ...p, age: ageFromDob(p.dob) }))))
+      .catch(() => setPatients([]))
+      .finally(() => setPatientsLoading(false));
+  }, []);
   const [selectedId, setSelectedId] = useState(null);
   const [dmePatient, setDmePatient] = useState(null);
   const [filter, setFilter] = useState('all');
   const [txFilter, setTxFilter] = useState('all');
   const [search, setSearch] = useState('');
-  const [expandedProvider, setExpandedProvider] = useState(null);
   const [addOpen, setAddOpen] = useState(false);
 
   const selectedPatient = patients.find(p => p.id === selectedId);
@@ -1106,14 +1343,9 @@ const PatientsPage = ({ openStudy }) => {
         title="Patients"
         subtitle="Patient records, treatment prescriptions, and CPAP therapy compliance monitoring"
         actions={
-          <>
-            <button className="btn" onClick={() => setTab('integrations')}>
-              <Icon name="wifi" size={14} />Device integrations
-            </button>
-            <button className="btn btn-primary" onClick={() => setAddOpen(true)}>
-              <Icon name="plus" size={14} />Add patient
-            </button>
-          </>
+          <button className="btn btn-primary" onClick={() => setAddOpen(true)}>
+            <Icon name="plus" size={14} />Add patient
+          </button>
         }
       />
 
@@ -1121,11 +1353,13 @@ const PatientsPage = ({ openStudy }) => {
         { id: 'patients',      label: 'Patient list',          count: filtered.length },
         { id: 'compliance',    label: 'CPAP compliance',       count: cpapPatients.length },
         { id: 'prescriptions', label: 'Active prescriptions'  },
-        { id: 'integrations',  label: 'Device integrations'   },
       ]} />
 
       {/* ── PATIENT LIST ──────────────────────────────────────────────────────── */}
-      {tab === 'patients' && (
+      {tab === 'patients' && patientsLoading && (
+        <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--ink-3)', fontSize: 13 }}>Loading patients…</div>
+      )}
+      {tab === 'patients' && !patientsLoading && (
         <>
           <div className="filter-bar">
             {[['all', 'All'], ['active', 'Active'], ['monitoring', 'Monitoring'], ['awaiting-study', 'Awaiting study']].map(([v, l]) => (
@@ -1302,92 +1536,6 @@ const PatientsPage = ({ openStudy }) => {
         </div>
       )}
 
-      {/* ── DEVICE INTEGRATIONS ───────────────────────────────────────────────── */}
-      {tab === 'integrations' && (
-        <>
-          <div className="banner info" style={{ marginBottom: 18 }}>
-            <Icon name="wifi" size={18} />
-            <div style={{ flex: 1 }}>
-              <strong>CPAP device cloud integrations.</strong>
-              <div style={{ fontSize: 12, marginTop: 2 }}>
-                Compliance data is automatically synced via manufacturer APIs when patients consent via the device's companion app (myAir, DreamMapper, etc.).
-                Backend credentials are configured in Settings → Integrations.
-              </div>
-            </div>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14, marginBottom: 20 }}>
-            {PROVIDER_APIS.map(prov => {
-              const status = CPAP_PROVIDERS[prov.id];
-              const isOpen = expandedProvider === prov.id;
-              return (
-                <div key={prov.id} className="card" style={{ border: status?.connected ? '1px solid var(--good)' : undefined }}>
-                  <div className="card-head" style={{ cursor: 'pointer' }} onClick={() => setExpandedProvider(isOpen ? null : prov.id)}>
-                    <div style={{ width: 36, height: 36, borderRadius: 8, background: status?.connected ? '#dcfce7' : 'var(--surface-2)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-                      <Icon name="wifi" size={16} style={{ color: status?.connected ? '#15803d' : 'var(--ink-3)' }} />
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0, marginLeft: 10 }}>
-                      <div style={{ fontWeight: 600, fontSize: 13 }}>{prov.name}</div>
-                      <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>
-                        {status?.connected ? `${status.patients} patient${status.patients !== 1 ? 's' : ''} · Last sync ${status.lastSync}` : 'Not connected'}
-                      </div>
-                    </div>
-                    <Pill kind={status?.connected ? 'good' : 'outline'}>{status?.connected ? 'Connected' : 'Setup required'}</Pill>
-                    <Icon name={isOpen ? 'chev_down' : 'chev_right'} size={14} style={{ color: 'var(--ink-4)', marginLeft: 6 }} />
-                  </div>
-
-                  {isOpen && (
-                    <div style={{ borderTop: '1px solid var(--border)', padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-                      <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr', gap: '6px 12px', fontSize: 12 }}>
-                        <span style={{ color: 'var(--ink-3)' }}>API endpoint</span>
-                        <span className="mono" style={{ fontSize: 11 }}>{prov.endpoint}</span>
-                        <span style={{ color: 'var(--ink-3)' }}>Authentication</span>
-                        <span>{prov.auth}</span>
-                        <span style={{ color: 'var(--ink-3)' }}>Sync interval</span>
-                        <span>{prov.syncInterval}</span>
-                        <span style={{ color: 'var(--ink-3)' }}>Documentation</span>
-                        <span style={{ color: 'var(--accent-ink)' }}>{prov.docs}</span>
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Data fields available</div>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                          {prov.dataFields.map(f => (
-                            <span key={f} style={{ fontSize: 11, padding: '2px 8px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--ink-2)' }}>{f}</span>
-                          ))}
-                        </div>
-                      </div>
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        {status?.connected
-                          ? <><button className="btn">Force sync</button><button className="btn btn-ghost" style={{ color: 'var(--bad)' }}>Disconnect</button></>
-                          : <button className="btn btn-primary"><Icon name="link" size={13} />Connect {prov.logo}</button>
-                        }
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="card card-pad">
-            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 8 }}>How CPAP API integration works</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
-              {[
-                { n: '1', title: 'Patient consent', body: 'Patient consents to data sharing via the manufacturer\'s companion app (ResMed myAir, Philips DreamMapper, etc.).' },
-                { n: '2', title: 'Device upload', body: 'CPAP device automatically uploads nightly data via cellular or Wi-Fi to the manufacturer\'s cloud.' },
-                { n: '3', title: 'API sync', body: 'Nexus 360 backend polls the AirView / EncoreAnywhere API (OAuth 2.0) on a scheduled interval and stores compliance metrics.' },
-                { n: '4', title: 'Clinician view', body: 'Compliance data appears here automatically. Alerts trigger when a patient falls below the 70% threshold.' },
-              ].map(s => (
-                <div key={s.n} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <div style={{ width: 28, height: 28, borderRadius: 8, background: 'var(--accent-soft)', color: 'var(--accent-ink)', display: 'grid', placeItems: 'center', fontWeight: 700, fontSize: 13 }}>{s.n}</div>
-                  <div style={{ fontWeight: 600, fontSize: 12 }}>{s.title}</div>
-                  <div style={{ fontSize: 12, color: 'var(--ink-3)', lineHeight: 1.55 }}>{s.body}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </>
-      )}
 
       {/* Patient detail drawer */}
       <Drawer open={!!selectedId} onClose={() => setSelectedId(null)}>
@@ -1413,6 +1561,15 @@ const PatientsPage = ({ openStudy }) => {
           site={site}
           user={user}
           onClose={() => setDmePatient(null)}
+        />
+      )}
+
+      {/* Add patient modal */}
+      {addOpen && (
+        <AddPatientModal
+          sites={allSites}
+          onClose={() => setAddOpen(false)}
+          onAdd={p => setPatients(prev => [...prev, p])}
         />
       )}
     </div>

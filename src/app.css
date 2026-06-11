@@ -392,49 +392,74 @@ body {
 .tbl tr.row-clickable:hover td { background: var(--surface-2); }
 
 /* ─── AG Grid / NexusGrid theme ─────────────────────────────────────────── */
-/* Maps every app palette to the AG Grid quartz theme CSS variables.        */
 .ag-theme-quartz {
-  --ag-background-color:              var(--surface);
-  --ag-foreground-color:              var(--ink);
-  --ag-header-background-color:       var(--surface-2);
-  --ag-header-foreground-color:       var(--ink-3);
-  --ag-header-column-separator-color: var(--border);
-  --ag-border-color:                  var(--border);
-  --ag-row-hover-color:               var(--surface-2);
-  --ag-selected-row-background-color: var(--accent-soft);
-  --ag-odd-row-background-color:      var(--surface);
-  --ag-accent-color:                  var(--accent);
+  --ag-background-color:               var(--surface);
+  --ag-foreground-color:               var(--ink);
+  --ag-header-background-color:        var(--surface-2);
+  --ag-header-foreground-color:        var(--ink-3);
+  --ag-header-column-separator-color:  transparent;
+  --ag-border-color:                   var(--border);
+  --ag-row-hover-color:                var(--surface-3);
+  --ag-selected-row-background-color:  var(--accent-soft);
+  --ag-odd-row-background-color:       var(--surface-2);
+  --ag-accent-color:                   var(--accent);
+  --ag-input-focus-border-color:       var(--accent);
 
-  --ag-font-size:              13px;
-  --ag-font-family:            inherit;
-  --ag-row-height:             45px;
-  --ag-header-height:          37px;
+  --ag-font-size:               13px;
+  --ag-font-family:             inherit;
+  --ag-row-height:              42px;
+  --ag-header-height:           38px;
   --ag-cell-horizontal-padding: 14px;
 
-  /* Remove heavy default chrome */
-  --ag-border-radius:         0px;
-  --ag-wrapper-border-radius: 0px;
-  --ag-grid-size:             4px;
+  --ag-border-radius:           0px;
+  --ag-wrapper-border-radius:   0px;
+  --ag-grid-size:               4px;
 
   font-size: 13px;
   font-family: inherit;
 }
 
-/* Header: uppercase label style matching .tbl th */
+/* Card provides the container — remove the redundant outer border */
+.ag-theme-quartz .ag-root-wrapper { border: none; }
+
+/* Stronger header bottom border */
+.ag-theme-quartz .ag-header { border-bottom: 1px solid var(--border-strong); }
+
+/* Header labels */
 .ag-theme-quartz .ag-header-cell-text {
   font-size: 11px;
-  font-weight: 500;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
 }
-/* Remove the default sort icon left-spacing when no sort applied */
+
+/* Hide sort icon when no sort is applied */
 .ag-theme-quartz .ag-header-cell-sorted-none .ag-sort-none-icon { display: none; }
 
-/* Pointer cursor for clickable grids */
+/* Active filter icon: accent colour */
+.ag-theme-quartz .ag-column-filtered .ag-filter-icon { color: var(--accent); }
+
+/* Clickable rows: pointer + left accent stripe on hover */
 .nexus-grid--clickable .ag-row { cursor: pointer; }
+.nexus-grid--clickable .ag-row:hover { box-shadow: inset 3px 0 0 var(--accent); }
 
 /* Cell vertical alignment */
 .ag-theme-quartz .ag-cell { display: flex; align-items: center; }
+
+/* "No rows" overlay */
+.ag-theme-quartz .ag-overlay-no-rows-center { font-size: 13px; color: var(--ink-4); }
+
+/* Pagination bar */
+.ag-theme-quartz .ag-paging-panel {
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--ink-3);
+  padding: 0 14px;
+  min-height: 38px;
+}
+.ag-theme-quartz .ag-paging-button .ag-icon { color: var(--ink-3); }
+.ag-theme-quartz .ag-paging-button:not(.ag-disabled):hover .ag-icon { color: var(--accent); }
+.ag-theme-quartz .ag-paging-button.ag-disabled .ag-icon { opacity: 0.3; }
 
 /* ─────────────────────────────────────────────────────────────────────── */
 

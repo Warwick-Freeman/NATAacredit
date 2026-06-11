@@ -349,7 +349,7 @@ ${gapClauses.length > 0 ? `
   setTimeout(() => URL.revokeObjectURL(url), 15000);
 }
 
-const AccreditationPage = ({ data: D }) => {
+const AccreditationPage = ({ data: D, goTo }) => {
   const { openCreateTask } = useTaskContext();
   const { user } = useAuth();
   const { activeStandard, refreshData } = useNexusData();
@@ -360,10 +360,10 @@ const AccreditationPage = ({ data: D }) => {
     window.open(`${BASE}/api/standards/${activeStandard ?? 'asa'}`, '_blank');
   }, [activeStandard]);
 
-  // Local clause state — seed with realistic linked evidence
+  // Local clause state — use persisted linkedEvidence from API; fall back to SEED_EVIDENCE only if the DB has none yet
   const [clauses,   setClauses]   = useState(() => D.clauses.map(c => ({
     ...c,
-    linkedEvidence: SEED_EVIDENCE[c.id] || [],
+    linkedEvidence: (c.linkedEvidence && c.linkedEvidence.length > 0) ? c.linkedEvidence : (SEED_EVIDENCE[c.id] || []),
   })));
   const [filter,    setFilter]    = useState("all");
   const [search,    setSearch]    = useState('');
@@ -410,6 +410,7 @@ const AccreditationPage = ({ data: D }) => {
         evidence: typeof updated.evidence === 'number' ? updated.evidence : undefined,
         owner: updated.owner ?? undefined,
         lastReviewed: updated.lastReviewed ?? undefined,
+        linkedEvidence: updated.linkedEvidence ?? [],
       });
       refreshData();
     } catch {
@@ -444,6 +445,31 @@ const AccreditationPage = ({ data: D }) => {
   }, [filtered]);
 
   const needsCount = totalNc + totalPartial;
+
+  // Derive evidence library from clause linkedEvidence — deduped by ref, each item carries all clause IDs it appears in
+  const libraryItems = useMemo(() => {
+    const map = new Map();
+    clauses.forEach(clause => {
+      (clause.linkedEvidence || []).forEach(ev => {
+        const key = ev.ref || ev.id;
+        if (!map.has(key)) map.set(key, { ...ev, clauseIds: [] });
+        map.get(key).clauseIds.push(clause.id);
+      });
+    });
+    return Array.from(map.values()).sort((a, b) => {
+      if (a.missing && !b.missing) return 1;
+      if (!a.missing && b.missing) return -1;
+      if (a.date === '—' && b.date !== '—') return 1;
+      if (a.date !== '—' && b.date === '—') return -1;
+      return b.date.localeCompare(a.date);
+    });
+  }, [clauses]);
+
+  const handleEvidenceDocClick = (e) => {
+    const docId = e.docId || e.ref?.split(' v')[0] || null;
+    if (docId) sessionStorage.setItem('nexus_open_doc', docId);
+    if (goTo) goTo('documents');
+  };
 
   // Gap report column definitions
   const gapColumnDefs = useMemo(() => [
@@ -568,7 +594,7 @@ const AccreditationPage = ({ data: D }) => {
 
       <Tabs value={tab} onChange={setTab} tabs={[
         { id: "clauses",  label: "Clause map",        count: totalClauses },
-        { id: "evidence", label: "Evidence library" },
+        { id: "evidence", label: "Evidence library", count: libraryItems.length },
         { id: "gap",      label: "Gap report",        count: needsCount || undefined },
         { id: "assessor", label: "Assessor view" },
         { id: "history",  label: "Assessment history" },
@@ -651,39 +677,41 @@ const AccreditationPage = ({ data: D }) => {
       {/* ── Evidence library ── */}
       {tab === "evidence" && (
         <div className="card card-pad">
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-            {[
-              { name: "SOP-PSG-031 Bio-signal verification", v: "v3.2", clauses: ["5.3.4", "5.5.2"], type: "SOP", date: "21 Apr 2026" },
-              { name: "Q1 2026 Internal audit report", v: "v1.0", clauses: ["4.14.1"], type: "Audit", date: "11 Feb 2026" },
-              { name: "Calibration cert — Grael 4K #19847", v: "—", clauses: ["5.3.4"], type: "Certificate", date: "02 Apr 2026" },
-              { name: "Management review minutes Q4-2025", v: "v1.1", clauses: ["4.15.2"], type: "Minutes", date: "14 Jan 2026" },
-              { name: "Inter-observer concordance Q1", v: "v1.0", clauses: ["5.6.6"], type: "Report", date: "20 Mar 2026" },
-              { name: "BLS competency register", v: "live", clauses: ["5.1.4"], type: "Register", date: "today" },
-              { name: "CoI declarations 2026", v: "v2", clauses: ["4.1.5"], type: "Form", date: "02 Apr 2026" },
-              { name: "Subcontractor evidence — XYZ Scoring", v: "v1", clauses: ["4.5.2"], type: "Evidence", date: "—" },
-              { name: "Quality manual", v: "v8.1", clauses: ["4.2"], type: "Manual", date: "15 Jan 2026" },
-            ].map((e, i) => (
-              <div key={i} style={{ border: '1px solid var(--border)', borderRadius: 8, padding: 14, cursor: 'pointer' }}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 8 }}>
-                  <div style={{ width: 32, height: 32, borderRadius: 6, background: 'var(--accent-soft)', color: 'var(--accent-ink)', display: 'grid', placeItems: 'center' }}>
-                    <Icon name="paper" size={15} />
+          {libraryItems.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: 40, color: 'var(--ink-4)', fontSize: 13 }}>
+              No evidence items linked to any clause yet.
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+              {libraryItems.map(e => (
+                <div key={e.ref || e.id} style={{ border: `1px solid ${e.missing ? 'var(--bad)' : 'var(--border)'}`, borderRadius: 8, padding: 14 }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 8 }}>
+                    <div
+                      onClick={() => handleEvidenceDocClick(e)}
+                      title="Open in Documents"
+                      style={{ width: 32, height: 32, borderRadius: 6, background: e.missing ? 'var(--bad-soft)' : 'var(--accent-soft)', color: e.missing ? 'var(--bad)' : 'var(--accent-ink)', display: 'grid', placeItems: 'center', flexShrink: 0, cursor: 'pointer' }}>
+                      <Icon name="paper" size={15} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 2, wordBreak: 'break-word' }}>{e.name}</div>
+                      <div style={{ fontSize: 11, color: e.missing ? 'var(--bad)' : 'var(--ink-3)' }}>
+                        {e.type} · <span className="mono">{e.ref}</span> · {e.date}
+                        {e.missing && <strong> · ⚠ MISSING</strong>}
+                      </div>
+                    </div>
                   </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 2 }}>{e.name}</div>
-                    <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{e.type} · {e.v} · {e.date}</div>
+                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                    {e.clauseIds.map(cl => (
+                      <span key={cl} className="mono" style={{ fontSize: 10, padding: '2px 6px', background: 'var(--surface-2)', borderRadius: 4, color: 'var(--ink-2)', cursor: 'pointer' }}
+                        onClick={() => setDetailId(cl)}>
+                        cl. {cl}
+                      </span>
+                    ))}
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                  {e.clauses.map(cl => (
-                    <span key={cl} className="mono" style={{ fontSize: 10, padding: '2px 6px', background: 'var(--surface-2)', borderRadius: 4, color: 'var(--ink-2)', cursor: 'pointer' }}
-                      onClick={() => setDetailId(cl)}>
-                      cl. {cl}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

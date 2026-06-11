@@ -235,12 +235,27 @@ const DocumentsPage = () => {
   const [search, setSearch]       = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [detailDocId, setDetailDocId] = useState(null);
+  const pendingDocRef = React.useRef((() => {
+    const v = sessionStorage.getItem('nexus_open_doc');
+    if (v) sessionStorage.removeItem('nexus_open_doc');
+    return v || null;
+  })());
   const [viewingDoc,  setViewingDoc]  = useState(null);
   const [autoEdit,    setAutoEdit]    = useState(false);
   const [designingDoc, setDesigningDoc] = useState(null);
   const [uploadPrefill, setUploadPrefill] = useState(null);
   const [uploadOpen,    setUploadOpen]    = useState(false);
   const [uploadError,   setUploadError]   = useState(null);
+
+  // Open a specific doc once docs are loaded (navigated from evidence library)
+  React.useEffect(() => {
+    if (!pendingDocRef.current) return;
+    const found = docs.find(d => d.id === pendingDocRef.current);
+    if (found) {
+      setDetailDocId(pendingDocRef.current);
+      pendingDocRef.current = null;
+    }
+  }, [docs]);
 
   // Load from server; fall back to SEED_DOCS if API is unavailable
   const loadDocs = useCallback(() => {
@@ -517,16 +532,18 @@ const DocumentsPage = () => {
           : 'Quality manual → policies → SOPs → forms → records · controlled, versioned, audited'
         }
         actions={
-          hasPerm('canUploadDoc') ? (
-            <>
+          <>
+            {hasPerm('canUploadDoc') && (
               <button className="btn" onClick={() => openUpload()}>
                 <Icon name="upload" size={14} />Upload
               </button>
+            )}
+            {hasPerm('canCreateDoc') && (
               <button className="btn btn-primary" onClick={() => openUpload()}>
                 <Icon name="plus" size={14} />New document
               </button>
-            </>
-          ) : null
+            )}
+          </>
         }
       />
 

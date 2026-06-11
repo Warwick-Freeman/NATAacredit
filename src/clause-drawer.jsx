@@ -182,6 +182,7 @@ const ClauseDrawer = ({ data, clauseId, onClose, onUpdate }) => {
       ref:  newEv.ref.trim(),
       date: newEv.date ? new Date(newEv.date).toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' }) : '—',
       notes: newEv.notes.trim(),
+      docId: pickedDoc?.id ?? null,
     };
     const updated = {
       ...clause,
@@ -342,7 +343,16 @@ const ClauseDrawer = ({ data, clauseId, onClose, onUpdate }) => {
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn btn-primary" style={{ flex: 1 }}><Icon name="download" size={14} />Download</button>
             <button className="btn"><Icon name="upload" size={14} />Replace</button>
-            <button className="btn" style={{ color: 'var(--bad)', borderColor: 'var(--bad-soft)' }}><Icon name="x" size={14} />Unlink</button>
+            <button className="btn" style={{ color: 'var(--bad)', borderColor: 'var(--bad-soft)' }} onClick={() => {
+              const updated = {
+                ...clause,
+                linkedEvidence: (clause.linkedEvidence || []).filter(e => e.id !== activeDoc.id),
+                evidence: Math.max(0, (clause.linkedEvidence || []).length - 1),
+              };
+              if (onUpdate) onUpdate(updated);
+              setPanel(null);
+              setActiveDoc(null);
+            }}><Icon name="x" size={14} />Unlink</button>
           </div>
         </div>
       </div>

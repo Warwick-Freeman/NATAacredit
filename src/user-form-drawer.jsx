@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import Icon from './icons';
-import { ROLE_LEVEL, ASA_ROLES, AASM_ROLES, ALL_SITES } from './AuthContext';
+import { ROLE_LEVEL, ASA_ROLES, AASM_ROLES, ALL_SITES, useAuth } from './AuthContext';
 import { useNexusData } from './NexusDataContext';
 
 const AUTH_METHODS = ['Okta', 'Local', 'Magic link', 'SAML'];
@@ -26,14 +26,18 @@ const UserFormDrawer = ({ userData, currentUserRole, onSave, onClose }) => {
   const [form, setForm] = useState(() => initForm(userData));
   const [errors, setErrors] = useState({});
   const { activeStandard } = useNexusData();
+  const { allSites, getRoleLevel, roleMap } = useAuth();
 
-  const currentLevel = ROLE_LEVEL[currentUserRole] ?? 0;
+  const currentLevel = getRoleLevel(currentUserRole);
   const standardRoles = activeStandard === 'aasm' ? AASM_ROLES : ASA_ROLES;
 
   // Roles the current user can assign: only standard-appropriate roles strictly below their own level
-  const allowedRoles = standardRoles
-    .filter(role => (ROLE_LEVEL[role] ?? 0) < currentLevel)
-    .sort((a, b) => (ROLE_LEVEL[b] ?? 0) - (ROLE_LEVEL[a] ?? 0));
+  // If roleMap loaded, also expose any dynamic roles not in the static list
+  const dynamicRoles = roleMap ? Object.keys(roleMap) : [];
+  const allRoles = [...new Set([...standardRoles, ...dynamicRoles])];
+  const allowedRoles = allRoles
+    .filter(role => getRoleLevel(role) < currentLevel)
+    .sort((a, b) => getRoleLevel(b) - getRoleLevel(a));
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -48,15 +52,13 @@ const UserFormDrawer = ({ userData, currentUserRole, onSave, onClose }) => {
   };
 
   const toggleSite = (siteName) => {
-    const allNames = ALL_SITES.map(s => s.name);
+    const allNames = allSites.map(s => s.name);
     if (form.sites.length === 0) {
-      // Currently unrestricted — unchecking one site creates an explicit list of the rest
       set('sites', allNames.filter(n => n !== siteName));
     } else if (form.sites.includes(siteName)) {
       set('sites', form.sites.filter(n => n !== siteName));
     } else {
       const next = [...form.sites, siteName];
-      // If all sites are now checked, revert to unrestricted
       set('sites', next.length === allNames.length ? [] : next);
     }
   };
@@ -115,10 +117,10 @@ const UserFormDrawer = ({ userData, currentUserRole, onSave, onClose }) => {
           </select>
           {form.role && (
             <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 4 }}>
-              Level {ROLE_LEVEL[form.role] ?? 0} · {
+              Level {getRoleLevel(form.role)} · {
                 activeStandard === 'aasm'
-                  ? ['No QMS access', 'Technician/RPSGT', 'Lead Technologist', 'Site Director', 'Site Director', 'Network Director', 'Network Director'][ROLE_LEVEL[form.role] ?? 0]
-                  : ['No QMS access', 'Recording/Scoring', 'Senior tech', 'Physician', 'Physician', 'Quality Manager', 'Medical Director'][ROLE_LEVEL[form.role] ?? 0]
+                  ? ['No QMS access', 'Technician/RPSGT', 'Lead Technologist', 'Site Director', 'Site Director', 'Network Director', 'Network Director'][getRoleLevel(form.role)]
+                  : ['No QMS access', 'Recording/Scoring', 'Senior tech', 'Physician', 'Physician', 'Quality Manager', 'Medical Director'][getRoleLevel(form.role)]
               }
             </div>
           )}
@@ -142,7 +144,7 @@ const UserFormDrawer = ({ userData, currentUserRole, onSave, onClose }) => {
         <div className="form-field">
           <label className="form-label">Site access</label>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 }}>
-            {ALL_SITES.map(site => (
+            {allSites.map(site => (
               <label key={site.name}
                 style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
                 <input type="checkbox"
@@ -155,7 +157,7 @@ const UserFormDrawer = ({ userData, currentUserRole, onSave, onClose }) => {
           <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 6 }}>
             {form.sites.length === 0
               ? 'Unrestricted — all sites visible'
-              : `Restricted to ${form.sites.length} of ${ALL_SITES.length} sites`}
+              : `Restricted to ${form.sites.length} of ${allSites.length} sites`}
           </div>
         </div>
 

@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import Icon from '../icons';
 import { PageHeader, Pill, Avatar, Tabs, Drawer } from '../components';
-import { useAuth, ROLE_LEVEL, ROLE_PERMISSIONS, ASA_ROLES, AASM_ROLES, ALL_SITES } from '../AuthContext';
+import { useAuth, ROLE_LEVEL, ROLE_PERMISSIONS, ASA_ROLES, AASM_ROLES } from '../AuthContext';
 import UserFormDrawer from '../user-form-drawer';
 import { useNexusData } from '../NexusDataContext';
 import { getStdCfg } from '../standardConfig';
-import { fetchRooms, createRoom, updateRoom, deleteRoom, fetchConfig, saveConfigKey } from '../api';
+import { fetchRooms, createRoom, updateRoom, deleteRoom, fetchConfig, saveConfigKey, fetchSites, createSite, updateSite, deleteSite, fetchRoles, createRole, updateRolePerms, deleteRole } from '../api';
 import NexusGrid from '../nexus-grid';
 
 // ─── Toggle switch ─────────────────────────────────────────────────────────────
@@ -30,20 +30,44 @@ const Toggle = ({ on, onChange, disabled }) => (
 
 // ─── Seed data ─────────────────────────────────────────────────────────────────
 
-const SEED_SITES = [
-  { id: 1, code: 'RML', name: 'Riverside Main Lab',       type: 'Adult attended PSG · CPAP · MSLT/MWT',          beds: 6  },
-  { id: 2, code: 'EPL', name: 'Eastside Paediatric Lab',  type: 'Paediatric attended PSG · NIV',                  beds: 3  },
-  { id: 3, code: 'HSN', name: 'Home Service – North',     type: 'Type 2/3/4 HSAT · CPAP follow-up',              beds: '—'},
-];
-
 const SEED_INTEGRATIONS = [
   { id: 1,  name: 'Compumedics ProFusion',      cat: 'PSG software',         on: true,  apiKey: 'cpf_live_sk_4e...a91c', lastSync: '3 min ago',    webhook: 'https://api.nexus360.com/ingest/cpf' },
-  { id: 4,  name: 'ResMed AirView',             cat: 'CPAP cloud',           on: true,  apiKey: 'rsm_live_sk_9a...f02b', lastSync: '12 min ago',   webhook: '' },
   { id: 6,  name: 'FHIR R4 endpoint',           cat: 'Interoperability',     on: true,  apiKey: 'fhir_live_sk_5d...311f', lastSync: '1 h ago',     webhook: 'https://api.nexus360.com/fhir/r4' },
   { id: 7,  name: 'HealthLink secure messaging',cat: 'Secure messaging',     on: true,  apiKey: 'hlk_live_sk_3e...aa7c', lastSync: '22 min ago',   webhook: '' },
   { id: 8,  name: 'Argus secure messaging',     cat: 'Secure messaging',     on: false, apiKey: '',                      lastSync: '—',            webhook: '' },
   { id: 10, name: 'TGA adverse event export',   cat: 'Regulatory',           on: true,  apiKey: 'tga_live_sk_1a...c50b', lastSync: '1 d ago',      webhook: '' },
   { id: 12, name: 'Sentry',                     cat: 'Observability',        on: true,  apiKey: 'sentry_live_sk_0c...12af', lastSync: 'live',      webhook: '' },
+];
+
+const CPAP_DEVICE_PROVIDERS = {
+  resmed:  { label: 'ResMed AirView',         connected: true,  lastSync: '2026-05-15 07:12', patients: 3 },
+  philips: { label: 'Philips EncoreAnywhere', connected: true,  lastSync: '2026-05-14 06:44', patients: 1 },
+  fp:      { label: 'F&P myAir',              connected: false, lastSync: null,               patients: 1 },
+  lowenstein: { label: 'Löwenstein prismaLAB',connected: false, lastSync: null,               patients: 0 },
+};
+
+const PROVIDER_APIS = [
+  {
+    id: 'resmed', name: 'ResMed AirView API', logo: 'ResMed', endpoint: 'https://api.resmed.com/v1',
+    auth: 'OAuth 2.0 (client_credentials)', scopes: 'therapy.read patient.read',
+    dataFields: ['Daily usage (hours)', 'AHI (events/h)', 'Mask leak (L/min)', '90th percentile pressure', 'Apnea/hypopnea counts', 'CSR index (ASV)'],
+    syncInterval: 'Every 6 hours (device uploads via cellular/Wi-Fi)',
+    docs: 'developer.resmed.com',
+  },
+  {
+    id: 'philips', name: 'Philips DreamStation API', logo: 'Philips', endpoint: 'https://api.connected-health.philips.com/v2',
+    auth: 'OAuth 2.0 (authorization_code)', scopes: 'therapy.read',
+    dataFields: ['Daily usage', 'AHI', 'Pressure', 'Leak', 'Compliance flag'],
+    syncInterval: 'Every 12 hours',
+    docs: 'developer.philips.com/healthcare',
+  },
+  {
+    id: 'fp', name: 'Fisher & Paykel myAir API', logo: 'F&P', endpoint: 'Contact F&P Healthcare for API access',
+    auth: 'Partner agreement required', scopes: 'therapy.read',
+    dataFields: ['Daily usage', 'AHI', 'Leak', 'Pressure'],
+    syncInterval: 'Daily batch',
+    docs: 'Contact fphealthcare.com/professionals',
+  },
 ];
 
 const SEED_RETENTION = [
@@ -67,19 +91,21 @@ const SECURITY_EVENTS = [
 ];
 
 const PERM_LABELS = {
-  canCreateDoc:     'Create documents',
+  canCreateDoc:     'Create docs',
   canUploadDoc:     'Upload files',
   canPeerReviewDoc: 'Peer review',
-  canApproveDoc:    'Approve documents',
-  canIssueDoc:      'Issue documents',
+  canApproveDoc:    'Approve docs',
+  canIssueDoc:      'Issue docs',
+  canSignStudy:     'Sign study',
   canManageUsers:   'Manage users',
   canInviteUsers:   'Invite users',
 };
+const PERM_KEYS = Object.keys(PERM_LABELS);
 
 // ─── Component ─────────────────────────────────────────────────────────────────
 
 const SettingsPage = () => {
-  const { user, users, hasPerm, addUser, updateUser } = useAuth();
+  const { user, users, hasPerm, addUser, updateUser, allSites, setAllSites, roleMap, setRoleMap, getRoleLevel } = useAuth();
   const { assessmentDate, setAssessmentDate, activeStandard, changeStandard } = useNexusData();
   const stdCfg = getStdCfg(activeStandard);
   const [tab, setTab] = useState('service');
@@ -104,11 +130,24 @@ const SettingsPage = () => {
   const [svcDraft, setSvcDraft] = useState(service);
 
   // Sites
-  const [sites, setSites] = useState(SEED_SITES);
   const [addSiteOpen, setAddSiteOpen] = useState(false);
-  const [editSiteId, setEditSiteId] = useState(null);
+  const [editSiteCode, setEditSiteCode] = useState(null);
   const [siteDraft, setSiteDraft] = useState({ code: '', name: '', type: '', beds: '' });
   const [newSite, setNewSite] = useState({ code: '', name: '', type: '', beds: '' });
+  const [siteSaving, setSiteSaving] = useState(false);
+
+  // Roles
+  const [localRoles, setLocalRoles] = useState([]);
+  const [addRoleOpen, setAddRoleOpen] = useState(false);
+  const [newRoleDraft, setNewRoleDraft] = useState({ name: '', level: 1 });
+
+  useEffect(() => {
+    if (!roleMap) return;
+    setLocalRoles(Object.entries(roleMap).map(([roleName, perms]) => ({
+      roleName, level: perms.level ?? 0,
+      ...Object.fromEntries(PERM_KEYS.map(k => [k, !!perms[k]])),
+    })));
+  }, [roleMap]);
 
   // Rooms
   const [rooms, setRooms] = useState([]);
@@ -130,6 +169,9 @@ const SettingsPage = () => {
   const [pendingOff, setPendingOff] = useState(null);
   const [showKey, setShowKey] = useState({});
 
+  // Device integrations
+  const [expandedProvider, setExpandedProvider] = useState(null);
+
   // Nexus 360 server integration
   const [n360Url,      setN360Url]      = useState('');
   const [n360Username, setN360Username] = useState('');
@@ -139,11 +181,41 @@ const SettingsPage = () => {
   const [n360TestResult, setN360TestResult] = useState(null); // null | 'ok' | 'fail'
   const [showN360Pass, setShowN360Pass] = useState(false);
 
+  // Twilio (SMS + Email via comms.twilio.com)
+  const [twilioConfig, setTwilioConfig] = useState({ accountSid: '', authToken: '', from: '', emailFrom: '', emailFromName: '' });
+  const [twilioSaving, setTwilioSaving] = useState(false);
+  const [twilioSaved,  setTwilioSaved]  = useState(false);
+  const [showTwilioToken, setShowTwilioToken] = useState(false);
+
+  async function saveTwilioConfig() {
+    setTwilioSaving(true);
+    try {
+      await Promise.all([
+        saveConfigKey('twilio_account_sid',      twilioConfig.accountSid),
+        saveConfigKey('twilio_auth_token',        twilioConfig.authToken),
+        saveConfigKey('twilio_from',              twilioConfig.from),
+        saveConfigKey('twilio_email_from',        twilioConfig.emailFrom),
+        saveConfigKey('twilio_email_from_name',   twilioConfig.emailFromName),
+      ]);
+      setTwilioSaved(true);
+      setTimeout(() => setTwilioSaved(false), 2500);
+    } catch {} finally { setTwilioSaving(false); }
+  }
+
   useEffect(() => {
     fetchConfig().then(cfg => {
       if (cfg['nexus360_url'])      setN360Url(cfg['nexus360_url']);
       if (cfg['nexus360_username']) setN360Username(cfg['nexus360_username']);
       if (cfg['nexus360_password']) setN360Password(cfg['nexus360_password']);
+      // Twilio (SMS + Email)
+      setTwilioConfig(c => ({
+        ...c,
+        accountSid:    cfg['twilio_account_sid']    ?? '',
+        authToken:     cfg['twilio_auth_token']     ?? '',
+        from:          cfg['twilio_from']           ?? '',
+        emailFrom:     cfg['twilio_email_from']     ?? '',
+        emailFromName: cfg['twilio_email_from_name']?? '',
+      }));
     }).catch(() => {});
   }, []);
 
@@ -171,13 +243,13 @@ const SettingsPage = () => {
 
   const canInvite = hasPerm('canInviteUsers');
   const canManage = hasPerm('canManageUsers');
-  const myLevel   = ROLE_LEVEL[user?.role] ?? 0;
+  const myLevel   = getRoleLevel(user?.role);
 
   // ── User helpers ─────────────────────────────────────────────────────────────
 
   const openInvite = () => canInvite && setUserTarget({});
   const openEdit   = (u) => {
-    if (canManage && (ROLE_LEVEL[u.role] ?? 0) < myLevel) setUserTarget(u);
+    if (canManage && getRoleLevel(u.role) < myLevel) setUserTarget(u);
   };
   const handleSaveUser = (saved) => {
     if (saved.id) updateUser(saved.id, saved); else addUser(saved);
@@ -194,19 +266,78 @@ const SettingsPage = () => {
 
   // ── Site helpers ─────────────────────────────────────────────────────────────
 
-  function addSite() {
+  async function addSite() {
     if (!newSite.name || !newSite.code) return;
-    setSites(prev => [...prev, { ...newSite, id: Date.now() }]);
-    setNewSite({ code: '', name: '', type: '', beds: '' });
-    setAddSiteOpen(false);
+    setSiteSaving(true);
+    try {
+      await createSite({ siteCode: newSite.code, name: newSite.name, type: newSite.type, beds: newSite.beds });
+      setAllSites(prev => [...prev, { code: newSite.code, name: newSite.name, type: newSite.type, beds: newSite.beds, abbr: newSite.name }]);
+      setNewSite({ code: '', name: '', type: '', beds: '' });
+      setAddSiteOpen(false);
+    } catch { /* silent */ } finally { setSiteSaving(false); }
   }
-  function beginEditSite(s) { setSiteDraft({ ...s }); setEditSiteId(s.id); }
-  function saveSite() {
-    setSites(prev => prev.map(s => s.id === editSiteId ? { ...siteDraft } : s));
-    setEditSiteId(null);
-    showSaved();
+  function beginEditSite(s) { setSiteDraft({ code: s.code, name: s.name, type: s.type ?? '', beds: s.beds ?? '' }); setEditSiteCode(s.code); }
+  async function saveSite() {
+    setSiteSaving(true);
+    try {
+      await updateSite(editSiteCode, { siteCode: siteDraft.code, name: siteDraft.name, type: siteDraft.type, beds: siteDraft.beds });
+      setAllSites(prev => prev.map(s => s.code === editSiteCode ? { ...s, ...siteDraft, abbr: siteDraft.name } : s));
+      setEditSiteCode(null);
+      showSaved();
+    } catch { /* silent */ } finally { setSiteSaving(false); }
   }
-  function removeSite(id) { setSites(prev => prev.filter(s => s.id !== id)); }
+  async function removeSite(code) {
+    try {
+      await deleteSite(code);
+      setAllSites(prev => prev.filter(s => s.code !== code));
+    } catch { /* silent */ }
+  }
+
+  // ── Role helpers ──────────────────────────────────────────────────────────────
+
+  async function togglePerm(roleName, permKey, value) {
+    const role = localRoles.find(r => r.roleName === roleName);
+    if (!role) return;
+    const updated = { ...role, [permKey]: value };
+    setLocalRoles(prev => prev.map(r => r.roleName === roleName ? updated : r));
+    const permissionsJson = JSON.stringify(Object.fromEntries(PERM_KEYS.map(k => [k, !!updated[k]])));
+    try {
+      await updateRolePerms(roleName, { roleName, level: updated.level, permissionsJson });
+      setRoleMap(prev => prev ? { ...prev, [roleName]: { ...prev[roleName], [permKey]: value } } : prev);
+    } catch { /* silent */ }
+  }
+
+  async function saveRoleLevel(roleName, level) {
+    const role = localRoles.find(r => r.roleName === roleName);
+    if (!role) return;
+    const permissionsJson = JSON.stringify(Object.fromEntries(PERM_KEYS.map(k => [k, !!role[k]])));
+    try {
+      await updateRolePerms(roleName, { roleName, level, permissionsJson });
+      setRoleMap(prev => prev ? { ...prev, [roleName]: { ...prev[roleName], level } } : prev);
+    } catch { /* silent */ }
+  }
+
+  async function handleAddRole() {
+    if (!newRoleDraft.name.trim()) return;
+    const permissionsJson = JSON.stringify(Object.fromEntries(PERM_KEYS.map(k => [k, false])));
+    try {
+      await createRole({ roleName: newRoleDraft.name.trim(), level: newRoleDraft.level, permissionsJson });
+      const newRoleObj = { roleName: newRoleDraft.name.trim(), level: newRoleDraft.level, ...Object.fromEntries(PERM_KEYS.map(k => [k, false])) };
+      setLocalRoles(prev => [...prev, newRoleObj]);
+      setRoleMap(prev => prev ? { ...prev, [newRoleDraft.name.trim()]: { level: newRoleDraft.level, ...Object.fromEntries(PERM_KEYS.map(k => [k, false])) } } : prev);
+      setNewRoleDraft({ name: '', level: 1 });
+      setAddRoleOpen(false);
+      showSaved();
+    } catch { /* silent */ }
+  }
+
+  async function handleDeleteRole(roleName) {
+    try {
+      await deleteRole(roleName);
+      setLocalRoles(prev => prev.filter(r => r.roleName !== roleName));
+      setRoleMap(prev => { if (!prev) return prev; const next = { ...prev }; delete next[roleName]; return next; });
+    } catch (e) { alert(e.message); }
+  }
 
   // ── Room helpers ─────────────────────────────────────────────────────────────
 
@@ -363,7 +494,7 @@ const SettingsPage = () => {
         return (
           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
             {s.map(name => {
-              const site = ALL_SITES.find(x => x.name === name);
+              const site = allSites.find(x => x.name === name);
               return <Pill key={name} kind="accent">{site?.code ?? name}</Pill>;
             })}
           </div>
@@ -371,25 +502,6 @@ const SettingsPage = () => {
       },
     },
     { headerName: 'Last sign-in', field: 'lastSeen', flex: 1 },
-  ];
-
-  const permMatrixRoles = activeStandard === 'aasm' ? AASM_ROLES : ASA_ROLES;
-  const permMatrixRowData = permMatrixRoles.map(role => ({
-    role,
-    ...Object.fromEntries(Object.keys(PERM_LABELS).map(key => [key, !!(ROLE_PERMISSIONS[role]?.[key])])),
-  }));
-  const permMatrixColDefs = [
-    { headerName: 'Role', field: 'role', width: 160, pinned: 'left', cellStyle: { fontWeight: 500, whiteSpace: 'nowrap' } },
-    ...Object.entries(PERM_LABELS).map(([key, label]) => ({
-      headerName: label,
-      field: key,
-      width: 130,
-      headerClass: 'ag-header-center',
-      cellStyle: { textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center' },
-      cellRenderer: p => p.value
-        ? <span style={{ color: 'var(--good)' }}><Icon name="check" size={14} /></span>
-        : <span style={{ color: 'var(--surface-3)' }}>—</span>,
-    })),
   ];
 
   const retentionColDefs = [
@@ -503,6 +615,7 @@ const SettingsPage = () => {
         { id: 'service',      label: 'Service profile'  },
         { id: 'users',        label: 'Users & roles',   count: users.length },
         { id: 'integrations', label: 'Integrations',    count: integrations.filter(i => i.on).length },
+        { id: 'devices',      label: 'Device integrations', count: PROVIDER_APIS.filter(p => CPAP_DEVICE_PROVIDERS[p.id]?.connected).length },
         { id: 'retention',    label: 'Retention'        },
         { id: 'security',     label: 'Security'         },
       ]} />
@@ -594,9 +707,9 @@ const SettingsPage = () => {
                 </div>
               )}
 
-              {sites.map(s => (
-                <div key={s.id} style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
-                  {editSiteId === s.id ? (
+              {allSites.map(s => (
+                <div key={s.code} style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+                  {editSiteCode === s.code ? (
                     <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
                       <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr', gap: 8 }}>
                         <div>
@@ -613,8 +726,8 @@ const SettingsPage = () => {
                         <input className="input" style={{ width: '100%', boxSizing: 'border-box' }} value={siteDraft.type} onChange={e => setSiteDraft(p => ({ ...p, type: e.target.value }))} />
                       </div>
                       <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                        <button className="btn" onClick={() => setEditSiteId(null)}>Cancel</button>
-                        <button className="btn btn-primary" onClick={saveSite}>Save</button>
+                        <button className="btn" onClick={() => setEditSiteCode(null)}>Cancel</button>
+                        <button className="btn btn-primary" onClick={saveSite} disabled={siteSaving}>Save</button>
                       </div>
                     </div>
                   ) : (
@@ -627,7 +740,7 @@ const SettingsPage = () => {
                         <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{s.type} · {s.beds} beds</div>
                       </div>
                       <button className="btn-icon" title="Edit" onClick={() => beginEditSite(s)}><Icon name="edit" size={13} /></button>
-                      <button className="btn-icon" title="Remove" style={{ color: 'var(--bad)', opacity: 0.6 }} onClick={() => removeSite(s.id)}><Icon name="x" size={13} /></button>
+                      <button className="btn-icon" title="Remove" style={{ color: 'var(--bad)', opacity: 0.6 }} onClick={() => removeSite(s.code)}><Icon name="x" size={13} /></button>
                     </div>
                   )}
                 </div>
@@ -651,7 +764,7 @@ const SettingsPage = () => {
 
           {/* Site selector */}
           <div style={{ padding: '10px 18px 0', display: 'flex', gap: 6 }}>
-            {SEED_SITES.filter(s => s.code !== 'HSN').concat([{ id: 3, code: 'HSN', name: 'Home Service – North' }]).map(s => (
+            {allSites.map(s => (
               <button
                 key={s.code}
                 onClick={() => { setRoomSite(s.code); setAddRoomOpen(false); setRoomEditId(null); }}
@@ -677,7 +790,7 @@ const SettingsPage = () => {
             {addRoomOpen && (
               <div style={{ background: 'var(--surface-2)', borderRadius: 8, padding: 12, border: '1px solid var(--accent)' }}>
                 <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent-ink)', marginBottom: 10 }}>
-                  New room · {SEED_SITES.find(s => s.code === roomSite)?.name ?? roomSite}
+                  New room · {allSites.find(s => s.code === roomSite)?.name ?? roomSite}
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 130px', gap: 8, marginBottom: 8 }}>
                   <div>
@@ -866,23 +979,81 @@ const SettingsPage = () => {
               columnDefs={userColDefs}
               onRowClicked={p => {
                 const u = p.data;
-                const theirLevel = ROLE_LEVEL[u.role] ?? 0;
-                if (canManage && myLevel > theirLevel) openEdit(u);
+                if (canManage && myLevel > getRoleLevel(u.role)) openEdit(u);
               }}
             />
           </div>
 
-          {/* Permission matrix */}
+          {/* Permission matrix — editable */}
           {showPermMatrix && (
             <div className="card">
               <div className="card-head">
-                <div className="card-title">Permission matrix</div>
+                <div className="card-title">Roles &amp; permissions</div>
+                <div className="topbar-spacer" />
+                <button className="btn" style={{ fontSize: 11, padding: '3px 8px' }} onClick={() => setAddRoleOpen(v => !v)}>
+                  <Icon name="plus" size={11} />New role
+                </button>
                 <button className="btn-icon" onClick={() => setShowPermMatrix(false)}><Icon name="x" size={14} /></button>
               </div>
-              <NexusGrid
-                rowData={permMatrixRowData}
-                columnDefs={permMatrixColDefs}
-              />
+
+              {addRoleOpen && (
+                <div style={{ padding: '10px 18px', borderBottom: '1px solid var(--border)', background: 'var(--surface-2)', display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                  <div>
+                    <label style={{ fontSize: 11, color: 'var(--ink-3)', display: 'block', marginBottom: 3 }}>Role name</label>
+                    <input className="input" style={{ width: 220 }} placeholder="e.g. Head of Department" value={newRoleDraft.name} onChange={e => setNewRoleDraft(p => ({ ...p, name: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 11, color: 'var(--ink-3)', display: 'block', marginBottom: 3 }}>Level (0–5)</label>
+                    <input type="number" className="input" style={{ width: 70 }} min={0} max={5} value={newRoleDraft.level} onChange={e => setNewRoleDraft(p => ({ ...p, level: +e.target.value }))} />
+                  </div>
+                  <button className="btn" onClick={() => setAddRoleOpen(false)}>Cancel</button>
+                  <button className="btn btn-primary" onClick={handleAddRole} disabled={!newRoleDraft.name.trim()}>Add role</button>
+                </div>
+              )}
+
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                  <thead>
+                    <tr style={{ borderBottom: '2px solid var(--border)' }}>
+                      <th style={{ textAlign: 'left', padding: '8px 18px', fontWeight: 600, minWidth: 180, position: 'sticky', left: 0, background: 'var(--surface)', zIndex: 1 }}>Role</th>
+                      <th style={{ textAlign: 'center', padding: '8px 10px', fontWeight: 600, width: 70 }}>Level</th>
+                      {PERM_KEYS.map(k => (
+                        <th key={k} style={{ textAlign: 'center', padding: '8px 10px', fontWeight: 500, color: 'var(--ink-2)', fontSize: 11, minWidth: 80 }}>{PERM_LABELS[k]}</th>
+                      ))}
+                      <th style={{ width: 36 }} />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(localRoles.length > 0 ? localRoles : (activeStandard === 'aasm' ? AASM_ROLES : ASA_ROLES).map(rn => ({
+                      roleName: rn, level: ROLE_LEVEL[rn] ?? 0,
+                      ...Object.fromEntries(PERM_KEYS.map(k => [k, !!(ROLE_PERMISSIONS[rn]?.[k])])),
+                    }))).map((role, i) => (
+                      <tr key={role.roleName} style={{ borderBottom: '1px solid var(--border)', background: i % 2 === 0 ? 'var(--surface)' : 'var(--surface-2)' }}>
+                        <td style={{ padding: '7px 18px', fontWeight: 500, position: 'sticky', left: 0, background: i % 2 === 0 ? 'var(--surface)' : 'var(--surface-2)', zIndex: 1 }}>{role.roleName}</td>
+                        <td style={{ textAlign: 'center', padding: '7px 10px' }}>
+                          <input
+                            type="number" min={0} max={5}
+                            defaultValue={role.level}
+                            style={{ width: 44, textAlign: 'center', border: '1px solid var(--border)', borderRadius: 4, padding: '2px 4px', fontSize: 12, background: 'var(--surface)' }}
+                            onBlur={e => saveRoleLevel(role.roleName, +e.target.value)}
+                          />
+                        </td>
+                        {PERM_KEYS.map(k => (
+                          <td key={k} style={{ textAlign: 'center', padding: '7px 10px' }}>
+                            <input type="checkbox" checked={!!role[k]} onChange={e => togglePerm(role.roleName, k, e.target.checked)} />
+                          </td>
+                        ))}
+                        <td style={{ textAlign: 'center', padding: '7px 6px' }}>
+                          <button className="btn-icon" title="Delete role" style={{ color: 'var(--bad)', opacity: 0.6 }}
+                            onClick={() => handleDeleteRole(role.roleName)}>
+                            <Icon name="x" size={12} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </>
@@ -973,6 +1144,67 @@ const SettingsPage = () => {
             )}
           </div>
 
+          {/* ── Twilio (SMS + Email) ──────────────────────────────────────────── */}
+          <div className="card" style={{ marginBottom: 8, overflow: 'hidden' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px' }}>
+              <div style={{ width: 36, height: 36, borderRadius: 8, flexShrink: 0, background: twilioConfig.accountSid ? 'var(--good-soft)' : 'var(--surface-2)', color: twilioConfig.accountSid ? 'var(--good)' : 'var(--ink-3)', display: 'grid', placeItems: 'center' }}>
+                <Icon name={twilioConfig.accountSid ? 'check' : 'phone'} size={16} />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 500 }}>Twilio</div>
+                <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>
+                  SMS &amp; Email delivery · {twilioConfig.accountSid ? 'Configured' : 'Not configured'}
+                </div>
+              </div>
+              {twilioSaved && <span style={{ fontSize: 11, color: 'var(--good)', fontWeight: 600 }}>Saved</span>}
+              <button className="btn" style={{ fontSize: 11, padding: '3px 8px' }} onClick={() => setExpandedInt(expandedInt === 'twilio' ? null : 'twilio')}>
+                <Icon name="cog" size={11} />Configure
+              </button>
+            </div>
+            {expandedInt === 'twilio' && (
+              <div style={{ borderTop: '1px solid var(--border)', padding: '14px 18px', background: 'var(--surface-2)', display: 'flex', flexDirection: 'column', gap: 12 }}>
+
+                <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--ink-3)' }}>Account credentials</div>
+                <div className="form-field" style={{ marginBottom: 0 }}>
+                  <label className="form-label">Account SID</label>
+                  <input className="form-input" style={{ fontFamily: 'monospace' }} value={twilioConfig.accountSid} onChange={e => setTwilioConfig(c => ({ ...c, accountSid: e.target.value }))} placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" />
+                </div>
+                <div className="form-field" style={{ marginBottom: 0 }}>
+                  <label className="form-label">Auth token</label>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <input className="form-input" style={{ flex: 1, fontFamily: 'monospace' }} type={showTwilioToken ? 'text' : 'password'} value={twilioConfig.authToken} onChange={e => setTwilioConfig(c => ({ ...c, authToken: e.target.value }))} placeholder="••••••••••••••••••••••••••••••••" />
+                    <button className="btn" style={{ flexShrink: 0 }} onClick={() => setShowTwilioToken(v => !v)}><Icon name="eye" size={13} /></button>
+                  </div>
+                </div>
+
+                <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--ink-3)', marginTop: 4 }}>SMS</div>
+                <div className="form-field" style={{ marginBottom: 0 }}>
+                  <label className="form-label">From number</label>
+                  <input className="form-input" value={twilioConfig.from} onChange={e => setTwilioConfig(c => ({ ...c, from: e.target.value }))} placeholder="+61400000000" />
+                </div>
+
+                <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--ink-3)', marginTop: 4 }}>Email</div>
+                <div style={{ display: 'flex', gap: 12 }}>
+                  <div className="form-field" style={{ flex: 2, marginBottom: 0 }}>
+                    <label className="form-label">From address</label>
+                    <input className="form-input" type="email" value={twilioConfig.emailFrom} onChange={e => setTwilioConfig(c => ({ ...c, emailFrom: e.target.value }))} placeholder="ACxxxxxxxx@yourdomain.com" />
+                  </div>
+                  <div className="form-field" style={{ flex: 1, marginBottom: 0 }}>
+                    <label className="form-label">From name</label>
+                    <input className="form-input" value={twilioConfig.emailFromName} onChange={e => setTwilioConfig(c => ({ ...c, emailFromName: e.target.value }))} placeholder="Nexus 360" />
+                  </div>
+                </div>
+
+                <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+                  Find your credentials at <strong>console.twilio.com</strong>. SMS from-number must be E.164 format (e.g. +61412345678). Email from-address must be verified in your Twilio account.
+                </div>
+                <button className="btn btn-primary" style={{ alignSelf: 'flex-start' }} onClick={saveTwilioConfig} disabled={twilioSaving}>
+                  <Icon name="check" size={13} />{twilioSaving ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+            )}
+          </div>
+
           {pendingOff && (
             <div className="banner" style={{ background: 'var(--bad-soft)', border: '1px solid var(--bad)', borderRadius: 8, marginBottom: 18 }}>
               <Icon name="alert" size={18} style={{ color: 'var(--bad)' }} />
@@ -1053,6 +1285,92 @@ const SettingsPage = () => {
                 </div>
               );
             })}
+          </div>
+        </>
+      )}
+
+      {/* ── DEVICE INTEGRATIONS ───────────────────────────────────────────────── */}
+      {tab === 'devices' && (
+        <>
+          <div className="banner info" style={{ marginBottom: 18 }}>
+            <Icon name="wifi" size={18} />
+            <div style={{ flex: 1 }}>
+              <strong>CPAP device cloud integrations.</strong>
+              <div style={{ fontSize: 12, marginTop: 2 }}>
+                Compliance data is automatically synced via manufacturer APIs when patients consent via the device's companion app (myAir, DreamMapper, etc.).
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14, marginBottom: 20 }}>
+            {PROVIDER_APIS.map(prov => {
+              const status = CPAP_DEVICE_PROVIDERS[prov.id];
+              const isOpen = expandedProvider === prov.id;
+              return (
+                <div key={prov.id} className="card" style={{ border: status?.connected ? '1px solid var(--good)' : undefined }}>
+                  <div className="card-head" style={{ cursor: 'pointer' }} onClick={() => setExpandedProvider(isOpen ? null : prov.id)}>
+                    <div style={{ width: 36, height: 36, borderRadius: 8, background: status?.connected ? 'var(--good-soft)' : 'var(--surface-2)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                      <Icon name="wifi" size={16} style={{ color: status?.connected ? 'var(--good)' : 'var(--ink-3)' }} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0, marginLeft: 10 }}>
+                      <div style={{ fontWeight: 600, fontSize: 13 }}>{prov.name}</div>
+                      <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+                        {status?.connected ? `${status.patients} patient${status.patients !== 1 ? 's' : ''} · Last sync ${status.lastSync}` : 'Not connected'}
+                      </div>
+                    </div>
+                    <Pill kind={status?.connected ? 'good' : 'outline'}>{status?.connected ? 'Connected' : 'Setup required'}</Pill>
+                    <Icon name={isOpen ? 'chev_down' : 'chev_right'} size={14} style={{ color: 'var(--ink-4)', marginLeft: 6 }} />
+                  </div>
+
+                  {isOpen && (
+                    <div style={{ borderTop: '1px solid var(--border)', padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr', gap: '6px 12px', fontSize: 12 }}>
+                        <span style={{ color: 'var(--ink-3)' }}>API endpoint</span>
+                        <span className="mono" style={{ fontSize: 11 }}>{prov.endpoint}</span>
+                        <span style={{ color: 'var(--ink-3)' }}>Authentication</span>
+                        <span>{prov.auth}</span>
+                        <span style={{ color: 'var(--ink-3)' }}>Sync interval</span>
+                        <span>{prov.syncInterval}</span>
+                        <span style={{ color: 'var(--ink-3)' }}>Documentation</span>
+                        <span style={{ color: 'var(--accent-ink)' }}>{prov.docs}</span>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Data fields available</div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                          {prov.dataFields.map(f => (
+                            <span key={f} style={{ fontSize: 11, padding: '2px 8px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--ink-2)' }}>{f}</span>
+                          ))}
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        {status?.connected
+                          ? <><button className="btn">Force sync</button><button className="btn btn-ghost" style={{ color: 'var(--bad)' }}>Disconnect</button></>
+                          : <button className="btn btn-primary"><Icon name="link" size={13} />Connect {prov.logo}</button>
+                        }
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="card card-pad">
+            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 8 }}>How CPAP API integration works</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
+              {[
+                { n: '1', title: 'Patient consent', body: "Patient consents to data sharing via the manufacturer's companion app (ResMed myAir, Philips DreamMapper, etc.)." },
+                { n: '2', title: 'Device upload', body: 'CPAP device automatically uploads nightly data via cellular or Wi-Fi to the manufacturer\'s cloud.' },
+                { n: '3', title: 'API sync', body: 'Nexus 360 backend polls the AirView / EncoreAnywhere API (OAuth 2.0) on a scheduled interval and stores compliance metrics.' },
+                { n: '4', title: 'Clinician view', body: 'Compliance data appears in the Patients module automatically. Alerts trigger when a patient falls below the 70% threshold.' },
+              ].map(s => (
+                <div key={s.n} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ width: 28, height: 28, borderRadius: 8, background: 'var(--accent-soft)', color: 'var(--accent-ink)', display: 'grid', placeItems: 'center', fontWeight: 700, fontSize: 13 }}>{s.n}</div>
+                  <div style={{ fontWeight: 600, fontSize: 12 }}>{s.title}</div>
+                  <div style={{ fontSize: 12, color: 'var(--ink-3)', lineHeight: 1.55 }}>{s.body}</div>
+                </div>
+              ))}
+            </div>
           </div>
         </>
       )}
