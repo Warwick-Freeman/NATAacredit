@@ -1153,9 +1153,6 @@ function PatientDrawer({ patient, onClose, onCreateTask, onOrderDme, onUpdate, s
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
               <div style={{ fontSize: 13, fontWeight: 600 }}>Sent forms</div>
-              <button className="btn" style={{ fontSize: 11 }} onClick={refreshLinks} disabled={loadingLinks}>
-                <Icon name="activity" size={11} />{loadingLinks ? 'Refreshing…' : 'Refresh'}
-              </button>
               <button className="btn btn-primary" style={{ fontSize: 12 }} onClick={() => setShowSendModal(true)}>
                 <Icon name="plus" size={12} />Send form
               </button>
