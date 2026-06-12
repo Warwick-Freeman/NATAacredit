@@ -483,11 +483,11 @@ const HomePage = ({ data: D, goTo, openClause }) => {
             <div className="card-head">
               <div className="card-title">Recent activity</div>
               <div className="topbar-spacer" />
-              <button className="btn btn-ghost" style={{ padding: '4px 8px', fontSize: 11 }}>Audit log</button>
+              <button className="btn btn-ghost" style={{ padding: '4px 8px', fontSize: 11 }} onClick={() => goTo('trail')}>Audit log</button>
             </div>
             <div className="card-pad">
               <div className="timeline">
-                {D.activity.map((a, i) => (
+                {D.activity.slice(0, 5).map((a, i) => (
                   <div key={i} className="timeline-item">
                     <div><strong>{a.who}</strong> {a.what}</div>
                     <div className="timeline-time">{a.when}</div>

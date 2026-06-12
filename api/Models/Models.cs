@@ -95,6 +95,27 @@ public class IsrAssessment
     public string CreatedAt { get; set; } = "";
 }
 
+public class IsrReferenceStudy
+{
+    public int Id { get; set; }
+    public string StudyId { get; set; } = "";
+    public string Quarter { get; set; } = "";
+    public string Label { get; set; } = "";
+    public string AddedAt { get; set; } = "";
+    public string AddedBy { get; set; } = "";
+}
+
+public class IsrScoringSession
+{
+    public int Id { get; set; }
+    public int ReferenceStudyId { get; set; }
+    public string ScorerName { get; set; } = "";
+    public string Status { get; set; } = "pending"; // pending | opened | completed
+    public string OpenedAt { get; set; } = "";
+    public string CompletedAt { get; set; } = "";
+    public string Notes { get; set; } = "";
+}
+
 public class FormRecord
 {
     public int Id { get; set; }

@@ -1,0 +1,40 @@
+
+To open a prodigi page you fir get the AccessToken from the call used to test the connection in the integrations Nexus360 server section.
+
+
+The open prodigi url is as below.
+
+[ProdigiURL]?enData=[Encrypted data]&StudyID=[Nexus360 Study ID]
+
+the encrypted data is as per the sample routine below.
+
+where:
+
+Encrypted data = [Nexus360URL];[Username];[AccessToken]
+
+The Nexus360URL and username are from the integrations Nexus360 server and username.
+
+using System.Security.Cryptography;
+
+
+public static string Encrypt(string inString, string sSecret = "rr7XCptHLQcBBFqLyGw+Yw==")
+        {
+
+            try
+            {
+                AesCryptoServiceProvider aesCSP = new AesCryptoServiceProvider();
+                aesCSP.Key = UnicodeEncoding.Unicode.GetBytes("Nexus360");
+                aesCSP.IV = Convert.FromBase64String(sSecret);
+                byte[] inBlock = UnicodeEncoding.Unicode.GetBytes(inString);
+                ICryptoTransform xfrm = aesCSP.CreateEncryptor();
+                string strEncrypted = Convert.ToBase64String(xfrm.TransformFinalBlock(inBlock, 0, inBlock.Length));
+                return strEncrypted;
+            }
+            catch (Exception e)
+            {
+                System.Diagnostics.Debug.WriteLine("Encrypt failed! Error = " + e.Message + "\n");
+                if (e.InnerException != null)
+                    System.Diagnostics.Debug.WriteLine("Encrypt failed! error = " + e.InnerException.Message + "\n");
+            }
+            return inString;
+        }

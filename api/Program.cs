@@ -204,6 +204,29 @@ using (var scope = app.Services.CreateScope())
         """);
 
     db.Database.ExecuteSqlRaw("""
+        CREATE TABLE IF NOT EXISTS IsrReferenceStudies (
+            Id        INTEGER PRIMARY KEY AUTOINCREMENT,
+            StudyId   TEXT NOT NULL DEFAULT '',
+            Quarter   TEXT NOT NULL DEFAULT '',
+            Label     TEXT NOT NULL DEFAULT '',
+            AddedAt   TEXT NOT NULL DEFAULT '',
+            AddedBy   TEXT NOT NULL DEFAULT ''
+        )
+        """);
+
+    db.Database.ExecuteSqlRaw("""
+        CREATE TABLE IF NOT EXISTS IsrScoringSessions (
+            Id                INTEGER PRIMARY KEY AUTOINCREMENT,
+            ReferenceStudyId  INTEGER NOT NULL DEFAULT 0,
+            ScorerName        TEXT NOT NULL DEFAULT '',
+            Status            TEXT NOT NULL DEFAULT 'pending',
+            OpenedAt          TEXT NOT NULL DEFAULT '',
+            CompletedAt       TEXT NOT NULL DEFAULT '',
+            Notes             TEXT NOT NULL DEFAULT ''
+        )
+        """);
+
+    db.Database.ExecuteSqlRaw("""
         CREATE TABLE IF NOT EXISTS FormRecords (
             Id           INTEGER PRIMARY KEY AUTOINCREMENT,
             FormId       TEXT NOT NULL DEFAULT '',
@@ -1678,6 +1701,151 @@ app.MapPost("/api/isr/{id:int}/sign", async (int id, IsrSignDto dto, NexusDbCont
     return Results.Ok(a);
 }).RequireAuthorization();
 
+// ── ISR Reference Studies ──────────────────────────────────────────────────────
+
+app.MapGet("/api/isr/reference", async (string? quarter, NexusDbContext db) =>
+{
+    var q = db.IsrReferenceStudies.AsQueryable();
+    if (!string.IsNullOrEmpty(quarter)) q = q.Where(r => r.Quarter == quarter);
+    return await q.OrderBy(r => r.AddedAt).ToListAsync();
+}).RequireAuthorization();
+
+app.MapPost("/api/isr/reference", async (IsrRefDto dto, NexusDbContext db, ClaimsPrincipal principal) =>
+{
+    var study = new NexusApi.Models.IsrReferenceStudy
+    {
+        StudyId = dto.StudyId, Quarter = dto.Quarter,
+        Label   = dto.Label ?? "",
+        AddedAt = DateTime.Now.ToString("yyyy-MM-ddTHH:mm"),
+        AddedBy = ActorName(principal),
+    };
+    db.IsrReferenceStudies.Add(study);
+    await db.SaveChangesAsync();
+    return Results.Ok(study);
+}).RequireAuthorization();
+
+app.MapDelete("/api/isr/reference/{id:int}", async (int id, NexusDbContext db) =>
+{
+    var study = await db.IsrReferenceStudies.FindAsync(id);
+    if (study == null) return Results.NotFound();
+    db.IsrReferenceStudies.Remove(study);
+    db.IsrScoringSessions.RemoveRange(db.IsrScoringSessions.Where(s => s.ReferenceStudyId == id));
+    await db.SaveChangesAsync();
+    return Results.Ok();
+}).RequireAuthorization();
+
+// ── ISR Scoring Sessions ───────────────────────────────────────────────────────
+
+app.MapGet("/api/isr/sessions", async (string? quarter, NexusDbContext db) =>
+{
+    var studies = await db.IsrReferenceStudies
+        .Where(s => string.IsNullOrEmpty(quarter) || s.Quarter == quarter)
+        .ToListAsync();
+    var ids = studies.Select(s => s.Id).ToList();
+    var sessions = await db.IsrScoringSessions.Where(s => ids.Contains(s.ReferenceStudyId)).ToListAsync();
+    return Results.Ok(new { studies, sessions });
+}).RequireAuthorization();
+
+app.MapPost("/api/isr/sessions", async (IsrSessionDto dto, NexusDbContext db, ClaimsPrincipal principal) =>
+{
+    var scorer = string.IsNullOrEmpty(dto.ScorerName) ? ActorName(principal) : dto.ScorerName;
+    var now = DateTime.Now.ToString("yyyy-MM-ddTHH:mm");
+    var existing = await db.IsrScoringSessions.FirstOrDefaultAsync(
+        s => s.ReferenceStudyId == dto.ReferenceStudyId && s.ScorerName == scorer);
+    if (existing != null)
+    {
+        if (dto.Status != null) existing.Status = dto.Status;
+        if (dto.Status == "opened" && string.IsNullOrEmpty(existing.OpenedAt)) existing.OpenedAt = now;
+        if (dto.Status == "completed") existing.CompletedAt = now;
+        if (dto.Notes != null) existing.Notes = dto.Notes;
+        await db.SaveChangesAsync();
+        return Results.Ok(existing);
+    }
+    var session = new NexusApi.Models.IsrScoringSession
+    {
+        ReferenceStudyId = dto.ReferenceStudyId,
+        ScorerName       = scorer,
+        Status           = dto.Status ?? "pending",
+        OpenedAt         = dto.Status == "opened"    ? now : "",
+        CompletedAt      = dto.Status == "completed" ? now : "",
+        Notes            = dto.Notes ?? "",
+    };
+    db.IsrScoringSessions.Add(session);
+    await db.SaveChangesAsync();
+    return Results.Ok(session);
+}).RequireAuthorization();
+
+// GET /api/isr/prodigi-url/{studyId}  →  ProDigi open-study URL with enData auth
+app.MapGet("/api/isr/prodigi-url/{studyId}", async (string studyId, NexusDbContext db, IHttpClientFactory httpFactory) =>
+{
+    var cfg        = (await db.SiteConfig.ToListAsync()).ToDictionary(e => e.Key, e => e.Value);
+    var prodigiUrl = cfg.GetValueOrDefault("prodigi_study_url", "").TrimEnd('/');
+    var nexusUrl   = cfg.GetValueOrDefault("nexus360_url",      "").TrimEnd('/');
+    var username   = cfg.GetValueOrDefault("nexus360_username", "");
+    var password   = cfg.GetValueOrDefault("nexus360_password", "");
+
+    if (string.IsNullOrEmpty(prodigiUrl))
+        return Results.BadRequest(new { error = "ProDigi WebPSG URL not configured (Settings → Integrations → ProDigi WebPSG URL)" });
+    if (string.IsNullOrEmpty(nexusUrl) || string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password))
+        return Results.BadRequest(new { error = "Nexus360 credentials not configured (Settings → Integrations)" });
+
+    // 1. Fetch Nexus360 access token — mirrors the test-nexus360 endpoint approach
+    string accessToken;
+    try
+    {
+        var http     = httpFactory.CreateClient();
+        var userEnc  = Uri.EscapeDataString(username);
+        var passEnc  = Uri.EscapeDataString(password);
+        var form     = new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["grant_type"] = "password",
+            ["username"]   = username,
+            ["password"]   = password,
+        });
+
+        // Try GET with query-string first (matches how the test endpoint succeeds)
+        var tokenRes = await http.GetAsync($"{nexusUrl}/token?grant_type=password&username={userEnc}&password={passEnc}");
+        if (!tokenRes.IsSuccessStatusCode)
+            tokenRes = await http.PostAsync($"{nexusUrl}/token", form);   // fallback to POST
+        if (!tokenRes.IsSuccessStatusCode)
+            return Results.BadRequest(new { error = $"Nexus360 token fetch failed ({(int)tokenRes.StatusCode})" });
+
+        var tokenJson = await tokenRes.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
+        accessToken = tokenJson.GetProperty("access_token").GetString() ?? "";
+        if (string.IsNullOrEmpty(accessToken))
+            return Results.BadRequest(new { error = "Nexus360 token response missing access_token" });
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { error = $"Nexus360 token error: {ex.Message}" });
+    }
+
+    // 2. Build enData string (matches ProDigi OpenStudy_ProDigi pattern)
+    var est = $"{nexusUrl};{username};{accessToken}";
+
+    // 3. Encrypt using AesCryptoServiceProvider (matches Utils.Encrypt exactly)
+    string enData;
+    try
+    {
+        var keyBytes   = System.Text.Encoding.Unicode.GetBytes("Nexus360");
+        var ivBytes    = Convert.FromBase64String("rr7XCptHLQcBBFqLyGw+Yw==");
+        using var aes  = System.Security.Cryptography.Aes.Create();
+        aes.Key        = keyBytes;
+        aes.IV         = ivBytes;
+        var inputBytes = System.Text.Encoding.Unicode.GetBytes(est);
+        var encrypted  = aes.CreateEncryptor().TransformFinalBlock(inputBytes, 0, inputBytes.Length);
+        enData = Convert.ToBase64String(encrypted);
+    }
+    catch (Exception ex)
+    {
+        return Results.BadRequest(new { error = $"Encryption error: {ex.Message}" });
+    }
+
+    // 4. Return final URL
+    var url = $"{prodigiUrl}?enData={Uri.EscapeDataString(enData)}&StudyID={studyId}";
+    return Results.Ok(new { url });
+}).RequireAuthorization();
+
 // ── Prodigi PSG integration (placeholder) ─────────────────────────────────────
 // TODO: Replace placeholder responses with actual Prodigi API calls.
 // Prodigi ISR integration would:
@@ -2229,6 +2397,8 @@ record StandardSwitchDto(string Value);
 record ConfigValueDto(string? Value);
 record Nexus360TestDto(string Url, string Username, string Password);
 record FormRecordDto(string FormId, string? FormTitle, string? Period, string? Notes, string? FormData, string? SnapshotHtml);
+record IsrRefDto(string StudyId, string Quarter, string? Label);
+record IsrSessionDto(int ReferenceStudyId, string? ScorerName, string? Status, string? Notes);
 record IsrDto(string Quarter, string? Scorer, string? Reviewer, string? ReviewerRole,
     string? StudyIds, string? Results, string? Thresholds, string? Notes, string? Status,
     string? AttestationBy, string? AttestationDate);

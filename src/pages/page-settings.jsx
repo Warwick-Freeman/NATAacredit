@@ -173,9 +173,10 @@ const SettingsPage = () => {
   const [expandedProvider, setExpandedProvider] = useState(null);
 
   // Nexus 360 server integration
-  const [n360Url,      setN360Url]      = useState('');
-  const [n360Username, setN360Username] = useState('');
-  const [n360Password, setN360Password] = useState('');
+  const [n360Url,        setN360Url]        = useState('');
+  const [n360Username,   setN360Username]   = useState('');
+  const [n360Password,   setN360Password]   = useState('');
+  const [prodigiStudyUrl, setProdigiStudyUrl] = useState('');
   const [n360Saving,   setN360Saving]   = useState(false);
   const [n360Testing,  setN360Testing]  = useState(false);
   const [n360TestResult, setN360TestResult] = useState(null); // null | 'ok' | 'fail'
@@ -204,9 +205,10 @@ const SettingsPage = () => {
 
   useEffect(() => {
     fetchConfig().then(cfg => {
-      if (cfg['nexus360_url'])      setN360Url(cfg['nexus360_url']);
-      if (cfg['nexus360_username']) setN360Username(cfg['nexus360_username']);
-      if (cfg['nexus360_password']) setN360Password(cfg['nexus360_password']);
+      if (cfg['nexus360_url'])        setN360Url(cfg['nexus360_url']);
+      if (cfg['nexus360_username'])   setN360Username(cfg['nexus360_username']);
+      if (cfg['nexus360_password'])   setN360Password(cfg['nexus360_password']);
+      if (cfg['prodigi_study_url']) setProdigiStudyUrl(cfg['prodigi_study_url']);
       // Twilio (SMS + Email)
       setTwilioConfig(c => ({
         ...c,
@@ -390,6 +392,7 @@ const SettingsPage = () => {
         saveConfigKey('nexus360_url',      n360Url.trim()),
         saveConfigKey('nexus360_username', n360Username.trim()),
         saveConfigKey('nexus360_password', n360Password),
+        saveConfigKey('prodigi_study_url', prodigiStudyUrl.trim()),
       ]);
       showSaved();
     } catch { /* silent — toast not shown on error */ }
@@ -1126,6 +1129,18 @@ const SettingsPage = () => {
                         <Icon name="eye" size={13} />
                       </button>
                     </div>
+                  </div>
+                </div>
+                <div className="form-field">
+                  <label className="form-label">ProDigi WebPSG URL</label>
+                  <input
+                    className="form-input"
+                    value={prodigiStudyUrl}
+                    onChange={e => setProdigiStudyUrl(e.target.value)}
+                    placeholder="https://prodigi.example.com/WebPSG"
+                  />
+                  <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 3 }}>
+                    Base URL of the ProDigi WebPSG viewer. <code>enData</code> and <code>StudyID</code> are appended automatically.
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 8 }}>

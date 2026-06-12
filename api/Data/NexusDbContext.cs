@@ -18,6 +18,8 @@ public class NexusDbContext(DbContextOptions<NexusDbContext> options) : DbContex
     public DbSet<SiteRoom> Rooms => Set<SiteRoom>();
     public DbSet<SiteConfig> SiteConfig => Set<SiteConfig>();
     public DbSet<IsrAssessment> IsrAssessments => Set<IsrAssessment>();
+    public DbSet<IsrReferenceStudy> IsrReferenceStudies => Set<IsrReferenceStudy>();
+    public DbSet<IsrScoringSession> IsrScoringSessions => Set<IsrScoringSession>();
     public DbSet<FormRecord> FormRecords => Set<FormRecord>();
     public DbSet<WorkbookSchedule> WorkbookSchedules => Set<WorkbookSchedule>();
     public DbSet<WorkbookCompletion> WorkbookCompletions => Set<WorkbookCompletion>();
