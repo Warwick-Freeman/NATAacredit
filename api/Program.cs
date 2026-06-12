@@ -5,6 +5,7 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using NexusApi.Data;
@@ -32,23 +33,45 @@ var jwtKey = new SymmetricSecurityKey(jwtKeyBytes);
 builder.Services.AddDbContext<NexusDbContext>(opt =>
     opt.UseSqlite("Data Source=nexus.db"));
 
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(opt =>
-    {
-        opt.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuerSigningKey = true,
-            IssuerSigningKey         = jwtKey,
-            ValidateIssuer           = true,
-            ValidIssuer              = "nexus360",
-            ValidateAudience         = true,
-            ValidAudience            = "nexus360",
-            ValidateLifetime         = true,
-            ClockSkew                = TimeSpan.Zero,
-        };
-    });
+// Two JWT trust domains share the signing key but are isolated by audience:
+//   "staff"  → audience "nexus360"        — full application access
+//   "portal" → audience "nexus360-portal" — patient portal endpoints only
+// Isolating them by audience prevents a patient-portal token from being accepted
+// on staff endpoints (which only assert "is authenticated", not "is staff").
+const string StaffScheme    = "staff";
+const string PortalScheme   = "portal";
+const string StaffAudience  = "nexus360";
+const string PortalAudience = "nexus360-portal";
 
-builder.Services.AddAuthorization();
+TokenValidationParameters ValidationFor(string audience) => new()
+{
+    ValidateIssuerSigningKey = true,
+    IssuerSigningKey         = jwtKey,
+    ValidateIssuer           = true,
+    ValidIssuer              = "nexus360",
+    ValidateAudience         = true,
+    ValidAudience            = audience,
+    ValidateLifetime         = true,
+    ClockSkew                = TimeSpan.Zero,
+};
+
+builder.Services.AddAuthentication(StaffScheme)
+    .AddJwtBearer(StaffScheme,  opt => opt.TokenValidationParameters = ValidationFor(StaffAudience))
+    .AddJwtBearer(PortalScheme, opt => opt.TokenValidationParameters = ValidationFor(PortalAudience));
+
+builder.Services.AddAuthorization(opt =>
+{
+    // Default policy backs every bare RequireAuthorization() → staff tokens only.
+    opt.DefaultPolicy = new AuthorizationPolicyBuilder()
+        .AddAuthenticationSchemes(StaffScheme)
+        .RequireAuthenticatedUser()
+        .Build();
+
+    // Patient-portal endpoints opt in explicitly via RequireAuthorization("Portal").
+    opt.AddPolicy("Portal", p => p
+        .AddAuthenticationSchemes(PortalScheme)
+        .RequireAuthenticatedUser());
+});
 builder.Services.AddHttpClient();
 
 builder.Services.AddCors(opt => opt.AddDefaultPolicy(p =>
@@ -423,6 +446,11 @@ app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
 
+// Roles permitted to manage users and role definitions (server-side enforcement
+// of the client-side `canManageUsers` permission).
+var manageUsersRoles = new HashSet<string>(StringComparer.Ordinal)
+    { "Medical Director", "Quality Manager", "Network Director", "Site Director" };
+
 // ── Auth ─────────────────────────────────────────────────────────────────────
 
 app.MapPost("/api/auth/login", async (LoginDto dto, NexusDbContext db) =>
@@ -484,8 +512,9 @@ app.MapGet("/api/users", async (NexusDbContext db) =>
     })
 ).RequireAuthorization();
 
-app.MapPut("/api/users/{id:int}", async (int id, UserUpdateDto dto, NexusDbContext db) =>
+app.MapPut("/api/users/{id:int}", async (int id, UserUpdateDto dto, NexusDbContext db, ClaimsPrincipal principal) =>
 {
+    if (!manageUsersRoles.Contains(ActorRole(principal))) return Results.Forbid();
     var user = await db.Users.FindAsync(id);
     if (user == null) return Results.NotFound();
     if (dto.Name  != null) user.Name  = dto.Name;
@@ -499,8 +528,9 @@ app.MapPut("/api/users/{id:int}", async (int id, UserUpdateDto dto, NexusDbConte
         sites = System.Text.Json.JsonSerializer.Deserialize<string[]>(user.Sites) ?? Array.Empty<string>() });
 }).RequireAuthorization();
 
-app.MapPost("/api/users", async (UserCreateDto dto, NexusDbContext db) =>
+app.MapPost("/api/users", async (UserCreateDto dto, NexusDbContext db, ClaimsPrincipal principal) =>
 {
+    if (!manageUsersRoles.Contains(ActorRole(principal))) return Results.Forbid();
     if (await db.Users.AnyAsync(u => u.Email == dto.Email))
         return Results.Conflict(new { error = "Email already in use" });
     var user = new AppUser
@@ -977,7 +1007,7 @@ app.MapGet("/api/portal/me", async (NexusDbContext db, ClaimsPrincipal principal
     var patient = await db.Patients.FirstOrDefaultAsync(p => p.PatientId == patientId);
     if (patient == null) return Results.NotFound();
     return Results.Ok(new { patient.Name, patient.Dob, patient.Mrn, patient.Site });
-}).RequireAuthorization();
+}).RequireAuthorization("Portal");
 
 // GET /api/portal/forms  (portal auth)
 app.MapGet("/api/portal/forms", async (NexusDbContext db, ClaimsPrincipal principal) =>
@@ -988,7 +1018,7 @@ app.MapGet("/api/portal/forms", async (NexusDbContext db, ClaimsPrincipal princi
         .Where(l => l.PatientId == patientId)
         .OrderByDescending(l => l.SentAt)
         .ToListAsync());
-}).RequireAuthorization();
+}).RequireAuthorization("Portal");
 
 // ── Send form link via Twilio (SMS + Email) ───────────────────────────────────
 
@@ -1089,8 +1119,9 @@ app.MapGet("/api/roles", async (NexusDbContext db) =>
     await db.Roles.OrderByDescending(r => r.Level).ThenBy(r => r.RoleName).ToListAsync()
 ).RequireAuthorization();
 
-app.MapPost("/api/roles", async (RoleUpsertDto dto, NexusDbContext db) =>
+app.MapPost("/api/roles", async (RoleUpsertDto dto, NexusDbContext db, ClaimsPrincipal principal) =>
 {
+    if (!manageUsersRoles.Contains(ActorRole(principal))) return Results.Forbid();
     if (await db.Roles.AnyAsync(r => r.RoleName == dto.RoleName)) return Results.Conflict();
     var role = new NexusApi.Models.RoleRecord { RoleName = dto.RoleName, Level = dto.Level, PermissionsJson = dto.PermissionsJson };
     db.Roles.Add(role);
@@ -1098,8 +1129,9 @@ app.MapPost("/api/roles", async (RoleUpsertDto dto, NexusDbContext db) =>
     return Results.Ok(role);
 }).RequireAuthorization();
 
-app.MapPut("/api/roles/{roleName}", async (string roleName, RoleUpsertDto dto, NexusDbContext db) =>
+app.MapPut("/api/roles/{roleName}", async (string roleName, RoleUpsertDto dto, NexusDbContext db, ClaimsPrincipal principal) =>
 {
+    if (!manageUsersRoles.Contains(ActorRole(principal))) return Results.Forbid();
     var role = await db.Roles.FirstOrDefaultAsync(r => r.RoleName == roleName);
     if (role == null) return Results.NotFound();
     role.Level = dto.Level;
@@ -1108,8 +1140,9 @@ app.MapPut("/api/roles/{roleName}", async (string roleName, RoleUpsertDto dto, N
     return Results.Ok(role);
 }).RequireAuthorization();
 
-app.MapDelete("/api/roles/{roleName}", async (string roleName, NexusDbContext db) =>
+app.MapDelete("/api/roles/{roleName}", async (string roleName, NexusDbContext db, ClaimsPrincipal principal) =>
 {
+    if (!manageUsersRoles.Contains(ActorRole(principal))) return Results.Forbid();
     var role = await db.Roles.FirstOrDefaultAsync(r => r.RoleName == roleName);
     if (role == null) return Results.NotFound();
     var count = await db.Users.CountAsync(u => u.Role == roleName);
@@ -2090,7 +2123,7 @@ string GeneratePortalToken(string email, string patientId, SymmetricSecurityKey 
     };
     var tok = new JwtSecurityToken(
         issuer:             "nexus360",
-        audience:           "nexus360",
+        audience:           "nexus360-portal",   // isolated from staff audience — see auth setup
         claims:             claims,
         expires:            DateTime.UtcNow.AddDays(30),
         signingCredentials: new SigningCredentials(key, SecurityAlgorithms.HmacSha256));
