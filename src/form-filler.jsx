@@ -256,7 +256,10 @@ const FormFiller = ({ doc, htmlContent, onSaved, onCancel }) => {
         srcDoc={filledHtml}
         className="doc-frame"
         title={`Fill: ${doc.title}`}
-        sandbox="allow-scripts allow-forms allow-popups allow-same-origin"
+        // No allow-same-origin: form template scripts must run in an opaque origin
+        // so they cannot read the parent app's localStorage (JWT). The collect/snapshot
+        // handshake uses postMessage, which works cross-origin.
+        sandbox="allow-scripts allow-forms allow-popups"
         style={{ flex: 1, border: 'none' }}
       />
     </div>

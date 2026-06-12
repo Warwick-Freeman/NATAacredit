@@ -613,10 +613,28 @@ app.MapPost("/api/config/test-nexus360", async (Nexus360TestDto dto) =>
     if (string.IsNullOrWhiteSpace(dto.Url) || string.IsNullOrWhiteSpace(dto.Username) || string.IsNullOrWhiteSpace(dto.Password))
         return Results.BadRequest("url, username and password are required");
 
+    // SSRF guard: only allow outbound calls to public http(s) hosts so this endpoint
+    // cannot be used to probe internal services or the cloud metadata endpoint.
+    if (!Uri.TryCreate(dto.Url, UriKind.Absolute, out var target)
+        || (target.Scheme != Uri.UriSchemeHttp && target.Scheme != Uri.UriSchemeHttps))
+        return Results.BadRequest("url must be an absolute http(s) URL");
+    try
+    {
+        var addresses = await System.Net.Dns.GetHostAddressesAsync(target.DnsSafeHost);
+        if (addresses.Length == 0 || addresses.Any(IsPrivateOrReserved))
+            return Results.BadRequest("url must resolve to a public host");
+    }
+    catch
+    {
+        return Results.BadRequest("url host could not be resolved");
+    }
+
     var baseUrl = dto.Url.TrimEnd('/');
     try
     {
-        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+        // Don't follow redirects — a public URL must not be able to 30x into an internal host.
+        using var handler = new HttpClientHandler { AllowAutoRedirect = false };
+        using var http = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(10) };
         var body = new FormUrlEncodedContent(new Dictionary<string, string>
         {
             ["grant_type"] = "password",
@@ -632,9 +650,9 @@ app.MapPost("/api/config/test-nexus360", async (Nexus360TestDto dto) =>
             ? Results.Ok(new { ok = true })
             : Results.Ok(new { ok = false, status = (int)res2.StatusCode });
     }
-    catch (Exception ex)
+    catch
     {
-        return Results.Ok(new { ok = false, error = ex.Message });
+        return Results.Ok(new { ok = false, error = "Connection failed" });
     }
 }).RequireAuthorization();
 
@@ -2087,6 +2105,29 @@ string BuildDocScript(Document doc)
 
     sb.Append("})();\n</script>");
     return sb.ToString();
+}
+
+// SSRF guard — true for loopback, private, link-local (incl. cloud metadata
+// 169.254.169.254), CGNAT and reserved ranges that outbound calls must not reach.
+bool IsPrivateOrReserved(System.Net.IPAddress ip)
+{
+    if (System.Net.IPAddress.IsLoopback(ip)) return true;
+    var b = ip.GetAddressBytes();
+    if (ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+    {
+        return b[0] == 0 || b[0] == 10 || b[0] == 127
+            || (b[0] == 169 && b[1] == 254)                 // link-local / metadata
+            || (b[0] == 172 && b[1] >= 16 && b[1] <= 31)    // 172.16.0.0/12
+            || (b[0] == 192 && b[1] == 168)                 // 192.168.0.0/16
+            || (b[0] == 100 && b[1] >= 64 && b[1] <= 127);  // 100.64.0.0/10 CGNAT
+    }
+    if (ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6)
+    {
+        if (ip.IsIPv6LinkLocal || ip.IsIPv6SiteLocal || ip.IsIPv6Multicast) return true;
+        if (ip.IsIPv4MappedToIPv6) return IsPrivateOrReserved(ip.MapToIPv4());
+        return (b[0] & 0xFE) == 0xFC;                       // fc00::/7 unique-local
+    }
+    return true; // unknown address family — reject
 }
 
 string ExtractTextFromHtml(string html) => SeedData.StripHtml(html);
