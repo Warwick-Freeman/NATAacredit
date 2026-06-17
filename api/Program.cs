@@ -156,6 +156,8 @@ using (var scope = app.Services.CreateScope())
         "ALTER TABLE Users ADD COLUMN Sites TEXT NOT NULL DEFAULT '[]'",
         "ALTER TABLE Clauses ADD COLUMN LinkedEvidenceJson TEXT NOT NULL DEFAULT '[]'",
         "ALTER TABLE ReferringPhysicians ADD COLUMN SetupToken TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE IsrAssessments ADD COLUMN ActionPlanJson TEXT NOT NULL DEFAULT '{}'",
+        "ALTER TABLE IsrAssessments ADD COLUMN ScorerAcknowledgedAt TEXT NOT NULL DEFAULT ''",
     })
     {
         try { db.Database.ExecuteSqlRaw(col); } catch { /* column already exists */ }
@@ -1922,8 +1924,10 @@ app.MapPut("/api/isr/{id:int}", async (int id, IsrDto dto, NexusDbContext db, Cl
     if (dto.Thresholds  != null) a.Thresholds  = dto.Thresholds;
     if (dto.Notes       != null) a.Notes       = dto.Notes;
     if (dto.Status      != null) a.Status      = dto.Status;
-    if (dto.AttestationBy   != null) a.AttestationBy   = dto.AttestationBy;
-    if (dto.AttestationDate != null) a.AttestationDate = dto.AttestationDate;
+    if (dto.AttestationBy          != null) a.AttestationBy          = dto.AttestationBy;
+    if (dto.AttestationDate        != null) a.AttestationDate        = dto.AttestationDate;
+    if (dto.ActionPlanJson         != null) a.ActionPlanJson         = dto.ActionPlanJson;
+    if (dto.ScorerAcknowledgedAt   != null) a.ScorerAcknowledgedAt   = dto.ScorerAcknowledgedAt;
     await db.SaveChangesAsync();
     return Results.Ok(a);
 }).RequireAuthorization();
@@ -2669,7 +2673,8 @@ record IsrRefDto(string StudyId, string Quarter, string? Label);
 record IsrSessionDto(int ReferenceStudyId, string? ScorerName, string? Status, string? Notes);
 record IsrDto(string Quarter, string? Scorer, string? Reviewer, string? ReviewerRole,
     string? StudyIds, string? Results, string? Thresholds, string? Notes, string? Status,
-    string? AttestationBy, string? AttestationDate);
+    string? AttestationBy, string? AttestationDate,
+    string? ActionPlanJson, string? ScorerAcknowledgedAt);
 record IsrSignDto(string? AttestationBy, string? AttestationDate, string? Notes);
 record ProdigiLaunchDto(string StudyId, string ScorerId, string? ReviewerId);
 record WorkbookUpdateDto(string? Frequency, string? AssignedTo);

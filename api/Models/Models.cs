@@ -93,6 +93,8 @@ public class IsrAssessment
     public string SignedAt { get; set; } = "";
     public string Notes { get; set; } = "";
     public string CreatedAt { get; set; } = "";
+    public string ActionPlanJson { get; set; } = "{}";       // JSON: action plan items
+    public string ScorerAcknowledgedAt { get; set; } = "";   // ISO timestamp when scorer signed off
 }
 
 public class IsrReferenceStudy
