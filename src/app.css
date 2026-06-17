@@ -1,19 +1,19 @@
 /* Nexus 360 Accreditation — modern healthcare SaaS aesthetic */
 :root {
-  /* Default: clinical blue palette */
-  --bg: #fbfbfa;
+  /* Default: ProDigi-matched clinical palette */
+  --bg: #f4f6f9;
   --surface: #ffffff;
-  --surface-2: #f6f6f4;
-  --surface-3: #efeeea;
-  --border: #e6e5e0;
-  --border-strong: #d4d3cc;
-  --ink: #1a1a17;
-  --ink-2: #4a4a45;
-  --ink-3: #76756e;
-  --ink-4: #a4a39c;
-  --accent: #2563eb;
-  --accent-soft: #dbeafe;
-  --accent-ink: #1e40af;
+  --surface-2: #edf1f6;
+  --surface-3: #e2e8f0;
+  --border: #d4dbe7;
+  --border-strong: #b5c0d0;
+  --ink: #1a2740;
+  --ink-2: #374f6e;
+  --ink-3: #607898;
+  --ink-4: #96aec8;
+  --accent: #1b3a6b;
+  --accent-soft: #dce5f5;
+  --accent-ink: #12274f;
   --good: #15803d;
   --good-soft: #dcfce7;
   --warn: #b45309;
@@ -26,25 +26,25 @@
   --radius: 8px;
   --radius-lg: 12px;
   --radius-sm: 5px;
-  --shadow-sm: 0 1px 2px rgba(20, 20, 18, 0.04), 0 0 0 1px rgba(20, 20, 18, 0.04);
-  --shadow: 0 1px 3px rgba(20, 20, 18, 0.06), 0 4px 12px rgba(20, 20, 18, 0.04);
-  --shadow-lg: 0 4px 8px rgba(20, 20, 18, 0.06), 0 16px 40px rgba(20, 20, 18, 0.08);
+  --shadow-sm: 0 1px 2px rgba(20, 30, 50, 0.05), 0 0 0 1px rgba(20, 30, 50, 0.04);
+  --shadow: 0 1px 3px rgba(20, 30, 50, 0.07), 0 4px 12px rgba(20, 30, 50, 0.05);
+  --shadow-lg: 0 4px 8px rgba(20, 30, 50, 0.07), 0 16px 40px rgba(20, 30, 50, 0.09);
 }
 
 [data-palette="navy"] {
-  --bg: #f7f7f9;
+  --bg: #f0f3f8;
   --surface: #ffffff;
-  --surface-2: #f3f3f7;
-  --surface-3: #ecebf1;
-  --border: #e3e2ea;
-  --border-strong: #cfcedb;
-  --ink: #131127;
-  --ink-2: #3b3957;
-  --ink-3: #6c6a85;
-  --ink-4: #a3a1b6;
-  --accent: #4338ca;
-  --accent-soft: #e0e7ff;
-  --accent-ink: #312e81;
+  --surface-2: #e6ecf5;
+  --surface-3: #d9e2ef;
+  --border: #c8d4e4;
+  --border-strong: #a8bbd1;
+  --ink: #0f1f38;
+  --ink-2: #2a3f5c;
+  --ink-3: #546880;
+  --ink-4: #8aa0b8;
+  --accent: #163260;
+  --accent-soft: #d4dfee;
+  --accent-ink: #0c2246;
 }
 
 [data-palette="neutral"] {
@@ -101,12 +101,44 @@ body {
 
 /* Sidebar */
 .sidebar {
-  background: var(--surface-2);
-  border-right: 1px solid var(--border);
+  background: #1b3a6b;
+  border-right: none;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  box-shadow: 2px 0 8px rgba(10, 20, 40, 0.18);
 }
+
+/* Dark sidebar element overrides */
+.sidebar .brand { border-bottom-color: rgba(255,255,255,0.1); }
+.sidebar .brand-name { color: rgba(255,255,255,0.95); }
+.sidebar .brand-sub { color: rgba(255,255,255,0.45); }
+.sidebar .brand-mark { background: rgba(255,255,255,0.18); box-shadow: none; }
+.sidebar .org-switcher {
+  background: rgba(255,255,255,0.07);
+  border-color: rgba(255,255,255,0.1);
+}
+.sidebar .org-switcher:hover { border-color: rgba(255,255,255,0.22); }
+.sidebar .org-name { color: rgba(255,255,255,0.8); }
+.sidebar .org-chev { color: rgba(255,255,255,0.35); }
+.sidebar .org-avatar { background: rgba(255,255,255,0.15); color: white; }
+.sidebar .nav-section { color: rgba(255,255,255,0.38); }
+.sidebar .nav-item { color: rgba(255,255,255,0.65); }
+.sidebar .nav-item:hover { background: rgba(255,255,255,0.09); color: rgba(255,255,255,0.95); }
+.sidebar .nav-item.active { background: rgba(255,255,255,0.14); color: white; box-shadow: none; }
+.sidebar .nav-item .icon { color: rgba(255,255,255,0.4); }
+.sidebar .nav-item:hover .icon { color: rgba(255,255,255,0.75); }
+.sidebar .nav-item.active .icon { color: rgba(255,255,255,0.95); }
+.sidebar .user-card { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.1); }
+.sidebar .user-name { color: rgba(255,255,255,0.9); }
+.sidebar .user-role { color: rgba(255,255,255,0.45); }
+.sidebar .icon-btn {
+  background: rgba(255,255,255,0.07);
+  border-color: rgba(255,255,255,0.1);
+  color: rgba(255,255,255,0.5);
+}
+.sidebar .icon-btn:hover { background: rgba(255,255,255,0.14); color: rgba(255,255,255,0.85); }
+
 .brand {
   display: flex;
   align-items: center;

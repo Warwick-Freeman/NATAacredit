@@ -27,6 +27,8 @@ import StudyDrawer from './study-drawer';
 import GlobalSearch from './global-search';
 import FormFillPage from './pages/page-form-fill';
 import PatientPortalPage from './pages/page-patient-portal';
+import ReferringPhysiciansPage from './pages/page-referring-physicians';
+import PhysicianPortalPage from './pages/physician-portal';
 
 const App = () => {
   const { user, signOut } = useAuth();
@@ -57,13 +59,34 @@ const App = () => {
 
   const goTo = (r) => { setRoute(r); setSidebarOpen(false); window.scrollTo({ top: 0 }); };
 
-  const fillToken = new URLSearchParams(window.location.search).get('fill');
-  if (fillToken) return <FormFillPage token={fillToken} />;
-
+  const path = window.location.pathname;
   const params = new URLSearchParams(window.location.search);
+
+  // Clean path-based portal routing
+  if (path === '/patient-portal' || path === '/patient-portal/') {
+    const token = params.get('token');
+    return token ? <PatientPortalPage setupToken={token} /> : <PatientPortalPage />;
+  }
+  if (path === '/patient-portal/setup') {
+    return <PatientPortalPage setupToken={params.get('token')} />;
+  }
+  if (path === '/physician-portal' || path === '/physician-portal/') {
+    const token = params.get('token');
+    return token ? <PhysicianPortalPage setupToken={token} /> : <PhysicianPortalPage />;
+  }
+  if (path === '/physician-portal/setup') {
+    return <PhysicianPortalPage setupToken={params.get('token')} />;
+  }
+
+  // Legacy query-param routing (kept for backward compat with existing invite emails)
+  const fillToken = params.get('fill');
+  if (fillToken) return <FormFillPage token={fillToken} />;
   const portalSetupToken = params.get('portal_setup');
   if (portalSetupToken) return <PatientPortalPage setupToken={portalSetupToken} />;
   if (params.has('portal')) return <PatientPortalPage />;
+  const physicianSetupToken = params.get('physician_portal_setup');
+  if (physicianSetupToken) return <PhysicianPortalPage setupToken={physicianSetupToken} />;
+  if (params.has('physician_portal')) return <PhysicianPortalPage />;
 
   if (!user) return <LoginPage />;
 
@@ -129,6 +152,7 @@ const App = () => {
     indicators: ["Operations", "Quality indicators"],
     equipment: ["Operations", "Equipment register"],
     staff: ["Operations", "Staff & training"],
+    "referring-physicians": ["Operations", "Referring Physicians"],
     workbooks: ["Operations", "Workbooks"],
     isr:       ["Compliance", "Inter-Scorer Reliability"],
     settings: ["Admin", "Settings"],
@@ -149,6 +173,7 @@ const App = () => {
       case "audits": return <AuditsPage />;
       case "ncr": return <NCRPage />;
       case "staff": return <StaffPage />;
+      case "referring-physicians": return <ReferringPhysiciansPage />;
       case "workbooks": return <WorkbooksPage />;
       case "isr":       return <ISRPage />;
       case "settings": return <SettingsPage />;

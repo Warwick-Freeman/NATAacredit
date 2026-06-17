@@ -28,4 +28,5 @@ public class NexusDbContext(DbContextOptions<NexusDbContext> options) : DbContex
     public DbSet<Patient> Patients => Set<Patient>();
     public DbSet<PatientPortalAccount> PatientPortalAccounts => Set<PatientPortalAccount>();
     public DbSet<PatientFormLink> PatientFormLinks => Set<PatientFormLink>();
+    public DbSet<ReferringPhysician> ReferringPhysicians => Set<ReferringPhysician>();
 }

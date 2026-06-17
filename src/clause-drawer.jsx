@@ -74,7 +74,7 @@ const EvidenceItem = ({ item, onOpen }) => (
   </div>
 );
 
-const ClauseDrawer = ({ data, clauseId, onClose, onUpdate }) => {
+const ClauseDrawer = ({ data, clauseId, onClose, onUpdate, goTo }) => {
   const { openCreateTask } = useTaskContext();
   const { activeStandard } = useNexusData();
   const stdCfg = getStdCfg(activeStandard);
@@ -196,7 +196,15 @@ const ClauseDrawer = ({ data, clauseId, onClose, onUpdate }) => {
     setAddEvOpen(false);
   };
 
-  const openDoc = (item) => { setActiveDoc(item); setPanel('doc'); };
+  const openDoc = (item) => {
+    if (goTo) {
+      const id = item.docId || item.ref?.split(' v')[0] || null;
+      if (id) sessionStorage.setItem('nexus_open_doc', id);
+      goTo('documents');
+      return;
+    }
+    setActiveDoc(item); setPanel('doc');
+  };
 
   const linkedEvidence = clause.linkedEvidence || [];
   const crossRefs = CROSS_REFS[clause.id] || [];

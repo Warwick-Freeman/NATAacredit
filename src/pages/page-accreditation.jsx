@@ -798,6 +798,7 @@ const AccreditationPage = ({ data: D, goTo }) => {
             clauseId={detailId}
             onClose={() => setDetailId(null)}
             onUpdate={handleUpdateClause}
+            goTo={goTo}
           />
         )}
       </Drawer>

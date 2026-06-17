@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import Icon from '../icons';
 import { PageHeader, Pill, Avatar, Tabs, Drawer } from '../components';
 import NexusGrid from '../nexus-grid';
@@ -717,7 +717,19 @@ function AddPatientModal({ onClose, onAdd, sites = [] }) {
   const [form, setForm] = useState(BLANK_PATIENT);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [referringPhysicians, setReferringPhysicians] = useState([]);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  useEffect(() => {
+    const token = localStorage.getItem('nexus_token');
+    const base = import.meta.env.VITE_API_URL ?? '';
+    fetch(`${base}/api/referring-physicians`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+      .then(r => r.ok ? r.json() : [])
+      .then(data => setReferringPhysicians((data ?? []).filter(p => p.status === 'active')))
+      .catch(() => {});
+  }, []);
   const canSave = form.name.trim() && form.dob && form.mrn.trim();
 
   async function handleSave() {
@@ -811,7 +823,18 @@ function AddPatientModal({ onClose, onAdd, sites = [] }) {
 
           <div className="form-field">
             <label className="form-label">Referring clinician</label>
-            <input className="form-input" value={form.referrer} onChange={e => set('referrer', e.target.value)} placeholder="e.g. Dr. A. Brown (GP)" />
+            {referringPhysicians.length > 0 ? (
+              <select className="form-input" value={form.referrer} onChange={e => set('referrer', e.target.value)}>
+                <option value="">— select —</option>
+                {referringPhysicians.map(p => (
+                  <option key={p.physicianId} value={p.name}>
+                    {p.name}{p.specialty ? ` — ${p.specialty}` : p.type ? ` (${p.type})` : ''}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input className="form-input" value={form.referrer} onChange={e => set('referrer', e.target.value)} placeholder="e.g. Dr. A. Brown (GP)" />
+            )}
           </div>
 
           <div className="form-field">
@@ -836,6 +859,59 @@ function AddPatientModal({ onClose, onAdd, sites = [] }) {
 
 function PatientDrawer({ patient, onClose, onCreateTask, onOrderDme, onUpdate, studies = [], openStudy }) {
   const [dtab, setDtab] = useState('overview');
+
+  // ── Overview edit ──────────────────────────────────────────────────────────
+  const [overviewEdit, setOverviewEdit] = useState(false);
+  const [overviewDraft, setOverviewDraft] = useState(null);
+  const [overviewSaving, setOverviewSaving] = useState(false);
+  const [overviewError, setOverviewError] = useState('');
+  const [referringPhysicians, setReferringPhysicians] = useState([]);
+
+  React.useEffect(() => {
+    const token = localStorage.getItem('nexus_token');
+    const base = import.meta.env.VITE_API_URL ?? '';
+    fetch(`${base}/api/referring-physicians`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+      .then(r => r.ok ? r.json() : [])
+      .then(data => setReferringPhysicians((data ?? []).filter(p => p.status === 'active')))
+      .catch(() => {});
+  }, []);
+
+  function startOverviewEdit() {
+    setOverviewDraft({
+      name:       patient.name,
+      dob:        patient.dob ?? '',
+      sex:        patient.sex ?? 'M',
+      mrn:        patient.mrn ?? '',
+      site:       patient.site ?? '',
+      referrer:   patient.referrer ?? '',
+      physician:  patient.physician ?? '',
+      status:     patient.status ?? 'active',
+      nextReview: patient.nextReview ?? '',
+    });
+    setOverviewError('');
+    setOverviewEdit(true);
+  }
+
+  async function saveOverview() {
+    if (!overviewDraft.name?.trim()) { setOverviewError('Name is required'); return; }
+    setOverviewSaving(true); setOverviewError('');
+    try {
+      const updated = await updatePatient(patient.id, { ...patient, ...overviewDraft });
+      updated.age = ageFromDob(updated.dob);
+      onUpdate?.(updated);
+      setOverviewEdit(false);
+    } catch (e) {
+      setOverviewError(e.message ?? 'Failed to save');
+    } finally {
+      setOverviewSaving(false);
+    }
+  }
+
+  const setOv = (k, v) => setOverviewDraft(d => ({ ...d, [k]: v }));
+
+  // ── Contact edit ────────────────────────────────────────────────────────────
   const [contactEdit, setContactEdit] = useState(false);
   const [contactDraft, setContactDraft] = useState(null);
   const [contactSaving, setContactSaving] = useState(false);
@@ -937,6 +1013,9 @@ function PatientDrawer({ patient, onClose, onCreateTask, onOrderDme, onUpdate, s
         </div>
         <div style={{ flex: 1 }} />
         <StatusBadge status={patient.status} />
+        <button className="btn" style={{ fontSize: 12, padding: '4px 10px' }} onClick={startOverviewEdit}>
+          <Icon name="edit" size={13} /> Edit
+        </button>
         <button className="btn-icon" onClick={onClose}><Icon name="x" size={16} /></button>
       </div>
 
@@ -962,21 +1041,100 @@ function PatientDrawer({ patient, onClose, onCreateTask, onOrderDme, onUpdate, s
         {/* ── Overview ── */}
         {dtab === 'overview' && (
           <>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
-              {[
-                ['Site', patient.site],
-                ['Referring physician', patient.referrer],
-                ['Treating physician', patient.physician],
-                ['Next review', patient.nextReview ?? '—'],
-                ['Date of birth', patient.dob],
-                ['Treatment', patient.treatment?.type ?? 'None prescribed'],
-              ].map(([l, v]) => (
-                <div key={l} style={{ padding: '10px 12px', background: 'var(--surface-2)', borderRadius: 8 }}>
-                  <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--ink-3)', marginBottom: 3 }}>{l}</div>
-                  <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--ink)' }}>{v}</div>
+            {overviewEdit && overviewDraft ? (
+              <div style={{ marginBottom: 16, padding: 14, background: 'var(--surface-2)', borderRadius: 10, border: '1px solid var(--border)' }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink)', marginBottom: 12 }}>Edit patient details</div>
+
+                <div className="form-row">
+                  <div className="form-field" style={{ flex: 2 }}>
+                    <label className="form-label">Full name</label>
+                    <input className="form-input" value={overviewDraft.name} onChange={e => setOv('name', e.target.value)} />
+                  </div>
+                  <div className="form-field" style={{ flex: 1 }}>
+                    <label className="form-label">Sex</label>
+                    <select className="form-input" value={overviewDraft.sex} onChange={e => setOv('sex', e.target.value)}>
+                      <option value="M">Male</option>
+                      <option value="F">Female</option>
+                      <option value="O">Other</option>
+                    </select>
+                  </div>
                 </div>
-              ))}
-            </div>
+
+                <div className="form-row">
+                  <div className="form-field" style={{ flex: 1 }}>
+                    <label className="form-label">Date of birth</label>
+                    <input className="form-input" type="date" value={overviewDraft.dob} onChange={e => setOv('dob', e.target.value)} />
+                  </div>
+                  <div className="form-field" style={{ flex: 1 }}>
+                    <label className="form-label">MRN</label>
+                    <input className="form-input" value={overviewDraft.mrn} onChange={e => setOv('mrn', e.target.value)} />
+                  </div>
+                </div>
+
+                <div className="form-row">
+                  <div className="form-field" style={{ flex: 1 }}>
+                    <label className="form-label">Status</label>
+                    <select className="form-input" value={overviewDraft.status} onChange={e => setOv('status', e.target.value)}>
+                      <option value="active">Active</option>
+                      <option value="inactive">Inactive</option>
+                      <option value="discharged">Discharged</option>
+                      <option value="monitoring">Monitoring</option>
+                      <option value="awaiting-study">Awaiting study</option>
+                    </select>
+                  </div>
+                  <div className="form-field" style={{ flex: 1 }}>
+                    <label className="form-label">Next review</label>
+                    <input className="form-input" type="date" value={overviewDraft.nextReview} onChange={e => setOv('nextReview', e.target.value)} />
+                  </div>
+                </div>
+
+                <div className="form-field">
+                  <label className="form-label">Referring clinician</label>
+                  {referringPhysicians.length > 0 ? (
+                    <select className="form-input" value={overviewDraft.referrer} onChange={e => setOv('referrer', e.target.value)}>
+                      <option value="">— select —</option>
+                      {referringPhysicians.map(p => (
+                        <option key={p.physicianId} value={p.name}>
+                          {p.name}{p.specialty ? ` — ${p.specialty}` : p.type ? ` (${p.type})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input className="form-input" value={overviewDraft.referrer} onChange={e => setOv('referrer', e.target.value)} placeholder="e.g. Dr. A. Brown (GP)" />
+                  )}
+                </div>
+
+                <div className="form-field">
+                  <label className="form-label">Treating physician</label>
+                  <input className="form-input" value={overviewDraft.physician} onChange={e => setOv('physician', e.target.value)} placeholder="e.g. Dr. R. Okafor" />
+                </div>
+
+                {overviewError && <div style={{ fontSize: 12, color: 'var(--bad)', marginBottom: 8 }}>{overviewError}</div>}
+
+                <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                  <button className="btn btn-primary" style={{ flex: 1 }} onClick={saveOverview} disabled={overviewSaving}>
+                    <Icon name="check" size={13} /> {overviewSaving ? 'Saving…' : 'Save changes'}
+                  </button>
+                  <button className="btn" onClick={() => setOverviewEdit(false)} disabled={overviewSaving}>Cancel</button>
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
+                {[
+                  ['Site', patient.site],
+                  ['Referring physician', patient.referrer],
+                  ['Treating physician', patient.physician],
+                  ['Next review', patient.nextReview ?? '—'],
+                  ['Date of birth', patient.dob],
+                  ['Treatment', patient.treatment?.type ?? 'None prescribed'],
+                ].map(([l, v]) => (
+                  <div key={l} style={{ padding: '10px 12px', background: 'var(--surface-2)', borderRadius: 8 }}>
+                    <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--ink-3)', marginBottom: 3 }}>{l}</div>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--ink)' }}>{v}</div>
+                  </div>
+                ))}
+              </div>
+            )}
 
             <div style={{ marginBottom: 14 }}>
               <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--ink-3)', marginBottom: 8 }}>Diagnoses</div>

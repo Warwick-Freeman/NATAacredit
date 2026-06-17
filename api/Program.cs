@@ -38,10 +38,12 @@ builder.Services.AddDbContext<NexusDbContext>(opt =>
 //   "portal" → audience "nexus360-portal" — patient portal endpoints only
 // Isolating them by audience prevents a patient-portal token from being accepted
 // on staff endpoints (which only assert "is authenticated", not "is staff").
-const string StaffScheme    = "staff";
-const string PortalScheme   = "portal";
-const string StaffAudience  = "nexus360";
-const string PortalAudience = "nexus360-portal";
+const string StaffScheme              = "staff";
+const string PortalScheme             = "portal";
+const string PhysicianPortalScheme    = "physician-portal";
+const string StaffAudience            = "nexus360";
+const string PortalAudience           = "nexus360-portal";
+const string PhysicianPortalAudience  = "nexus360-rp-portal";
 
 TokenValidationParameters ValidationFor(string audience) => new()
 {
@@ -56,8 +58,9 @@ TokenValidationParameters ValidationFor(string audience) => new()
 };
 
 builder.Services.AddAuthentication(StaffScheme)
-    .AddJwtBearer(StaffScheme,  opt => opt.TokenValidationParameters = ValidationFor(StaffAudience))
-    .AddJwtBearer(PortalScheme, opt => opt.TokenValidationParameters = ValidationFor(PortalAudience));
+    .AddJwtBearer(StaffScheme,           opt => opt.TokenValidationParameters = ValidationFor(StaffAudience))
+    .AddJwtBearer(PortalScheme,          opt => opt.TokenValidationParameters = ValidationFor(PortalAudience))
+    .AddJwtBearer(PhysicianPortalScheme, opt => opt.TokenValidationParameters = ValidationFor(PhysicianPortalAudience));
 
 builder.Services.AddAuthorization(opt =>
 {
@@ -70,6 +73,11 @@ builder.Services.AddAuthorization(opt =>
     // Patient-portal endpoints opt in explicitly via RequireAuthorization("Portal").
     opt.AddPolicy("Portal", p => p
         .AddAuthenticationSchemes(PortalScheme)
+        .RequireAuthenticatedUser());
+
+    // Referring-physician portal endpoints opt in via RequireAuthorization("PhysicianPortal").
+    opt.AddPolicy("PhysicianPortal", p => p
+        .AddAuthenticationSchemes(PhysicianPortalScheme)
         .RequireAuthenticatedUser());
 });
 builder.Services.AddHttpClient();
@@ -147,6 +155,7 @@ using (var scope = app.Services.CreateScope())
         "ALTER TABLE Tasks ADD COLUMN AssignedTo TEXT NOT NULL DEFAULT ''",
         "ALTER TABLE Users ADD COLUMN Sites TEXT NOT NULL DEFAULT '[]'",
         "ALTER TABLE Clauses ADD COLUMN LinkedEvidenceJson TEXT NOT NULL DEFAULT '[]'",
+        "ALTER TABLE ReferringPhysicians ADD COLUMN SetupToken TEXT NOT NULL DEFAULT ''",
     })
     {
         try { db.Database.ExecuteSqlRaw(col); } catch { /* column already exists */ }
@@ -353,6 +362,27 @@ using (var scope = app.Services.CreateScope())
             InviteToken  TEXT NOT NULL DEFAULT '',
             CreatedAt    TEXT NOT NULL DEFAULT '',
             LastLogin    TEXT NOT NULL DEFAULT ''
+        )
+        """);
+
+    db.Database.ExecuteSqlRaw("""
+        CREATE TABLE IF NOT EXISTS ReferringPhysicians (
+            Id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+            PhysicianId        TEXT NOT NULL DEFAULT '',
+            Name               TEXT NOT NULL DEFAULT '',
+            Type               TEXT NOT NULL DEFAULT 'GP',
+            Specialty          TEXT NOT NULL DEFAULT '',
+            Practice           TEXT NOT NULL DEFAULT '',
+            Phone              TEXT NOT NULL DEFAULT '',
+            Fax                TEXT NOT NULL DEFAULT '',
+            Email              TEXT NOT NULL DEFAULT '',
+            Address            TEXT NOT NULL DEFAULT '',
+            ProviderNumber     TEXT NOT NULL DEFAULT '',
+            Notes              TEXT NOT NULL DEFAULT '',
+            Status             TEXT NOT NULL DEFAULT 'active',
+            PortalPasswordHash TEXT NOT NULL DEFAULT '',
+            CreatedAt          TEXT NOT NULL DEFAULT '',
+            LastPortalLogin    TEXT NOT NULL DEFAULT ''
         )
         """);
 
@@ -855,6 +885,174 @@ app.MapDelete("/api/patients/{id}", async (string id, NexusDbContext db) =>
     return Results.NoContent();
 }).RequireAuthorization();
 
+// ── Referring physicians ──────────────────────────────────────────────────────
+
+app.MapGet("/api/referring-physicians", async (NexusDbContext db) =>
+    Results.Ok(await db.ReferringPhysicians.OrderBy(p => p.Name).ToListAsync()))
+    .RequireAuthorization();
+
+app.MapPost("/api/referring-physicians", async (ReferringPhysicianDto dto, NexusDbContext db, ClaimsPrincipal principal) =>
+{
+    if (string.IsNullOrWhiteSpace(dto.Name))
+        return Results.BadRequest(new { error = "Name is required" });
+    var rp = new NexusApi.Models.ReferringPhysician {
+        PhysicianId    = $"RP-{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}",
+        Name           = dto.Name.Trim(),
+        Type           = dto.Type ?? "GP",
+        Specialty      = dto.Specialty ?? "",
+        Practice       = dto.Practice ?? "",
+        Phone          = dto.Phone ?? "",
+        Fax            = dto.Fax ?? "",
+        Email          = dto.Email ?? "",
+        Address        = dto.Address ?? "",
+        ProviderNumber = dto.ProviderNumber ?? "",
+        Notes          = dto.Notes ?? "",
+        Status         = dto.Status ?? "active",
+        CreatedAt      = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss"),
+    };
+    db.ReferringPhysicians.Add(rp);
+    await db.SaveChangesAsync();
+    db.Activity.Add(MakeActivity(ActorName(principal), "created", rp.Name, "success", "referring-physicians"));
+    await db.SaveChangesAsync();
+    return Results.Ok(rp);
+}).RequireAuthorization();
+
+app.MapPut("/api/referring-physicians/{id}", async (string id, ReferringPhysicianDto dto, NexusDbContext db) =>
+{
+    var rp = await db.ReferringPhysicians.FirstOrDefaultAsync(p => p.PhysicianId == id);
+    if (rp == null) return Results.NotFound();
+    if (!string.IsNullOrWhiteSpace(dto.Name)) rp.Name = dto.Name.Trim();
+    if (dto.Type          != null) rp.Type          = dto.Type;
+    if (dto.Specialty     != null) rp.Specialty     = dto.Specialty;
+    if (dto.Practice      != null) rp.Practice      = dto.Practice;
+    if (dto.Phone         != null) rp.Phone         = dto.Phone;
+    if (dto.Fax           != null) rp.Fax           = dto.Fax;
+    if (dto.Email         != null) rp.Email         = dto.Email;
+    if (dto.Address       != null) rp.Address       = dto.Address;
+    if (dto.ProviderNumber != null) rp.ProviderNumber = dto.ProviderNumber;
+    if (dto.Notes         != null) rp.Notes         = dto.Notes;
+    if (dto.Status        != null) rp.Status        = dto.Status;
+    await db.SaveChangesAsync();
+    return Results.Ok(rp);
+}).RequireAuthorization();
+
+app.MapDelete("/api/referring-physicians/{id}", async (string id, NexusDbContext db) =>
+{
+    var rp = await db.ReferringPhysicians.FirstOrDefaultAsync(p => p.PhysicianId == id);
+    if (rp == null) return Results.NotFound();
+    db.ReferringPhysicians.Remove(rp);
+    await db.SaveChangesAsync();
+    return Results.NoContent();
+}).RequireAuthorization();
+
+app.MapPost("/api/referring-physicians/{id}/set-portal-password", async (string id, SetPortalPasswordDto dto, NexusDbContext db) =>
+{
+    var rp = await db.ReferringPhysicians.FirstOrDefaultAsync(p => p.PhysicianId == id);
+    if (rp == null) return Results.NotFound();
+    if (string.IsNullOrEmpty(dto.Password) || dto.Password.Length < 8)
+        return Results.BadRequest(new { error = "Password must be at least 8 characters" });
+    rp.PortalPasswordHash = HashPassword(dto.Password);
+    rp.SetupToken = "";           // clear any pending invite
+    await db.SaveChangesAsync();
+    return Results.Ok(new { ok = true, enabled = true });
+}).RequireAuthorization();
+
+// POST /api/referring-physicians/{id}/send-invite  (staff auth)
+// Generates a one-time setup link; attempts Twilio email if configured.
+app.MapPost("/api/referring-physicians/{id}/send-invite", async (string id, PhysicianInviteDto dto, NexusDbContext db, IHttpClientFactory httpFactory, ClaimsPrincipal principal) =>
+{
+    var rp = await db.ReferringPhysicians.FirstOrDefaultAsync(p => p.PhysicianId == id);
+    if (rp == null) return Results.NotFound();
+    if (string.IsNullOrWhiteSpace(rp.Email))
+        return Results.BadRequest(new { error = "This physician has no email address on record." });
+
+    rp.SetupToken = Guid.NewGuid().ToString("N");
+    await db.SaveChangesAsync();
+
+    var baseUrl  = dto.BaseUrl?.TrimEnd('/') ?? "";
+    var setupUrl = $"{baseUrl}/physician-portal/setup?token={rp.SetupToken}";
+
+    // Attempt email via Twilio if configured
+    string? emailError = null;
+    var cfg        = (await db.SiteConfig.ToListAsync()).ToDictionary(e => e.Key, e => e.Value);
+    var accountSid = cfg.GetValueOrDefault("twilio_account_sid",      "");
+    var authToken  = cfg.GetValueOrDefault("twilio_auth_token",       "");
+    var fromEmail  = cfg.GetValueOrDefault("twilio_email_from",       "");
+    var fromName   = cfg.GetValueOrDefault("twilio_email_from_name",  "Nexus 360");
+
+    if (!string.IsNullOrEmpty(accountSid) && !string.IsNullOrEmpty(authToken) && !string.IsNullOrEmpty(fromEmail))
+    {
+        try
+        {
+            var credentials = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes($"{accountSid}:{authToken}"));
+            var http = httpFactory.CreateClient();
+            http.DefaultRequestHeaders.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", credentials);
+
+            var orgName = cfg.GetValueOrDefault("org_name", "the clinic");
+            var html = $"<p>Dear {rp.Name},</p>" +
+                       $"<p>You have been invited to access the {orgName} physician portal on Nexus 360.</p>" +
+                       $"<p><a href=\"{setupUrl}\" style=\"background:#1b3a6b;color:white;padding:10px 24px;" +
+                       $"border-radius:6px;text-decoration:none;display:inline-block;font-weight:600\">" +
+                       $"Set up your portal access</a></p>" +
+                       $"<p style=\"font-size:12px;color:#718096\">Or copy this link: {setupUrl}</p>" +
+                       $"<p style=\"font-size:12px;color:#718096\">This link expires once used.</p>";
+
+            var payload = new
+            {
+                from    = new { address = fromEmail, name = fromName },
+                to      = new[] { new { address = rp.Email, name = rp.Name } },
+                content = new { subject = $"You've been invited to the {orgName} Physician Portal", html },
+            };
+
+            var response = await http.PostAsJsonAsync("https://comms.twilio.com/v1/Emails", payload);
+            if (!response.IsSuccessStatusCode)
+                emailError = $"Email service returned {(int)response.StatusCode}: {await response.Content.ReadAsStringAsync()}";
+        }
+        catch (Exception ex)
+        {
+            emailError = ex.Message;
+        }
+    }
+    else
+    {
+        emailError = "Email not configured — copy the setup link below.";
+    }
+
+    var actor = ActorName(principal);
+    if (emailError == null)
+        db.Activity.Add(MakeActivity(actor, "sent physician portal invite to", rp.Name, "send", "email", $"To: {rp.Email}. Setup link generated."));
+    else
+        db.Activity.Add(MakeActivity(actor, "generated physician portal invite for", rp.Name, "send", "email", $"To: {rp.Email}. Email note: {emailError}"));
+    await db.SaveChangesAsync();
+
+    return Results.Ok(new { setupUrl, emailError, email = rp.Email });
+}).RequireAuthorization();
+
+// GET /api/physician-portal/setup/{token}  (public)
+app.MapGet("/api/physician-portal/setup/{token}", async (string token, NexusDbContext db) =>
+{
+    var rp = await db.ReferringPhysicians.FirstOrDefaultAsync(p => p.SetupToken == token);
+    if (rp == null || string.IsNullOrEmpty(token))
+        return Results.BadRequest(new { error = "This invite link is invalid or has already been used." });
+    return Results.Ok(new { name = rp.Name, email = rp.Email });
+});
+
+// POST /api/physician-portal/setup/{token}  (public)
+app.MapPost("/api/physician-portal/setup/{token}", async (string token, SetPortalPasswordDto dto, NexusDbContext db) =>
+{
+    var rp = await db.ReferringPhysicians.FirstOrDefaultAsync(p => p.SetupToken == token);
+    if (rp == null || string.IsNullOrEmpty(token))
+        return Results.BadRequest(new { error = "This invite link is invalid or has already been used." });
+    if (string.IsNullOrEmpty(dto.Password) || dto.Password.Length < 8)
+        return Results.BadRequest(new { error = "Password must be at least 8 characters." });
+    rp.PortalPasswordHash = HashPassword(dto.Password);
+    rp.SetupToken = "";
+    await db.SaveChangesAsync();
+    var jwtToken = GeneratePhysicianPortalToken(rp.Email, rp.PhysicianId, rp.Name, jwtKey);
+    return Results.Ok(new { token = jwtToken, name = rp.Name, email = rp.Email });
+});
+
 // ── Patient form links ────────────────────────────────────────────────────────
 
 app.MapPost("/api/patient-form-links", async (PatientFormLinkCreateDto dto, NexusDbContext db, HttpContext ctx) =>
@@ -953,14 +1151,14 @@ app.MapPost("/api/portal/invite", async (PortalInviteDto dto, NexusDbContext db,
     }
     await db.SaveChangesAsync();
 
-    var setupUrl = $"{dto.BaseUrl.TrimEnd('/')}?portal_setup={token}";
+    var setupUrl = $"{dto.BaseUrl.TrimEnd('/')}/patient-portal/setup?token={token}";
     var emailSent = false;
     var emailError = "";
 
     var cfg        = (await db.SiteConfig.ToListAsync()).ToDictionary(e => e.Key, e => e.Value);
-    var accountSid = cfg.GetValueOrDefault("twilio_account_sid", "");
-    var authToken  = cfg.GetValueOrDefault("twilio_auth_token",  "");
-    var fromEmail  = cfg.GetValueOrDefault("twilio_email_from",  "");
+    var accountSid = cfg.GetValueOrDefault("twilio_account_sid",     "");
+    var authToken  = cfg.GetValueOrDefault("twilio_auth_token",      "");
+    var fromEmail  = cfg.GetValueOrDefault("twilio_email_from",      "");
     var fromName   = cfg.GetValueOrDefault("twilio_email_from_name", "Nexus 360");
 
     if (!string.IsNullOrEmpty(accountSid) && !string.IsNullOrEmpty(authToken) && !string.IsNullOrEmpty(fromEmail))
@@ -976,7 +1174,7 @@ app.MapPost("/api/portal/invite", async (PortalInviteDto dto, NexusDbContext db,
         var payload = new {
             from    = new { address = fromEmail, name = fromName },
             to      = new[] { new { address = dto.Email } },
-            content = new { subject = "Your patient portal access — Nexus 360", html = html }
+            content = new { subject = "Your patient portal access — Nexus 360", html },
         };
         try {
             var r = await http.PostAsJsonAsync("https://comms.twilio.com/v1/Emails", payload);
@@ -1061,6 +1259,58 @@ app.MapGet("/api/portal/forms", async (NexusDbContext db, ClaimsPrincipal princi
         .ToListAsync());
 }).RequireAuthorization("Portal");
 
+// ── Referring physician portal ────────────────────────────────────────────────
+
+// POST /api/physician-portal/login  (public)
+app.MapPost("/api/physician-portal/login", async (PhysicianPortalLoginDto dto, NexusDbContext db) =>
+{
+    var rp = await db.ReferringPhysicians.FirstOrDefaultAsync(p => p.Email == dto.Email);
+    if (rp == null || string.IsNullOrEmpty(rp.PortalPasswordHash) || !VerifyPassword(dto.Password, rp.PortalPasswordHash))
+        return Results.Unauthorized();
+    rp.LastPortalLogin = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss");
+    await db.SaveChangesAsync();
+    var token = GeneratePhysicianPortalToken(rp.Email, rp.PhysicianId, rp.Name, jwtKey);
+    return Results.Ok(new { token, name = rp.Name, physicianId = rp.PhysicianId, email = rp.Email });
+});
+
+// GET /api/physician-portal/me  (physician portal auth)
+app.MapGet("/api/physician-portal/me", async (NexusDbContext db, ClaimsPrincipal principal) =>
+{
+    var physicianId = principal.FindFirst("physicianId")?.Value ?? "";
+    var rp = await db.ReferringPhysicians.FirstOrDefaultAsync(p => p.PhysicianId == physicianId);
+    if (rp == null) return Results.Forbid();
+    return Results.Ok(new { rp.Name, rp.Practice, rp.Specialty, rp.Type, rp.Phone, rp.Email });
+}).RequireAuthorization("PhysicianPortal");
+
+// GET /api/physician-portal/patients  (physician portal auth)
+app.MapGet("/api/physician-portal/patients", async (NexusDbContext db, ClaimsPrincipal principal) =>
+{
+    var physicianId = principal.FindFirst("physicianId")?.Value ?? "";
+    var rpName      = principal.FindFirst("name")?.Value ?? "";
+    if (string.IsNullOrEmpty(physicianId)) return Results.Forbid();
+
+    // Match patients by stored name (covers both legacy Referrer text and exact name match)
+    var patients = await db.Patients
+        .Where(p => p.Referrer == rpName || p.Referrer == physicianId)
+        .OrderBy(p => p.Name)
+        .ToListAsync();
+
+    return Results.Ok(patients.Select(p => new {
+        p.PatientId,
+        p.Name,
+        p.Dob,
+        p.Mrn,
+        p.Site,
+        p.Status,
+        p.Physician,
+        p.NextReview,
+        p.StudiesJson,
+        p.ComplianceJson,
+        p.DiagnosesJson,
+        p.AlertsJson,
+    }));
+}).RequireAuthorization("PhysicianPortal");
+
 // ── Send form link via Twilio (SMS + Email) ───────────────────────────────────
 
 app.MapPost("/api/send-form-link/{token}", async (string token, SendFormLinkDto dto, NexusDbContext db, IHttpClientFactory httpFactory, ClaimsPrincipal principal) =>
@@ -1075,11 +1325,10 @@ app.MapPost("/api/send-form-link/{token}", async (string token, SendFormLinkDto 
     var actor      = ActorName(principal);
     var target     = $"{link.FormTitle} → {link.RecipientName}";
 
-    if (string.IsNullOrEmpty(accountSid) || string.IsNullOrEmpty(authToken))
-        return Results.BadRequest(new { error = "Twilio not configured" });
-
     if (link.Method == "email")
     {
+        if (string.IsNullOrEmpty(accountSid) || string.IsNullOrEmpty(authToken))
+            return Results.BadRequest(new { error = "Twilio not configured" });
         var fromEmail = cfg.GetValueOrDefault("twilio_email_from", "");
         var fromName  = cfg.GetValueOrDefault("twilio_email_from_name", "Nexus 360");
         if (string.IsNullOrEmpty(fromEmail))
@@ -1103,7 +1352,7 @@ app.MapPost("/api/send-form-link/{token}", async (string token, SendFormLinkDto 
         {
             from    = new { address = fromEmail, name = fromName },
             to      = new[] { new { address = link.RecipientEmail } },
-            content = new { subject = $"Please complete: {link.FormTitle}", html = html }
+            content = new { subject = $"Please complete: {link.FormTitle}", html },
         };
 
         var response = await http.PostAsJsonAsync("https://comms.twilio.com/v1/Emails", payload);
@@ -2339,6 +2588,25 @@ string GeneratePortalToken(string email, string patientId, SymmetricSecurityKey 
     return new JwtSecurityTokenHandler().WriteToken(tok);
 }
 
+string GeneratePhysicianPortalToken(string email, string physicianId, string name, SymmetricSecurityKey key)
+{
+    var claims = new[]
+    {
+        new Claim(JwtRegisteredClaimNames.Sub,   email),
+        new Claim(JwtRegisteredClaimNames.Email, email),
+        new Claim("physicianId", physicianId),
+        new Claim("name",        name),
+        new Claim("role",        "referring-physician"),
+    };
+    var tok = new JwtSecurityToken(
+        issuer:             "nexus360",
+        audience:           "nexus360-rp-portal",
+        claims:             claims,
+        expires:            DateTime.UtcNow.AddDays(30),
+        signingCredentials: new SigningCredentials(key, SecurityAlgorithms.HmacSha256));
+    return new JwtSecurityTokenHandler().WriteToken(tok);
+}
+
 ActivityEntry MakeActivity(string who, string action, string target, string kind, string module, string detail = "")
 {
     var now = DateTime.Now;
@@ -2407,6 +2675,13 @@ record ProdigiLaunchDto(string StudyId, string ScorerId, string? ReviewerId);
 record WorkbookUpdateDto(string? Frequency, string? AssignedTo);
 record WorkbookCompleteDto(string? CompletedDate, string? Notes);
 record WorkbookCompletionDto(string Period, string? FormData, string? Status);
+record ReferringPhysicianDto(
+    string Name, string? Type, string? Specialty, string? Practice,
+    string? Phone, string? Fax, string? Email, string? Address,
+    string? ProviderNumber, string? Notes, string? Status);
+record SetPortalPasswordDto(string Password);
+record PhysicianPortalLoginDto(string Email, string Password);
+record PhysicianInviteDto(string? BaseUrl);
 record PortalInviteDto(string PatientId, string Email, string BaseUrl);
 record PortalSetupDto(string Password);
 record PortalLoginDto(string Email, string Password);

@@ -396,7 +396,7 @@ export async function sendPortalInvite(patientId, email) {
   return post('/api/portal/invite', {
     patientId,
     email,
-    baseUrl: window.location.origin + window.location.pathname,
+    baseUrl: window.location.origin,
   });
 }
 
@@ -413,6 +413,24 @@ export async function createRole(data) { return post('/api/roles', data); }
 export async function updateRolePerms(roleName, data) { return put(`/api/roles/${encodeURIComponent(roleName)}`, data); }
 
 export async function deleteRole(roleName) { return del(`/api/roles/${encodeURIComponent(roleName)}`); }
+
+export async function fetchActivity() {
+  const rows = await get('/api/activity');
+  return rows.map(a => ({
+    id:     a.id,
+    who:    a.who,
+    what:   a.action,
+    when:   a.time,
+    kind:   a.kind,
+    action: a.action,
+    target: a.target,
+    time:   a.time,
+    ts:     a.ts,
+    module: a.module || 'system',
+    detail: a.detail || '',
+    hash:   a.hash   || '',
+  }));
+}
 
 export async function fetchAll() {
   const [studies, equipment, indicators, clauses, compliance, tasks, activity] =

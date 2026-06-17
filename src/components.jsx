@@ -124,6 +124,7 @@ export const Sidebar = ({ current, setCurrent, badges, user, onSignOut, open, on
     { id: "indicators", label: "Quality indicators", icon: "chart" },
     { id: "equipment", label: "Equipment register", icon: "cube", badge: badges.equipment },
     { id: "staff", label: "Staff & training", icon: "users" },
+    { id: "referring-physicians", label: "Referring Physicians", icon: "user" },
     ...(activeStandard === 'aasm' ? [{ id: "workbooks", label: "Workbooks", icon: "paper" }] : []),
     { section: "Admin" },
     { id: "settings", label: "Settings", icon: "settings" },

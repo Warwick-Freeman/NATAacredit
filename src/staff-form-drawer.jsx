@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import Icon from './icons';
+import { useAuth } from './AuthContext';
 
 const ROLES = [
   'Medical Director',
@@ -33,6 +34,7 @@ function initForm(staff) {
 
 const StaffFormDrawer = ({ staff, onSave, onClose }) => {
   const isEdit = !!(staff && staff.name);
+  const { users } = useAuth();
   const [form, setForm]     = useState(() => initForm(staff));
   const [errors, setErrors] = useState({});
 
@@ -77,16 +79,20 @@ const StaffFormDrawer = ({ staff, onSave, onClose }) => {
         {/* Name */}
         <div className="form-field">
           <label className="form-label">
-            Full name
+            Staff member
             {errors.name && <span className="form-err-inline">{errors.name}</span>}
           </label>
-          <input
+          <select
             className={`form-input${errors.name ? ' is-error' : ''}`}
             value={form.name}
             onChange={e => set('name', e.target.value)}
-            placeholder="e.g. J. Smith"
             autoFocus
-          />
+          >
+            <option value="">Select user…</option>
+            {users.map(u => (
+              <option key={u.id} value={u.name}>{u.name}{u.role ? ` — ${u.role}` : ''}</option>
+            ))}
+          </select>
         </div>
 
         {/* Role + Site */}

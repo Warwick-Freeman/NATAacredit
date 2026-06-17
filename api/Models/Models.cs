@@ -237,6 +237,27 @@ public class PatientPortalAccount
     public string LastLogin { get; set; } = "";
 }
 
+public class ReferringPhysician
+{
+    public int Id { get; set; }
+    public string PhysicianId { get; set; } = "";        // RP-{timestamp}
+    public string Name { get; set; } = "";
+    public string Type { get; set; } = "GP";             // GP | Specialist | Paediatrician | Other
+    public string Specialty { get; set; } = "";
+    public string Practice { get; set; } = "";
+    public string Phone { get; set; } = "";
+    public string Fax { get; set; } = "";
+    public string Email { get; set; } = "";
+    public string Address { get; set; } = "";
+    public string ProviderNumber { get; set; } = "";
+    public string Notes { get; set; } = "";
+    public string Status { get; set; } = "active";       // active | inactive
+    public string PortalPasswordHash { get; set; } = "";
+    public string SetupToken { get; set; } = "";
+    public string CreatedAt { get; set; } = "";
+    public string LastPortalLogin { get; set; } = "";
+}
+
 public class PatientFormLink
 {
     public int Id { get; set; }

@@ -1,9 +1,10 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import Icon from '../icons';
 import { PageHeader, Pill, Avatar } from '../components';
 import { useAuth } from '../AuthContext';
 import { useNexusData } from '../NexusDataContext';
 import NexusGrid from '../nexus-grid';
+import { fetchActivity } from '../api';
 
 // ─── Seed data ─────────────────────────────────────────────────────────────────
 // ~70 events covering all modules over 28 days. Ordered newest-first.
@@ -166,8 +167,23 @@ const PAGE_SIZE = 25;
 const AuditTrailPage = () => {
   const { user } = useAuth();
   const { data } = useNexusData();
-  const liveEvents = data?.activity ?? [];
-  const events = liveEvents.length > 0 ? liveEvents : SEED_EVENTS;
+  const [liveActivity, setLiveActivity] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const load = useCallback(async (showSpinner = false) => {
+    if (showSpinner) setRefreshing(true);
+    try { setLiveActivity(await fetchActivity()); } catch { /* keep previous */ }
+    finally { if (showSpinner) setRefreshing(false); }
+  }, []);
+
+  useEffect(() => {
+    load();
+    const id = setInterval(load, 30_000);
+    return () => clearInterval(id);
+  }, [load]);
+
+  const seedFallback = data?.activity ?? SEED_EVENTS;
+  const events = (liveActivity ?? seedFallback).length > 0 ? (liveActivity ?? seedFallback) : SEED_EVENTS;
 
   const [moduleFilter, setModuleFilter] = useState('all');
   const [userFilter, setUserFilter]     = useState('all');
@@ -340,6 +356,9 @@ const AuditTrailPage = () => {
         actions={
           <>
             {isFiltered && <button className="btn" onClick={resetFilters}><Icon name="x" size={13} />Clear filters</button>}
+            <button className="btn" onClick={() => load(true)} disabled={refreshing}>
+              <Icon name="rotate_ccw" size={13} />{refreshing ? 'Refreshing…' : 'Refresh'}
+            </button>
             <button className="btn" onClick={doExport}><Icon name="download" size={14} />Export CSV</button>
           </>
         }
