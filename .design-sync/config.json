@@ -1,0 +1,26 @@
+{
+  "pkg": "nexus-360-accreditation",
+  "globalName": "Nexus360",
+  "projectId": "d7b9cf92-f755-4562-9dc6-7fc0ea653f86",
+  "shape": "package",
+  "srcDir": "src",
+  "cssEntry": "./src/app.css",
+  "componentSrcMap": {
+    "Sparkline":  "src/components.jsx",
+    "Donut":      "src/components.jsx",
+    "Pill":       "src/components.jsx",
+    "StatusPill": "src/components.jsx",
+    "Avatar":     "src/components.jsx",
+    "PageHeader": "src/components.jsx",
+    "Drawer":     "src/components.jsx",
+    "Tabs":       "src/components.jsx",
+    "Sidebar":    null,
+    "Topbar":     null
+  },
+  "readmeHeader": ".design-sync/conventions.md",
+  "overrides": {
+    "Drawer":     { "cardMode": "single", "primaryStory": "Open" },
+    "PageHeader": { "cardMode": "column" },
+    "Tabs":       { "cardMode": "column" }
+  }
+}
