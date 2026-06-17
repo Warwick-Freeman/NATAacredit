@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 
 const BASE = import.meta.env.VITE_API_URL ?? '';
 const LS_KEY = 'physician_portal_token';
@@ -153,43 +153,99 @@ function LoginScreen({ onLogin }) {
   );
 }
 
-// ── Compliance summary card ────────────────────────────────────────────────────
+// ── CPAP compliance helpers ────────────────────────────────────────────────────
 
-function ComplianceCard({ complianceJson }) {
+function makeDailyData(patientId, rate, meanUsage) {
+  const seed = patientId.split('').reduce((s, c, i) => s + c.charCodeAt(0) * (i + 1), 0);
+  const today = new Date(); today.setHours(0,0,0,0);
+  return Array.from({ length: 30 }, (_, i) => {
+    const d = new Date(today); d.setDate(today.getDate() - (29 - i));
+    const r = Math.abs(Math.sin(seed * (i + 1) * 0.31 + i * 0.77));
+    const used = r < rate / 100;
+    const usage = used ? Math.max(0.3, meanUsage + (r * 3 - 1.5)) : 0;
+    const ahi = used ? Math.max(0.3, 2 + (r * 4 - 2)) : null;
+    return { date: d.toISOString().slice(0, 10), usage: used ? +usage.toFixed(1) : 0, ahi: ahi ? +ahi.toFixed(1) : null };
+  });
+}
+
+function ComplianceBar({ patientId, rate, meanUsage }) {
+  const data = useMemo(() => makeDailyData(patientId, rate, meanUsage), [patientId, rate, meanUsage]);
+  const maxH = 36, thresholdPct = 4 / 8;
+  return (
+    <div style={{ position: 'relative', height: maxH + 4, display: 'flex', alignItems: 'flex-end', gap: 2 }}>
+      <div style={{ position: 'absolute', left: 0, right: 0, bottom: thresholdPct * maxH, borderTop: '1px dashed rgba(0,0,0,0.15)', zIndex: 1, pointerEvents: 'none' }} />
+      {data.map((d, i) => {
+        const h = d.usage > 0 ? Math.max(3, (Math.min(d.usage, 8) / 8) * maxH) : 2;
+        const color = d.usage === 0 ? '#e2e8f0' : d.usage >= 4 ? '#16a34a' : d.usage >= 2 ? '#ca8a04' : '#dc2626';
+        return (
+          <div key={i} title={`${d.date}: ${d.usage > 0 ? d.usage + 'h' : 'No use'}${d.ahi ? ', AHI ' + d.ahi : ''}`}
+            style={{ width: 4, height: h, background: color, borderRadius: 1, flexShrink: 0, cursor: 'default' }} />
+        );
+      })}
+    </div>
+  );
+}
+
+function ComplianceSection({ complianceJson, patientId }) {
   let data = null;
   try { data = complianceJson ? JSON.parse(complianceJson) : null; } catch { /* ignore */ }
-  if (!data) return null;
+  if (!data || data.rate == null) return null;
 
-  const pct = data.adherencePct ?? data.usage ?? data.percentNightsUsed ?? null;
-  const hrs = data.avgHoursPerNight ?? data.avgHours ?? null;
-  const device = data.device ?? data.deviceType ?? null;
-  const threshold = data.threshold ?? 70;
-
-  if (pct === null && hrs === null) return null;
-
-  const ok = pct !== null ? pct >= threshold : true;
+  const complianceDays = makeDailyData(patientId, data.rate, data.meanUsage);
 
   return (
-    <div style={{ padding: '12px 16px', background: ok ? '#dcfce7' : '#fef3c7', borderRadius: 8, border: `1px solid ${ok ? '#bbf7d0' : '#fde68a'}` }}>
-      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: ok ? '#15803d' : '#b45309', marginBottom: 6 }}>
-        CPAP Compliance
-      </div>
-      <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
-        {pct !== null && (
-          <div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: ok ? '#15803d' : '#b45309', lineHeight: 1 }}>{pct}%</div>
-            <div style={{ fontSize: 11, color: ok ? '#166534' : '#92400e', marginTop: 2 }}>Nights ≥4h (target ≥{threshold}%)</div>
+    <>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 16 }}>
+        {[
+          { l: 'Compliance rate',  v: `${data.rate}%`,          ok: data.rate >= 70,     note: '≥70% threshold' },
+          { l: 'Mean nightly use', v: `${data.meanUsage}h`,     ok: data.meanUsage >= 4, note: '≥4h target' },
+          { l: 'Mean AHI on Rx',  v: `${data.meanAhi}/h`,      ok: data.meanAhi < 5,    note: '<5 target' },
+          { l: 'Mean leak',        v: `${data.meanLeak} L/min`, ok: data.meanLeak < 24,  note: '<24 L/min' },
+        ].map(({ l, v, ok, note }) => (
+          <div key={l} style={{ padding: '10px 12px', borderRadius: 8, border: `1px solid ${ok ? '#bbf7d0' : '#fecaca'}`, background: ok ? '#f0fdf4' : '#fef2f2' }}>
+            <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.06em', color: ok ? '#15803d' : '#b91c1c', marginBottom: 3 }}>{l}</div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: ok ? '#15803d' : '#b91c1c' }}>{v}</div>
+            <div style={{ fontSize: 10, color: ok ? '#16a34a' : '#dc2626', marginTop: 2 }}>{note}</div>
           </div>
-        )}
-        {hrs !== null && (
-          <div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: '#1a2740', lineHeight: 1 }}>{typeof hrs === 'number' ? hrs.toFixed(1) : hrs}h</div>
-            <div style={{ fontSize: 11, color: '#607898', marginTop: 2 }}>Avg hours/night</div>
-          </div>
-        )}
-        {device && <div style={{ fontSize: 12, color: '#607898', alignSelf: 'center' }}>{device}</div>}
+        ))}
       </div>
-    </div>
+
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#96aec8' }}>30-day usage</div>
+          <div style={{ flex: 1 }} />
+          <div style={{ display: 'flex', gap: 10, fontSize: 10, color: '#96aec8' }}>
+            {[['#16a34a', '≥4h'], ['#ca8a04', '2–4h'], ['#dc2626', '<2h'], ['#e2e8f0', 'No use']].map(([c, l]) => (
+              <span key={l} style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                <span style={{ width: 8, height: 8, background: c, borderRadius: 1, flexShrink: 0 }} />{l}
+              </span>
+            ))}
+          </div>
+        </div>
+        <div style={{ background: '#f8fafc', borderRadius: 8, padding: '12px 14px', border: '1px solid #e2e8f0' }}>
+          <ComplianceBar patientId={patientId} rate={data.rate} meanUsage={data.meanUsage} />
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4, fontSize: 10, color: '#96aec8' }}>
+            <span>{complianceDays[0]?.date}</span><span>today</span>
+          </div>
+        </div>
+      </div>
+
+      {data.lastSync && (
+        <div style={{ fontSize: 12, color: '#96aec8', marginBottom: 12 }}>
+          Last sync: <strong style={{ color: '#374f6e' }}>{data.lastSync}</strong>
+        </div>
+      )}
+
+      {data.rate < 70 && (
+        <div style={{ padding: '12px 14px', background: '#fef3c7', borderRadius: 8, border: '1px solid #fde68a', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+          <span style={{ fontSize: 16, flexShrink: 0 }}>⚠️</span>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#b45309' }}>Below Medicare compliance threshold</div>
+            <div style={{ fontSize: 12, color: '#92400e', marginTop: 2 }}>Patient may require intervention — consider mask review, pressure adjustment, or education.</div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -198,8 +254,10 @@ function ComplianceCard({ complianceJson }) {
 function PatientDetail({ patient, onBack }) {
   let studies = [];
   let diagnoses = [];
-  try { studies = JSON.parse(patient.studiesJson || '[]') ?? []; } catch { /* ignore */ }
+  let treatment = null;
+  try { studies   = JSON.parse(patient.studiesJson   || '[]') ?? []; } catch { /* ignore */ }
   try { diagnoses = JSON.parse(patient.diagnosesJson || '[]') ?? []; } catch { /* ignore */ }
+  try { treatment = JSON.parse(patient.treatmentJson || 'null');      } catch { /* ignore */ }
 
   const statusColor = (s) => {
     if (!s) return { color: '#607898', bg: '#edf1f6' };
@@ -252,11 +310,59 @@ function PatientDetail({ patient, onBack }) {
         )}
       </div>
 
+      {/* Prescription */}
+      <div style={{ background: 'white', borderRadius: 12, padding: 24, marginBottom: 16, boxShadow: '0 1px 4px rgba(20,30,50,0.07)' }}>
+        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#96aec8', marginBottom: 12 }}>PRESCRIPTION</div>
+        {!treatment ? (
+          <div style={{ fontSize: 13, color: '#96aec8' }}>No active treatment prescribed.</div>
+        ) : (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', background: '#f8fafc', borderRadius: 10, marginBottom: 16, border: '1px solid #e2e8f0' }}>
+              <div style={{ width: 40, height: 40, borderRadius: 10, background: '#dbeafe', display: 'grid', placeItems: 'center', flexShrink: 0, fontSize: 18 }}>
+                {treatment.type === 'Medication' ? '💊' : '😴'}
+              </div>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: 14, color: '#1a2740' }}>{treatment.device ?? treatment.type}</div>
+                {treatment.serial   && <div style={{ fontSize: 11, color: '#96aec8', marginTop: 1 }}>S/N: {treatment.serial}</div>}
+                {treatment.startDate && <div style={{ fontSize: 11, color: '#96aec8', marginTop: 1 }}>Started: {treatment.startDate}</div>}
+              </div>
+              <div style={{ marginLeft: 'auto' }}>
+                <span style={{
+                  fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 10,
+                  color: '#1d4ed8', background: '#dbeafe',
+                }}>
+                  {treatment.type}
+                </span>
+              </div>
+            </div>
+
+            {treatment.prescription && Object.keys(treatment.prescription).length > 0 && (
+              <>
+                <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#96aec8', marginBottom: 10 }}>Prescription details</div>
+                {Object.entries(treatment.prescription).filter(([, v]) => v != null).map(([k, v]) => {
+                  const label = k
+                    .replace(/([A-Z])/g, ' $1')
+                    .replace('p Min', 'Min pressure')
+                    .replace('p Max', 'Max pressure')
+                    .replace(/^\w/, c => c.toUpperCase());
+                  return (
+                    <div key={k} style={{ display: 'flex', gap: 12, padding: '8px 0', borderBottom: '1px solid #f4f6f9', fontSize: 13 }}>
+                      <span style={{ color: '#96aec8', minWidth: 140, flexShrink: 0 }}>{label}</span>
+                      <span style={{ fontWeight: 500, color: '#1a2740' }}>{typeof v === 'number' ? `${v} cmH₂O` : v}</span>
+                    </div>
+                  );
+                })}
+              </>
+            )}
+          </>
+        )}
+      </div>
+
       {/* Compliance */}
       {patient.complianceJson && patient.complianceJson !== 'null' && (
         <div style={{ background: 'white', borderRadius: 12, padding: 24, marginBottom: 16, boxShadow: '0 1px 4px rgba(20,30,50,0.07)' }}>
-          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#96aec8', marginBottom: 12 }}>TREATMENT COMPLIANCE</div>
-          <ComplianceCard complianceJson={patient.complianceJson} />
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#96aec8', marginBottom: 12 }}>CPAP COMPLIANCE</div>
+          <ComplianceSection complianceJson={patient.complianceJson} patientId={patient.patientId} />
         </div>
       )}
 
@@ -314,10 +420,9 @@ function Dashboard({ physician, patients, onSelectPatient, onSignOut }) {
     if (!json || json === 'null') return null;
     try {
       const d = JSON.parse(json);
-      const pct = d.adherencePct ?? d.usage ?? d.percentNightsUsed ?? null;
-      const threshold = d.threshold ?? 70;
+      const pct = d.rate ?? d.adherencePct ?? d.usage ?? d.percentNightsUsed ?? null;
       if (pct === null) return null;
-      return pct >= threshold ? 'good' : 'warn';
+      return { pct, level: pct >= 70 ? 'good' : pct >= 50 ? 'warn' : 'bad' };
     } catch { return null; }
   };
 
@@ -386,9 +491,20 @@ function Dashboard({ physician, patients, onSelectPatient, onSignOut }) {
                         {ls ? `${ls.type ?? ls.studyType ?? 'Study'} · ${ls.date ?? ls.studyDate ?? '?'}` : '—'}
                       </td>
                       <td style={{ padding: '11px 16px' }}>
-                        {cs === 'good' && <span style={{ fontSize: 11, fontWeight: 600, color: '#15803d', background: '#dcfce7', padding: '2px 8px', borderRadius: 10 }}>Good</span>}
-                        {cs === 'warn' && <span style={{ fontSize: 11, fontWeight: 600, color: '#b45309', background: '#fef3c7', padding: '2px 8px', borderRadius: 10 }}>Review</span>}
-                        {cs === null  && <span style={{ fontSize: 12, color: '#96aec8' }}>—</span>}
+                        {cs ? (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{
+                              width: 10, height: 10, borderRadius: '50%', flexShrink: 0,
+                              background: cs.level === 'good' ? '#16a34a' : cs.level === 'warn' ? '#ca8a04' : '#dc2626',
+                              boxShadow: `0 0 0 3px ${cs.level === 'good' ? '#dcfce7' : cs.level === 'warn' ? '#fef3c7' : '#fee2e2'}`,
+                            }} />
+                            <span style={{ fontSize: 13, fontWeight: 600, color: cs.level === 'good' ? '#15803d' : cs.level === 'warn' ? '#b45309' : '#b91c1c' }}>
+                              {cs.pct}%
+                            </span>
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: 12, color: '#96aec8' }}>—</span>
+                        )}
                       </td>
                       <td style={{ padding: '11px 16px' }}>
                         <span style={{

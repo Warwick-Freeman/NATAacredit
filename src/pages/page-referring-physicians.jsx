@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Icon from '../icons';
+import { Drawer } from '../components';
 
 const BASE = import.meta.env.VITE_API_URL ?? '';
 
@@ -462,11 +463,11 @@ export default function ReferringPhysiciansPage() {
         )}
       </div>
 
-      {/* Content + Sidebar */}
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden', padding: '0 28px 40px' }}>
+      {/* Content */}
+      <div style={{ padding: '0 28px 40px' }}>
 
         {/* List */}
-        <div style={{ flex: 1, minWidth: 0 }}>
+        <div>
           {physicians.length > 0 && (
             <div style={{ marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
               <div className="search" style={{ width: 280 }}>
@@ -550,18 +551,18 @@ export default function ReferringPhysiciansPage() {
           )}
         </div>
 
-        {/* Detail sidebar */}
-        {selected && (
-          <div style={{ width: 360, flexShrink: 0, marginLeft: 20, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden', display: 'flex', flexDirection: 'column', alignSelf: 'flex-start', boxShadow: 'var(--shadow)' }}>
-            <PhysicianSidebar
-              rp={selected}
-              onClose={() => setSelected(null)}
-              onSaved={handleSaved}
-              onDeleted={handleDeleted}
-            />
-          </div>
-        )}
       </div>
+
+      <Drawer open={!!selected} onClose={() => setSelected(null)}>
+        {selected && (
+          <PhysicianSidebar
+            rp={selected}
+            onClose={() => setSelected(null)}
+            onSaved={handleSaved}
+            onDeleted={handleDeleted}
+          />
+        )}
+      </Drawer>
 
       {/* Add physician modal */}
       {showAdd && <AddPhysicianModal onClose={() => setShowAdd(false)} onAdded={rp => { setPhysicians(ps => [...ps, rp]); setShowAdd(false); setSelected(rp); }} />}
