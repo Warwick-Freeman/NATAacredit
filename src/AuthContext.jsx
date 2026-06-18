@@ -221,12 +221,33 @@ export function AuthProvider({ children }) {
     }
   }
 
+  async function selfUpdateProfile(data) {
+    const token = getToken();
+    const res = await fetch(`${BASE}/api/users/me`, {
+      method:  'PUT',
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body:    JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error(await res.text().catch(() => 'Failed to save'));
+    const updated = await res.json();
+    const session = {
+      ...user,
+      name:     updated.name,
+      title:    updated.title,
+      phone:    updated.phone,
+      initials: updated.initials,
+    };
+    setUser(session);
+    localStorage.setItem('nexus_user', JSON.stringify(session));
+    return updated;
+  }
+
   // Convenience: sites the logged-in user is allowed to see.
   // Empty array = unrestricted (sees all sites).
   const userSites = user?.sites ?? [];
 
   return (
-    <AuthContext.Provider value={{ user, users, userSites, signIn, signOut, hasPerm, addUser, updateUser, allSites, setAllSites, roleMap, setRoleMap, getRoleLevel }}>
+    <AuthContext.Provider value={{ user, users, userSites, signIn, signOut, hasPerm, addUser, updateUser, selfUpdateProfile, allSites, setAllSites, roleMap, setRoleMap, getRoleLevel }}>
       {children}
     </AuthContext.Provider>
   );

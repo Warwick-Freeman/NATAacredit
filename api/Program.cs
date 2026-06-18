@@ -158,6 +158,9 @@ using (var scope = app.Services.CreateScope())
         "ALTER TABLE ReferringPhysicians ADD COLUMN SetupToken TEXT NOT NULL DEFAULT ''",
         "ALTER TABLE IsrAssessments ADD COLUMN ActionPlanJson TEXT NOT NULL DEFAULT '{}'",
         "ALTER TABLE IsrAssessments ADD COLUMN ScorerAcknowledgedAt TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE Users ADD COLUMN Title TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE Users ADD COLUMN Phone TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE Users ADD COLUMN SignatureData TEXT NOT NULL DEFAULT ''",
     })
     {
         try { db.Database.ExecuteSqlRaw(col); } catch { /* column already exists */ }
@@ -546,11 +549,65 @@ app.MapPost("/api/auth/login", async (LoginDto dto, NexusDbContext db) =>
             name     = user.Name,
             role     = user.Role,
             email    = user.Email,
+            title    = user.Title,
+            phone    = user.Phone,
             initials = Initials(user.Name),
             sites    = userSites,
         },
     });
 });
+
+// ── Self-service profile endpoints (any authenticated user) ───────────────────
+
+app.MapGet("/api/users/me", async (NexusDbContext db, ClaimsPrincipal principal) =>
+{
+    var idStr = principal.FindFirstValue(JwtRegisteredClaimNames.Sub);
+    if (!int.TryParse(idStr, out var id)) return Results.Unauthorized();
+    var u = await db.Users.FindAsync(id);
+    if (u == null) return Results.NotFound();
+    return Results.Ok(new
+    {
+        id            = u.Id,
+        name          = u.Name,
+        email         = u.Email,
+        role          = u.Role,
+        title         = u.Title,
+        phone         = u.Phone,
+        signatureData = u.SignatureData,
+        initials      = Initials(u.Name),
+        sites         = string.IsNullOrEmpty(u.Sites) ? Array.Empty<string>()
+                        : System.Text.Json.JsonSerializer.Deserialize<string[]>(u.Sites) ?? Array.Empty<string>(),
+    });
+}).RequireAuthorization();
+
+app.MapPut("/api/users/me", async (UserProfileDto dto, NexusDbContext db, ClaimsPrincipal principal) =>
+{
+    var idStr = principal.FindFirstValue(JwtRegisteredClaimNames.Sub);
+    if (!int.TryParse(idStr, out var id)) return Results.Unauthorized();
+    var u = await db.Users.FindAsync(id);
+    if (u == null) return Results.NotFound();
+    if (dto.Name          != null) u.Name          = dto.Name;
+    if (dto.Title         != null) u.Title         = dto.Title;
+    if (dto.Phone         != null) u.Phone         = dto.Phone;
+    if (dto.SignatureData != null) u.SignatureData  = dto.SignatureData;
+    await db.SaveChangesAsync();
+    return Results.Ok(new { id = u.Id, name = u.Name, email = u.Email, role = u.Role,
+        title = u.Title, phone = u.Phone, signatureData = u.SignatureData,
+        initials = Initials(u.Name) });
+}).RequireAuthorization();
+
+app.MapPut("/api/users/me/password", async (PasswordChangeDto dto, NexusDbContext db, ClaimsPrincipal principal) =>
+{
+    var idStr = principal.FindFirstValue(JwtRegisteredClaimNames.Sub);
+    if (!int.TryParse(idStr, out var id)) return Results.Unauthorized();
+    var u = await db.Users.FindAsync(id);
+    if (u == null) return Results.NotFound();
+    if (!VerifyPassword(dto.CurrentPassword, u.PasswordHash))
+        return Results.BadRequest(new { error = "Current password is incorrect" });
+    u.PasswordHash = HashPassword(dto.NewPassword);
+    await db.SaveChangesAsync();
+    return Results.Ok();
+}).RequireAuthorization();
 
 app.MapGet("/api/users", async (NexusDbContext db) =>
     (await db.Users.ToListAsync()).Select(u => new
@@ -559,6 +616,8 @@ app.MapGet("/api/users", async (NexusDbContext db) =>
         email    = u.Email,
         name     = u.Name,
         role     = u.Role,
+        title    = u.Title,
+        phone    = u.Phone,
         mfa      = u.Mfa,
         auth     = u.Auth,
         lastSeen = u.LastSeen,
@@ -2631,6 +2690,8 @@ ActivityEntry MakeActivity(string who, string action, string target, string kind
 record LoginDto(string Email, string Password);
 record UserUpdateDto(string? Name, string? Role, bool? Mfa, string? Auth, string[]? Sites);
 record UserCreateDto(string Name, string Email, string Role, bool Mfa, string Auth, string[]? Sites, string Password);
+record UserProfileDto(string? Name, string? Title, string? Phone, string? SignatureData);
+record PasswordChangeDto(string CurrentPassword, string NewPassword);
 record StudyStatusDto(string Status, int? SignedDays);
 record ClauseUpdateDto(string? Status, int? Evidence, string? Owner, string? LastReviewed, string? LinkedEvidence);
 record SiteDto(string SiteCode, string Name, string? Type, string? Beds);

@@ -86,7 +86,7 @@ export const Avatar = ({ name, size = 22, idx }) => {
 };
 
 // === Sidebar ===
-export const Sidebar = ({ current, setCurrent, badges, user, onSignOut, open, onClose }) => {
+export const Sidebar = ({ current, setCurrent, badges, user, onSignOut, open, onClose, onProfileClick }) => {
   const { siteId, setSiteId, site, SITES } = useLocation();
   const { activeStandard } = useNexusData() ?? {};
   const { userSites } = useAuth() ?? { userSites: [] };
@@ -227,12 +227,13 @@ export const Sidebar = ({ current, setCurrent, badges, user, onSignOut, open, on
         })}
       </div>
 
-      <div className="user-card">
+      <div className="user-card" onClick={onProfileClick} style={{ cursor: onProfileClick ? 'pointer' : 'default' }} title="Edit profile">
         <div className="user-avatar">{user?.initials ?? 'U'}</div>
         <div className="user-meta">
           <div className="user-name">{user?.name ?? 'User'}</div>
           <div className="user-role">{user?.role ?? ''}</div>
         </div>
+        {onProfileClick && <Icon name="chev_right" size={12} style={{ color: 'var(--ink-3)', flexShrink: 0 }} />}
       </div>
       <button className="sign-out-btn" onClick={onSignOut} title="Sign out">
         <Icon name="log_out" size={14} />

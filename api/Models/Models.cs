@@ -202,6 +202,9 @@ public class AppUser
     public string LastSeen { get; set; } = "—";
     // JSON array of full site names. Empty array = unrestricted (sees all sites).
     public string Sites { get; set; } = "[]";
+    public string Title { get; set; } = "";          // e.g. "Dr.", "RPSGT", credentials line
+    public string Phone { get; set; } = "";
+    public string SignatureData { get; set; } = "";  // base64 data URL of signature image
 }
 
 public class Patient

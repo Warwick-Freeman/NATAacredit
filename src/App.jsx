@@ -22,6 +22,7 @@ import SchedulerPage from './pages/page-scheduler';
 import WorkbooksPage from './pages/page-workbooks';
 import ISRPage from './pages/page-isr';
 import TaskFormDrawer from './task-form-drawer';
+import UserProfileDrawer from './user-profile-drawer';
 import ClauseDrawer from './clause-drawer';
 import StudyDrawer from './study-drawer';
 import GlobalSearch from './global-search';
@@ -38,6 +39,7 @@ const App = () => {
   const [openStudyId, setOpenStudyId] = useState(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const [tweaks, setTweak] = useTweaks({
     "palette": "default",
     "density": "comfortable"
@@ -198,11 +200,15 @@ const App = () => {
     <>
       <div className="shell" data-density={tweaks.density}>
         {sidebarOpen && <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)} />}
-        <Sidebar current={route} setCurrent={goTo} badges={badges} user={user} onSignOut={signOut} open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+        <Sidebar current={route} setCurrent={goTo} badges={badges} user={user} onSignOut={signOut} open={sidebarOpen} onClose={() => setSidebarOpen(false)} onProfileClick={() => { setProfileOpen(true); setSidebarOpen(false); }} />
         <div className="main">
           <Topbar crumbs={crumbsFor[route] || ["Home"]} onSearch={() => setSearchOpen(true)} notifications={notifications} goTo={goTo} onMenuToggle={() => setSidebarOpen(o => !o)} />
           {renderPage()}
         </div>
+
+        <Drawer open={profileOpen} onClose={() => setProfileOpen(false)}>
+          <UserProfileDrawer onClose={() => setProfileOpen(false)} />
+        </Drawer>
 
         <Drawer open={!!openClauseId} onClose={() => setOpenClauseId(null)}>
           <ClauseDrawer data={data} clauseId={openClauseId} onClose={() => setOpenClauseId(null)} />
