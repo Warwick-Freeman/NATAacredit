@@ -561,7 +561,7 @@ app.MapPost("/api/auth/login", async (LoginDto dto, NexusDbContext db) =>
 
 app.MapGet("/api/users/me", async (NexusDbContext db, ClaimsPrincipal principal) =>
 {
-    var idStr = principal.FindFirstValue(JwtRegisteredClaimNames.Sub);
+    var idStr = principal.FindFirstValue(ClaimTypes.NameIdentifier);
     if (!int.TryParse(idStr, out var id)) return Results.Unauthorized();
     var u = await db.Users.FindAsync(id);
     if (u == null) return Results.NotFound();
@@ -582,7 +582,7 @@ app.MapGet("/api/users/me", async (NexusDbContext db, ClaimsPrincipal principal)
 
 app.MapPut("/api/users/me", async (UserProfileDto dto, NexusDbContext db, ClaimsPrincipal principal) =>
 {
-    var idStr = principal.FindFirstValue(JwtRegisteredClaimNames.Sub);
+    var idStr = principal.FindFirstValue(ClaimTypes.NameIdentifier);
     if (!int.TryParse(idStr, out var id)) return Results.Unauthorized();
     var u = await db.Users.FindAsync(id);
     if (u == null) return Results.NotFound();
@@ -598,7 +598,7 @@ app.MapPut("/api/users/me", async (UserProfileDto dto, NexusDbContext db, Claims
 
 app.MapPut("/api/users/me/password", async (PasswordChangeDto dto, NexusDbContext db, ClaimsPrincipal principal) =>
 {
-    var idStr = principal.FindFirstValue(JwtRegisteredClaimNames.Sub);
+    var idStr = principal.FindFirstValue(ClaimTypes.NameIdentifier);
     if (!int.TryParse(idStr, out var id)) return Results.Unauthorized();
     var u = await db.Users.FindAsync(id);
     if (u == null) return Results.NotFound();
