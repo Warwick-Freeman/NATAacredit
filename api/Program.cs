@@ -2432,8 +2432,11 @@ app.MapGet("/api/appointments", async (string? siteId, string? from, string? to,
 {
     var q = db.Appointments.AsQueryable();
     if (!string.IsNullOrEmpty(siteId) && siteId != "all") q = q.Where(a => a.SiteId == siteId);
-    if (!string.IsNullOrEmpty(from)) q = q.Where(a => string.Compare(a.Start, from, StringComparison.Ordinal) >= 0);
-    if (!string.IsNullOrEmpty(to))   q = q.Where(a => string.Compare(a.Start, to,   StringComparison.Ordinal) <= 0);
+    // Start is an ISO-8601 string, so lexical comparison is chronological.
+    // Use the two-arg string.Compare overload — EF Core can translate it to SQL,
+    // whereas the StringComparison.Ordinal overload throws at query time.
+    if (!string.IsNullOrEmpty(from)) q = q.Where(a => string.Compare(a.Start, from) >= 0);
+    if (!string.IsNullOrEmpty(to))   q = q.Where(a => string.Compare(a.Start, to)   <= 0);
     return await q.OrderBy(a => a.Start).ToListAsync();
 }).RequireAuthorization();
 
@@ -2751,3 +2754,8 @@ record PhysicianInviteDto(string? BaseUrl);
 record PortalInviteDto(string PatientId, string Email, string BaseUrl);
 record PortalSetupDto(string Password);
 record PortalLoginDto(string Email, string Password);
+
+// Exposed so the integration test project can reference the entry point via
+// WebApplicationFactory<Program>. Top-level statements otherwise emit an
+// internal Program class that test assemblies can't see.
+public partial class Program { }

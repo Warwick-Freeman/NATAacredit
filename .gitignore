@@ -5,3 +5,11 @@ cert/
 .ds-sync/
 ds-bundle/
 .design-sync/.cache/
+
+# Playwright test output
+playwright-report/
+test-results/
+
+# .NET build output
+bin/
+obj/
